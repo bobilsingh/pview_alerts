@@ -5,8 +5,8 @@
  *
  * Wipes operational tables and seeds a clean, production-ready environment:
  * - Creates only a single role: super_admin
- * - Seeds permissions for super_admin for all modules
- * - Seeds all default app settings
+ * - Seeds permissions for super_admin for all modules dynamically
+ * - Seeds all default app settings synced with environment config if available
  * - Seeds a single administrative user: 'admin' (password: Demo@1234)
  *
  * Usage (from project root):
@@ -94,43 +94,48 @@ $db->query("SET FOREIGN_KEY_CHECKS=1");
 
 say('==> Seeding only the super_admin role...');
 $db->table('roles')->insert([
-    'role_key'   => 'super_admin',
-    'label'      => 'Super Admin',
-    'is_builtin' => 1,
-    'sort_order' => 1,
-    'created_at' => ts(),
-    'updated_at' => ts(),
+    'role_key'       => 'super_admin',
+    'label'          => 'Super Admin',
+    'is_builtin'     => 1,
+    'is_admin_scope' => 1,
+    'sort_order'     => 1,
+    'created_at'     => ts(),
+    'updated_at'     => ts(),
 ]);
 say('  role super_admin created');
 
-// ---------- 3. Seed only super_admin permissions ----------
+// ---------- 3. Seed only super_admin permissions dynamically ----------
 
-say('==> Seeding module permissions for super_admin...');
-$modules = [
-    ['dashboard', 1, 1, 1, 1],
-    ['projects', 1, 1, 1, 1],
-    ['flows', 1, 1, 1, 1],
-    ['alerts', 1, 1, 1, 1],
-    ['escalation', 1, 1, 1, 1],
-    ['tickets', 1, 1, 1, 1],
-    ['tickets_all', 1, 1, 1, 1],
-    ['users', 1, 1, 1, 1],
-    ['api_keys', 1, 1, 1, 1],
-    ['settings', 1, 1, 1, 1],
-    ['module_control_panel', 1, 1, 1, 1],
-    ['activity_logs', 1, 0, 0, 0],
-];
+say('==> Seeding module permissions for super_admin dynamically...');
+helper('alert');
+$registry = module_registry();
 
-foreach ($modules as $m) {
+// Seed all modules registered in the system
+foreach ($registry as $modKey => $modVal) {
+    $perms = $modVal['defaults']['super_admin'] ?? [1, 1, 1, 1];
     $db->table('module_permissions')->insert([
         'role'       => 'super_admin',
-        'module_key' => $m[0],
-        'can_view'   => $m[1],
-        'can_add'    => $m[2],
-        'can_edit'   => $m[3],
-        'can_delete' => $m[4],
+        'module_key' => $modKey,
+        'can_view'   => $perms[0] ?? 1,
+        'can_add'    => $perms[1] ?? 1,
+        'can_edit'   => $perms[2] ?? 1,
+        'can_delete' => $perms[3] ?? 1,
     ]);
-    say("  permission seeded: super_admin -> {$m[0]}");
+    say("  permission seeded: super_admin -> {$modKey}");
+}
+
+// Seed special pages that are always super_admin only but not in sidebar registry
+$specialModules = ['settings', 'module_control_panel'];
+foreach ($specialModules as $modKey) {
+    $db->table('module_permissions')->insert([
+        'role'       => 'super_admin',
+        'module_key' => $modKey,
+        'can_view'   => 1,
+        'can_add'    => 1,
+        'can_edit'   => 1,
+        'can_delete' => 1,
+    ]);
+    say("  permission seeded: super_admin -> {$modKey}");
 }
 
 // ---------- 4. Seed single admin user with super_admin role ----------
@@ -140,10 +145,10 @@ $demoPw = password_hash('Demo@1234', PASSWORD_BCRYPT);
 $db->table('users')->insert([
     'user_id'             => 'admin',
     'name'                => 'System Administrator',
-    'email'               => 'admin@pview.local',
+    'email'               => 'bobil.singh@functionapps.in',
     'password'            => $demoPw,
     'role'                => 'super_admin',
-    'phone'               => '+91-99000-00000',
+    'phone'               => '+91-9027136352',
     'is_active'           => 1,
     'created_at'          => ts(),
     'updated_at'          => ts(),
@@ -159,19 +164,20 @@ $settings = [
     ['api_rate_per_hour', '1000', 'Max API requests per API key per hour (0 = disabled)'],
     ['api_rate_per_minute', '60', 'Max API requests per API key per minute (0 = disabled)'],
     ['app_name', 'pView', 'Application display name'],
+    ['asset_version', '1', 'Cache-buster appended to CSS / JS URLs. Bump this number by 1 after editing public/assets/css/app.css or public/assets/js/app.js directly on the server so every browser pulls the fresh file.'],
     ['datatable_page_length', '10', 'Default items per page in tables'],
     ['default_tat_l1_minutes', '60', 'Default L1 Turn-Around Time (minutes)'],
     ['default_tat_l2_minutes', '120', 'Default L2 Turn-Around Time (minutes)'],
     ['default_tat_l3_minutes', '240', 'Default L3 Turn-Around Time (minutes)'],
     ['default_tat_l4_minutes', '480', 'Default L4 Turn-Around Time (minutes)'],
-    ['email_from_email', 'alert@functionapps.in', 'From-address shown to recipients.'],
-    ['email_from_name', 'Functionapps Team', 'Display name shown to recipients.'],
-    ['email_protocol', 'smtp', 'SMTP protocol: smtp / sendmail / mail.'],
-    ['email_smtp_crypto', 'tls', 'Encryption: tls (STARTTLS, port 587), ssl (implicit SSL, port 465), or blank for none.'],
-    ['email_smtp_host', 'mail.functionapps.in', 'SMTP server hostname.'],
-    ['email_smtp_pass', '', 'SMTP password.'],
-    ['email_smtp_port', '587', 'SMTP port.'],
-    ['email_smtp_user', 'alert@functionapps.in', 'SMTP username.'],
+    ['email_from_email', $_ENV['email.fromEmail'] ?? getenv('email.fromEmail') ?: 'alert@functionapps.in', 'From-address shown to recipients.'],
+    ['email_from_name', $_ENV['email.fromName'] ?? getenv('email.fromName') ?: 'Functionapps Team', 'Display name shown to recipients.'],
+    ['email_protocol', $_ENV['email.protocol'] ?? getenv('email.protocol') ?: 'smtp', 'SMTP protocol: smtp / sendmail / mail.'],
+    ['email_smtp_crypto', $_ENV['email.SMTPCrypto'] ?? getenv('email.SMTPCrypto') ?: 'tls', 'Encryption: tls (STARTTLS, port 587), ssl (implicit SSL, port 465), or blank for none.'],
+    ['email_smtp_host', $_ENV['email.SMTPHost'] ?? getenv('email.SMTPHost') ?: 'mail.functionapps.in', 'SMTP server hostname.'],
+    ['email_smtp_pass', $_ENV['email.SMTPPass'] ?? getenv('email.SMTPPass') ?: '', 'SMTP password.'],
+    ['email_smtp_port', $_ENV['email.SMTPPort'] ?? getenv('email.SMTPPort') ?: '587', 'SMTP port.'],
+    ['email_smtp_user', $_ENV['email.SMTPUser'] ?? getenv('email.SMTPUser') ?: 'alert@functionapps.in', 'SMTP username.'],
     ['live_audio_enabled', '1', 'Play a short audio cue when the actionable-ticket count rises during live polling.'],
     ['live_browser_notify', '1', 'Show a browser notification when the actionable count rises.'],
     ['live_poll_seconds', '15', 'How often the dashboard/bell badge polls for new tickets, in seconds (range 5-120). Set to 0 to disable.'],

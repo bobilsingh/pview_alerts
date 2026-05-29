@@ -1,0 +1,45 @@
+name: Publish Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Build & Publish Release
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Create Production Zip Archive
+        run: |
+          # Package the codebase excluding local development environments, vendors, git logs, and runtime cache/session directories
+          zip -r release-${{ github.ref_name }}.zip . \
+            -x ".git/*" \
+            -x ".github/*" \
+            -x "vendor/*" \
+            -x "writable/uploads/*" \
+            -x "writable/session/*" \
+            -x "writable/cache/*" \
+            -x "writable/debugbar/*" \
+            -x ".env" \
+            -x "backup/*"
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v1
+        with:
+          name: Release ${{ github.ref_name }}
+          draft: false
+          prerelease: false
+          generate_release_notes: true
+          files: |
+            release-${{ github.ref_name }}.zip
+            backup/schema.sql
+            backup/setup_defaults.php
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

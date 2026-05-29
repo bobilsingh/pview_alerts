@@ -15,7 +15,7 @@ set -euo pipefail
 
 # ----- CONFIG (edit before first run) ---------------------------
 PROJECT_DIR="/home/pview/apache_pview/htdocs/pview_alerts"
-BACKUP_DIR="/home/pview/backups/pview_alerts"
+BACKUP_DIR="/home/pview/upload/pview_alerts"
 RETENTION_DAYS=14
 
 DB_HOST="127.0.0.1"

@@ -1,6 +1,6 @@
 -- MariaDB dump 10.19  Distrib 10.4.32-MariaDB, for Win64 (AMD64)
 --
--- Host: 127.0.0.1    Database: alert_system
+-- Host: 127.0.0.1    Database: pview_alerts
 -- ------------------------------------------------------
 -- Server version	10.4.32-MariaDB
 
@@ -45,7 +45,7 @@ CREATE TABLE `activity_logs` (
   KEY `idx_activity_entity` (`entity_type`,`entity_id`),
   KEY `idx_activity_action` (`action`),
   KEY `idx_activity_created` (`created_at`)
-) ENGINE=InnoDB AUTO_INCREMENT=91 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -62,7 +62,7 @@ CREATE TABLE `alarm_id_sequence` (
   `updated_at` datetime NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
   PRIMARY KEY (`id`),
   UNIQUE KEY `day_key` (`day_key`)
-) ENGINE=InnoDB AUTO_INCREMENT=2 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -93,7 +93,7 @@ CREATE TABLE `alert_definitions` (
   CONSTRAINT `alert_definitions_created_by_foreign` FOREIGN KEY (`created_by`) REFERENCES `users` (`user_id`),
   CONSTRAINT `alert_definitions_flow_id_foreign` FOREIGN KEY (`flow_id`) REFERENCES `flows` (`id`),
   CONSTRAINT `alert_definitions_project_id_foreign` FOREIGN KEY (`project_id`) REFERENCES `projects` (`id`)
-) ENGINE=InnoDB AUTO_INCREMENT=11 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -118,7 +118,7 @@ CREATE TABLE `api_keys` (
   KEY `api_keys_created_by_foreign` (`created_by`),
   CONSTRAINT `api_keys_created_by_foreign` FOREIGN KEY (`created_by`) REFERENCES `users` (`user_id`),
   CONSTRAINT `api_keys_project_id_foreign` FOREIGN KEY (`project_id`) REFERENCES `projects` (`id`)
-) ENGINE=InnoDB AUTO_INCREMENT=5 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -181,7 +181,7 @@ CREATE TABLE `escalation_matrix` (
   CONSTRAINT `escalation_matrix_created_by_foreign` FOREIGN KEY (`created_by`) REFERENCES `users` (`user_id`),
   CONSTRAINT `escalation_matrix_flow_id_foreign` FOREIGN KEY (`flow_id`) REFERENCES `flows` (`id`),
   CONSTRAINT `escalation_matrix_state_id_foreign` FOREIGN KEY (`state_id`) REFERENCES `states` (`id`)
-) ENGINE=InnoDB AUTO_INCREMENT=13 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -205,7 +205,7 @@ CREATE TABLE `flows` (
   KEY `flows_created_by_foreign` (`created_by`),
   CONSTRAINT `flows_created_by_foreign` FOREIGN KEY (`created_by`) REFERENCES `users` (`user_id`),
   CONSTRAINT `flows_project_id_foreign` FOREIGN KEY (`project_id`) REFERENCES `projects` (`id`)
-) ENGINE=InnoDB AUTO_INCREMENT=5 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -225,7 +225,7 @@ CREATE TABLE `login_attempts` (
   KEY `idx_login_attempts_ip_time` (`ip`,`attempted_at`),
   KEY `idx_login_attempts_login_time` (`login_identifier`,`attempted_at`),
   KEY `idx_login_attempts_success` (`success`)
-) ENGINE=InnoDB AUTO_INCREMENT=20 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -244,7 +244,7 @@ CREATE TABLE `migrations` (
   `time` int(11) NOT NULL,
   `batch` int(11) unsigned NOT NULL,
   PRIMARY KEY (`id`)
-) ENGINE=InnoDB AUTO_INCREMENT=2 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -264,7 +264,7 @@ CREATE TABLE `module_permissions` (
   `can_delete` tinyint(1) NOT NULL DEFAULT 0,
   PRIMARY KEY (`id`),
   UNIQUE KEY `idx_role_module` (`role`,`module_key`)
-) ENGINE=InnoDB AUTO_INCREMENT=70 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -290,7 +290,7 @@ CREATE TABLE `notification_logs` (
   KEY `notification_logs_ticket_id_foreign` (`ticket_id`),
   KEY `idx_notification_logs_status_id` (`status`,`id`),
   CONSTRAINT `notification_logs_ticket_id_foreign` FOREIGN KEY (`ticket_id`) REFERENCES `tickets` (`id`)
-) ENGINE=InnoDB AUTO_INCREMENT=17 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -312,7 +312,7 @@ CREATE TABLE `projects` (
   PRIMARY KEY (`id`),
   KEY `projects_created_by_foreign` (`created_by`),
   CONSTRAINT `projects_created_by_foreign` FOREIGN KEY (`created_by`) REFERENCES `users` (`user_id`)
-) ENGINE=InnoDB AUTO_INCREMENT=23 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -329,6 +329,7 @@ CREATE TABLE `roles` (
   `sort_order` int(11) NOT NULL DEFAULT 100,
   `created_at` datetime NOT NULL DEFAULT current_timestamp(),
   `updated_at` datetime NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+  `is_admin_scope` tinyint(1) NOT NULL DEFAULT 0,
   PRIMARY KEY (`role_key`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
@@ -350,7 +351,7 @@ CREATE TABLE `saved_filters` (
   PRIMARY KEY (`id`),
   KEY `idx_saved_filters_user` (`user_id`,`scope`),
   CONSTRAINT `fk_saved_filters_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`user_id`) ON DELETE CASCADE
-) ENGINE=InnoDB AUTO_INCREMENT=10 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -387,7 +388,7 @@ CREATE TABLE `states` (
   CONSTRAINT `states_created_by_foreign` FOREIGN KEY (`created_by`) REFERENCES `users` (`user_id`),
   CONSTRAINT `states_flow_id_foreign` FOREIGN KEY (`flow_id`) REFERENCES `flows` (`id`),
   CONSTRAINT `states_parent_state_id_foreign` FOREIGN KEY (`parent_state_id`) REFERENCES `states` (`id`) ON DELETE SET NULL
-) ENGINE=InnoDB AUTO_INCREMENT=44 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -417,7 +418,7 @@ CREATE TABLE `ticket_actions` (
   CONSTRAINT `ticket_actions_from_state_id_foreign` FOREIGN KEY (`from_state_id`) REFERENCES `states` (`id`) ON DELETE SET NULL,
   CONSTRAINT `ticket_actions_ticket_id_foreign` FOREIGN KEY (`ticket_id`) REFERENCES `tickets` (`id`),
   CONSTRAINT `ticket_actions_to_state_id_foreign` FOREIGN KEY (`to_state_id`) REFERENCES `states` (`id`) ON DELETE SET NULL
-) ENGINE=InnoDB AUTO_INCREMENT=119 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -464,7 +465,7 @@ CREATE TABLE `tickets` (
   CONSTRAINT `tickets_current_state_id_foreign` FOREIGN KEY (`current_state_id`) REFERENCES `states` (`id`) ON DELETE SET NULL,
   CONSTRAINT `tickets_flow_id_foreign` FOREIGN KEY (`flow_id`) REFERENCES `flows` (`id`),
   CONSTRAINT `tickets_project_id_foreign` FOREIGN KEY (`project_id`) REFERENCES `projects` (`id`)
-) ENGINE=InnoDB AUTO_INCREMENT=18 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -513,8 +514,16 @@ CREATE TABLE `users` (
   PRIMARY KEY (`id`),
   UNIQUE KEY `email` (`email`),
   UNIQUE KEY `uq_users_user_id` (`user_id`)
-) ENGINE=InnoDB AUTO_INCREMENT=18 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Dumping events for database 'pview_alerts'
+--
+
+--
+-- Dumping routines for database 'pview_alerts'
+--
 /*!40103 SET TIME_ZONE=@OLD_TIME_ZONE */;
 
 /*!40101 SET SQL_MODE=@OLD_SQL_MODE */;
@@ -525,4 +534,4 @@ CREATE TABLE `users` (
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
--- Dump completed on 2026-05-27 10:12:14
+-- Dump completed on 2026-05-29 16:38:40
