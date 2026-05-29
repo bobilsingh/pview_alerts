@@ -1,0 +1,42 @@
+# CodeIgniter 4 Standard Gitignore
+/vendor/
+/writable/backups/*
+/writable/cache/*
+/writable/debugbar/*
+/writable/logs/*
+/writable/session/*
+/writable/uploads/*
+
+# Keep .htaccess and index.html in writable folders to prevent directory listing issues
+!/writable/backups/index.html
+!/writable/cache/index.html
+!/writable/debugbar/index.html
+!/writable/logs/index.html
+!/writable/session/index.html
+!/writable/uploads/index.html
+
+!/writable/backups/.htaccess
+!/writable/cache/.htaccess
+!/writable/debugbar/.htaccess
+!/writable/logs/.htaccess
+!/writable/session/.htaccess
+!/writable/uploads/.htaccess
+
+# Environment Files
+.env
+.env.test
+
+# IDEs, Editors, and OS Files
+/.idea/
+/.vscode/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+.DS_Store
+Thumbs.db
+
+# Developer specific tools / Local config
+/.claude/
+/graphify-out/

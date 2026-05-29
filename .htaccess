@@ -1,0 +1,19 @@
+# ---------------------------------------------------------
+# Root .htaccess
+# Keeps /public out of the browser URL and sends all app
+# requests to the CodeIgniter front controller in public/.
+# ---------------------------------------------------------
+
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+
+    # If the request already targets public/, let public/.htaccess handle it.
+    RewriteRule ^public/ - [L]
+
+    # Internally route everything else into public/.
+    RewriteRule ^(.*)$ public/$1 [L]
+</IfModule>
+
+<IfModule !mod_rewrite.c>
+    ErrorDocument 404 public/index.php
+</IfModule>

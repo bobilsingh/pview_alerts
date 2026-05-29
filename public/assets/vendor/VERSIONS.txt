@@ -1,0 +1,15 @@
+Frontend assets vendored for offline use
+
+bootstrap: 5.3.3
+bootstrap-icons: 1.11.3
+chart.js: 4.4.1
+datatables: 1.13.8
+jquery: 3.7.1
+jquery-ui: 1.13.2
+select2: 4.1.0-rc.0
+sweetalert2: 11.26.24
+toastr: 2.1.3
+
+Fonts downloaded from Google Fonts CSS used by the app:
+Inter: v20
+JetBrains Mono: v24
