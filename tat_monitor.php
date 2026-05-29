@@ -16,10 +16,10 @@
  *      otherwise an admin-attention ticket sits silently.
  *
  * Usage:
- *   php /var/www/pview-alert-system/tat_monitor.php
+ *   php /var/www/pview_alerts/tat_monitor.php
  *
  * Linux cron (every minute):
- *   * * * * * php /var/www/pview-alert-system/tat_monitor.php >> /var/log/tat_monitor.log 2>&1
+ *   * * * * * php /var/www/pview_alerts/tat_monitor.php >> /var/log/tat_monitor.log 2>&1
  *
  * Refuses to run over HTTP (root .htaccess already hides it; this is the
  * belt-and-suspenders).

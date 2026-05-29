@@ -6,7 +6,7 @@
 # Keeps the last RETENTION_DAYS days of backups.
 #
 # Schedule via cron (see docs/cron.example):
-#   30 2 * * *  /home/pview/apache_pview/htdocs/pview-alert-system/docs/backup.sh >> /var/log/pview-backup.log 2>&1
+#   30 2 * * *  /home/pview/apache_pview/htdocs/pview_alerts/docs/backup.sh >> /var/log/pview-backup.log 2>&1
 #
 # Prereqs: mysqldump, tar, gzip in PATH.
 # ================================================================
@@ -14,8 +14,8 @@
 set -euo pipefail
 
 # ----- CONFIG (edit before first run) ---------------------------
-PROJECT_DIR="/home/pview/apache_pview/htdocs/pview-alert-system"
-BACKUP_DIR="/home/pview/backups/pview-alert-system"
+PROJECT_DIR="/home/pview/apache_pview/htdocs/pview_alerts"
+BACKUP_DIR="/home/pview/backups/pview_alerts"
 RETENTION_DAYS=14
 
 DB_HOST="127.0.0.1"

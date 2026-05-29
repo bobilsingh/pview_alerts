@@ -9,7 +9,7 @@ dependencies vendored locally so the UI runs without internet access.
 ## File structure
 
 ```text
-pview-alert-system/
+pview_alerts/
 │
 ├── app/
 │   ├── Common.php                        # Global helper bootstrap
@@ -113,7 +113,7 @@ pview-alert-system/
 
 ```env
 CI_ENVIRONMENT = development
-app.baseURL    = 'http://localhost/pview-alert-system/public/'
+app.baseURL    = 'http://localhost/pview_alerts/public/'
 ```
 
 3. Update `app/Config/Database.php` with your DB credentials.
@@ -125,10 +125,10 @@ mysql -u root -p alert_system < database_upgrade.sql
 ```
 
 5. _(Optional)_ Configure SMTP in `app/Config/Email.php` for alert email delivery.
-6. Open `http://localhost/pview-alert-system/public/` in your browser.
+6. Open `http://localhost/pview_alerts/public/` in your browser.
 7. Default login: **`admin`** / **`Admin@1234`**
 
-> If `mod_rewrite` is enabled you can also use `http://localhost/pview-alert-system/`
+> If `mod_rewrite` is enabled you can also use `http://localhost/pview_alerts/`
 > with the root `.htaccess` redirecting to `public/`.
 
 ---
@@ -177,13 +177,13 @@ have breached their configured TAT (Time-to-Acknowledge).
 **Linux cron (every minute):**
 
 ```bash
-* * * * * php /var/www/html/pview-alert-system/tat_monitor.php >> /var/log/tat.log 2>&1
+* * * * * php /var/www/html/pview_alerts/tat_monitor.php >> /var/log/tat.log 2>&1
 ```
 
 **Windows Task Scheduler:**
 
 - Program: `C:\xampp8\php\php.exe`
-- Arguments: `C:\xampp8\htdocs\pview-alert-system\tat_monitor.php`
+- Arguments: `C:\xampp8\htdocs\pview_alerts\tat_monitor.php`
 - Trigger: every 1 minute
 
 ---
@@ -196,7 +196,7 @@ the **API Keys** screen.
 **Raise a new alert:**
 
 ```bash
-curl -X POST http://localhost/pview-alert-system/public/api/raise \
+curl -X POST http://localhost/pview_alerts/public/api/raise \
   -H "X-API-KEY: <your_key>" \
   -H "Content-Type: application/json" \
   -d "{\"project_id\":1,\"flow_id\":1,\"title\":\"ETL failed\",\"alert_type\":\"critical\"}"
@@ -206,13 +206,13 @@ curl -X POST http://localhost/pview-alert-system/public/api/raise \
 
 ```bash
 curl -H "X-API-KEY: <your_key>" \
-  http://localhost/pview-alert-system/public/api/alert/ALM-20260507-00001
+  http://localhost/pview_alerts/public/api/alert/ALM-20260507-00001
 ```
 
 **Update ticket (resolve / close / comment):**
 
 ```bash
-curl -X POST http://localhost/pview-alert-system/public/api/alert/ALM-20260507-00001/update \
+curl -X POST http://localhost/pview_alerts/public/api/alert/ALM-20260507-00001/update \
   -H "X-API-KEY: <your_key>" \
   -H "Content-Type: application/json" \
   -d "{\"action\":\"resolved\",\"comment\":\"Fixed by pipeline restart\"}"

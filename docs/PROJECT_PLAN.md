@@ -349,7 +349,7 @@ job. The bullet points:
   rewrites internally into `public/`.
 - Cron entry, every minute:
   ```
-  * * * * * php /var/www/pview-alert-system/tat_monitor.php >> /var/log/pview/tat.log 2>&1
+  * * * * * php /var/www/pview_alerts/tat_monitor.php >> /var/log/pview/tat.log 2>&1
   ```
 - Daily `mysqldump` (30-day retention), weekly `rsync` of the uploads
   directory (90-day retention).
