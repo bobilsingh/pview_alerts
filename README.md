@@ -1105,6 +1105,42 @@ After running `setup_defaults.php`, the following account is created:
 
 ## Database Tables Reference
 
+### Structure Diagram
+
+The diagram below shows the core foreign-key relationships between the 21 tables. Audit and support tables (`activity_logs`, `login_attempts`, `alarm_id_sequence`, `app_settings`, `cron_runs`) reference the entities above them via string keys rather than hard FK constraints and are omitted from the diagram for clarity.
+
+```mermaid
+erDiagram
+    projects ||--o{ flows           : "contains"
+    projects ||--o{ alert_definitions : "defines"
+    projects ||--o{ api_keys        : "scopes"
+    projects ||--o{ tickets         : "tracks"
+
+    flows    ||--o{ states          : "defines"
+    flows    ||--o{ tickets         : "routes"
+    flows    ||--o{ escalation_matrix : "configures"
+
+    states   ||--o{ state_transitions : "from / to"
+    states   ||--o{ escalation_matrix : "per_state"
+    states   ||--o{ tickets         : "current_state"
+
+    roles    ||--o{ users           : "role"
+    roles    ||--o{ module_permissions : "grants"
+    modules  ||--o{ module_permissions : "controlled_by"
+
+    users    ||--o{ tickets         : "raised_by"
+    users    |o--o{ tickets         : "assignee"
+    users    ||--o{ saved_filters   : "saves"
+    users    ||--o{ user_notification_settings : "prefs"
+
+    tickets  ||--o{ ticket_actions  : "logs"
+    tickets  ||--o{ notification_logs : "queues"
+
+    api_keys ||--o{ api_request_log : "rate_limits"
+```
+
+### Table Reference
+
 | Table | Purpose |
 |---|---|
 | `users` | Operator accounts with roles, bcrypt passwords, and preferences |
