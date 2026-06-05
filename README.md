@@ -160,24 +160,42 @@ The order in which an administrator configures a new project from scratch:
 ─────────────────────────────────────────────────────────────────────────
 ```
 
-### Component Relationships
+### System Flow — Visual Diagram
 
-```
-projects
-   └── flows
-         └── states ──── escalation_matrix (TAT / notify overrides)
-               │
-               └── state_transitions (forward / backward paths)
+Interactive flowchart of the complete alert lifecycle (rendered on GitHub):
 
-alert_definitions ──── project + flow  (routing for API-raised tickets)
-api_keys          ──── project         (one key per project)
+```mermaid
+flowchart TD
+    EXT(["External Monitor\nor Operator UI"])
+    EXT -->|"POST /api/raise  or  UI form"| AUTH
 
-tickets ──── project + flow + state
-   └── ticket_actions  (comments, state changes, attachments, escalations)
-   └── notification_logs  (email queue: pending → sent / failed)
+    subgraph pview["pView Application"]
+        AUTH{"Auth &\nRate Limit"}
+        AUTH -->|Rejected| DENY(["HTTP 401 / 429"])
+        AUTH -->|Accepted| CREATE["Create Ticket\nstatus: open · level: L1\nstate: Initial"]
+        CREATE --> QUEUE[("notification_logs\nstatus: pending")]
+        CREATE --> ASSIGN{"Operator\nAssigns?"}
+        ASSIGN -->|Yes| INPROG["status: in_progress\nTAT clock starts"]
+        INPROG --> WORK["Work Ticket\ncomments · files · state moves"]
+        WORK -->|"Forward transition"| NEXT["Advance State\nTAT resets"]
+        WORK -->|"Backward transition\nreason required"| WORK
+        NEXT -->|"Not final state"| WORK
+        NEXT -->|"Reached final state"| RESOLVE["Resolve\nstatus: resolved"]
+        RESOLVE --> CLOSE["Close\nstatus: closed — terminal"]
+    end
 
-activity_logs  (append-only audit trail for every user action)
-cron_runs      (execution history of tat_monitor.php)
+    subgraph cron["tat_monitor.php — runs every minute"]
+        CHECK["Check open tickets\nfor TAT breach"]
+        CHECK -->|"L1 TAT breached"| BL2["Bump L1 → L2\nNotify L2 pool"]
+        BL2 -->|"L2 TAT breached"| BL3["Bump L2 → L3\nNotify L3 pool"]
+        BL3 -->|"L3 TAT breached"| BL4["Bump L3 → L4\nNotify L4 pool"]
+        BL4 -->|"L4 TAT breached"| ESC["status: escalated\nManagement alert"]
+        CHECK --> FLUSH["Flush email queue\nvia SMTP"]
+    end
+
+    QUEUE --> CHECK
+    BL2 & BL3 & BL4 & ESC --> QUEUE
+    FLUSH --> OPS(["Operators Notified"])
 ```
 
 ---
