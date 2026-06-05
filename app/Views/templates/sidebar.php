@@ -8,7 +8,7 @@ $role         = logged_user_role();
 $isAdmin      = role_has_admin_scope($role);
 $isSuperAdmin = ($role === 'super_admin');
 $userName = logged_user_name();
-$userUid  = logged_user_uid();
+$userUid  = logged_user_id();
 $userMail = session('user_email');
 
 $initialSource = $userMail;
@@ -85,8 +85,8 @@ $errMsg = \Config\Services::session()->getFlashdata('error');
     ?>
       <div class="nav-section">Overview</div>
       <a class="nav-link <?php if ($first === 'dashboard') {
-                              echo 'active';
-                            } ?>" href="<?= site_url('dashboard'); ?>"><i class="bi bi-speedometer2"></i><span>Dashboard</span></a>
+                            echo 'active';
+                          } ?>" href="<?= site_url('dashboard'); ?>"><i class="bi bi-speedometer2"></i><span>Dashboard</span></a>
     <?php } ?>
 
     <?php
@@ -164,6 +164,7 @@ $errMsg = \Config\Services::session()->getFlashdata('error');
     <?php } ?>
 
     <?php
+    // --- System section: manage users and monitor the system ---
     $showSystem = false;
     if (has_module_access('users', 'view') === true) {
       $showSystem = true;
@@ -171,51 +172,67 @@ $errMsg = \Config\Services::session()->getFlashdata('error');
     if (has_module_access('api_keys', 'view') === true) {
       $showSystem = true;
     }
-    if (has_module_access('settings', 'view') === true) {
-      $showSystem = true;
-    }
-    if (has_module_access('module_control_panel', 'view') === true) {
-      $showSystem = true;
-    }
-    if (has_module_access('roles', 'view') === true) {
-      $showSystem = true;
-    }
     if (has_module_access('activity_logs', 'view') === true) {
+      $showSystem = true;
+    }
+    if (has_module_access('cron_panel', 'view') === true) {
       $showSystem = true;
     }
 
     if ($showSystem === true) {
     ?>
       <div class="nav-section">System</div>
-      <?php if (has_module_access('api_keys', 'view') === true) { ?>
-        <a class="nav-link <?php if ($first === 'api_keys') {
-                              echo 'active';
-                            } ?>" href="<?= site_url('api_keys'); ?>"><i class="bi bi-key-fill"></i><span>API Keys</span></a>
-      <?php } ?>
       <?php if (has_module_access('users', 'view') === true) { ?>
         <a class="nav-link <?php if ($first === 'users') {
                               echo 'active';
                             } ?>" href="<?= site_url('users'); ?>"><i class="bi bi-people-fill"></i><span>Users</span></a>
       <?php } ?>
-      <?php if (has_module_access('roles', 'view') === true) { ?>
-        <a class="nav-link <?php if ($first === 'roles') {
+      <?php if (has_module_access('api_keys', 'view') === true) { ?>
+        <a class="nav-link <?php if ($first === 'api_keys') {
                               echo 'active';
-                            } ?>" href="<?= site_url('roles'); ?>"><i class="bi bi-person-badge"></i><span>Roles</span></a>
+                            } ?>" href="<?= site_url('api_keys'); ?>"><i class="bi bi-key-fill"></i><span>API Keys</span></a>
       <?php } ?>
       <?php if (has_module_access('activity_logs', 'view') === true) { ?>
         <a class="nav-link <?php if ($first === 'activity_logs') {
                               echo 'active';
                             } ?>" href="<?= site_url('activity_logs'); ?>"><i class="bi bi-clipboard-data"></i><span>Activity Log</span></a>
       <?php } ?>
-      <?php /*if (has_module_access('module_control_panel', 'view') === true) { ?>
-        <a class="nav-link <?php if ($first === 'module_control_panel') {
+      <?php if (has_module_access('cron_panel', 'view') === true) { ?>
+        <a class="nav-link <?php if ($first === 'cron_panel') {
                               echo 'active';
-                            } ?>" href="<?= site_url('module_control_panel'); ?>"><i class="bi bi-shield-lock-fill"></i><span>Module Permissions</span></a>
-      <?php }*/ ?>
+                            } ?>" href="<?= site_url('cron_panel'); ?>"><i class="bi bi-clock-history"></i><span>Cron Panel</span></a>
+      <?php } ?>
+    <?php } ?>
+
+    <?php
+    $showAdmin = false;
+    if (has_module_access('roles', 'view') === true) {
+      $showAdmin = true;
+    }
+    if (has_module_access('settings', 'view') === true) {
+      $showAdmin = true;
+    }
+    if (has_module_access('module_control_panel', 'view') === true) {
+      $showAdmin = true;
+    }
+
+    if ($showAdmin === true) {
+    ?>
+      <div class="nav-section">Administration</div>
+      <?php if (has_module_access('roles', 'view') === true) { ?>
+        <a class="nav-link <?php if ($first === 'roles') {
+                              echo 'active';
+                            } ?>" href="<?= site_url('roles'); ?>"><i class="bi bi-person-badge"></i><span>Roles</span></a>
+      <?php } ?>
       <?php if (has_module_access('settings', 'view') === true) { ?>
         <a class="nav-link <?php if ($first === 'settings') {
                               echo 'active';
                             } ?>" href="<?= site_url('settings'); ?>"><i class="bi bi-gear-fill"></i><span>Settings</span></a>
+      <?php } ?>
+      <?php if (has_module_access('module_control_panel', 'view') === true) { ?>
+        <a class="nav-link <?php if ($first === 'module_control_panel') {
+                              echo 'active';
+                            } ?>" href="<?= site_url('module_control_panel'); ?>"><i class="bi bi-shield-lock-fill"></i><span>Manage Module</span></a>
       <?php } ?>
     <?php } ?>
   </nav>
@@ -256,11 +273,6 @@ $errMsg = \Config\Services::session()->getFlashdata('error');
         <i class="bi bi-list"></i>
       </button>
       <?php
-      // Breadcrumb root points to wherever the current user's first
-      // accessible sidebar module is — so a user without Dashboard
-      // permission doesn't see a broken "Dashboard" link. Walks the
-      // exact same candidate list as the login-landing helper, kept in
-      // one place inside alert_helper.php.
       $bcHomeUrl   = first_accessible_module_url();
       $bcHomeLabel = first_accessible_module_label();
       ?>
@@ -288,8 +300,8 @@ $errMsg = \Config\Services::session()->getFlashdata('error');
           <span class="bell-badge<?php if ($actionableTotal > 0) {
                                     echo ' is-critical';
                                   } ?>" data-count="<?= $actionableTotal; ?>" <?php if ($actionableTotal === 0) {
-                                                                echo 'hidden';
-                                                              } ?>>
+                                                                                echo 'hidden';
+                                                                              } ?>>
             <?= esc($actionableBadge); ?>
           </span>
         </button>
@@ -311,20 +323,20 @@ $errMsg = \Config\Services::session()->getFlashdata('error');
         <span class="name"><?= esc($userName); ?></span>
       </div>
 
-      <a class="topbar-logout"
-        href="<?= site_url('logout'); ?>"
-        title="Sign out"
-        aria-label="Sign out">
-        <i class="bi bi-box-arrow-right"></i>
-      </a>
+      <form method="post" action="<?= site_url('logout'); ?>" class="d-inline">
+        <?= csrf_field(); ?>
+        <button type="submit" class="topbar-logout" title="Sign out" aria-label="Sign out">
+          <i class="bi bi-box-arrow-right"></i>
+        </button>
+      </form>
     </div>
   </header>
 
-  <main class="content">
+  <main class="content" id="mainContent">
 
     <?php if ($okMsg) { ?>
-      <div class="alert alert-success alert-dismissible fade show"><?= esc($okMsg); ?><button type="button" class="btn-close" data-bs-dismiss="alert"></button></div>
+      <div class="alert alert-success alert-dismissible fade show"><?= esc($okMsg); ?><button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button></div>
     <?php } ?>
     <?php if ($errMsg) { ?>
-      <div class="alert alert-danger alert-dismissible fade show"><?= esc($errMsg); ?><button type="button" class="btn-close" data-bs-dismiss="alert"></button></div>
+      <div class="alert alert-danger alert-dismissible fade show"><?= esc($errMsg); ?><button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button></div>
     <?php } ?>

@@ -10,7 +10,6 @@ class App_model
         $this->db = \Config\Database::connect();
     }
 
-    // Cached per-request lookup maps — callers merge names/counts in PHP instead of joining.
     private function userNameMap()
     {
         static $cache = null;
@@ -111,14 +110,14 @@ class App_model
         $data['created_at'] = date('Y-m-d H:i:s');
         $this->db->table('projects')->insert($data);
         $id = $this->db->insertID();
-        error_log("pview alert >> project save: query=[" . $this->db->getLastQuery() . "], new_id=[" . $id . "]");
+        log_message('debug', "pview alert >> project save: query=[" . $this->db->getLastQuery() . "], new_id=[" . $id . "]");
         return $id;
     }
 
     public function projectUpdate($id, $data)
     {
         $ok = $this->db->table('projects')->where('id', (int) $id)->update($data);
-        error_log("pview alert >> project update: query=[" . $this->db->getLastQuery() . "], id=[" . $id . "], ok=[" . (int) $ok . "]");
+        log_message('debug', "pview alert >> project update: query=[" . $this->db->getLastQuery() . "], id=[" . $id . "], ok=[" . (int) $ok . "]");
         return $ok;
     }
 
@@ -131,23 +130,20 @@ class App_model
             'status'     => 'inactive',
         ]);
 
-        // Cascade: soft-delete all flows under the project
         $this->db->table('flows')->where('project_id', $id)->update([
             'deleted_at' => $now,
             'status'     => 'inactive',
         ]);
 
-        // Cascade: deactivate all alert definitions under the project
         $this->db->table('alert_definitions')->where('project_id', $id)->update([
             'is_active' => 0,
         ]);
 
-        // Cascade: deactivate all API keys under the project
         $this->db->table('api_keys')->where('project_id', $id)->update([
             'is_active' => 0,
         ]);
 
-        error_log("pview alert >> project softDelete (cascaded): query=[" . $this->db->getLastQuery() . "], id=[" . $id . "]");
+        log_message('debug', "pview alert >> project softDelete (cascaded): query=[" . $this->db->getLastQuery() . "], id=[" . $id . "]");
         return $ok;
     }
 
@@ -156,8 +152,7 @@ class App_model
         return (int) $this->db->table('projects')->where('status', 'active')->where('deleted_at', null)->countAllResults();
     }
 
-    // True when an active (non-deleted) project already has this name.
-    // $ignoreId lets the edit form skip the row it's updating.
+    // Returns true when an active project with this name already exists ($ignoreId skips the row being edited).
     public function projectNameExists($name, $ignoreId = 0)
     {
         $q = $this->db->table('projects')->where('name', (string) $name)->where('deleted_at', null);
@@ -213,14 +208,14 @@ class App_model
         $data['created_at'] = date('Y-m-d H:i:s');
         $this->db->table('flows')->insert($data);
         $id = $this->db->insertID();
-        error_log("pview alert >> flow save: query=[" . $this->db->getLastQuery() . "], new_id=[" . $id . "]");
+        log_message('debug', "pview alert >> flow save: query=[" . $this->db->getLastQuery() . "], new_id=[" . $id . "]");
         return $id;
     }
 
     public function flowUpdate($id, $data)
     {
         $ok = $this->db->table('flows')->where('id', (int) $id)->update($data);
-        error_log("pview alert >> flow update: query=[" . $this->db->getLastQuery() . "], id=[" . $id . "], ok=[" . (int) $ok . "]");
+        log_message('debug', "pview alert >> flow update: query=[" . $this->db->getLastQuery() . "], id=[" . $id . "], ok=[" . (int) $ok . "]");
         return $ok;
     }
 
@@ -238,7 +233,7 @@ class App_model
             'is_active' => 0,
         ]);
 
-        error_log("pview alert >> flow softDelete (cascaded): query=[" . $this->db->getLastQuery() . "], id=[" . $id . "]");
+        log_message('debug', "pview alert >> flow softDelete (cascaded): query=[" . $this->db->getLastQuery() . "], id=[" . $id . "]");
         return $ok;
     }
 
@@ -247,8 +242,7 @@ class App_model
         return (int) $this->db->table('flows')->where('status', 'active')->where('deleted_at', null)->countAllResults();
     }
 
-    // True when an active flow with this name already exists IN the same
-    // project. Flow names are only unique within a project, not globally.
+    // Returns true when an active flow with this name already exists within the same project.
     public function flowNameExists($name, $project_id, $ignoreId = 0)
     {
         $q = $this->db->table('flows')->where('name', (string) $name)->where('project_id', (int) $project_id)->where('deleted_at', null);
@@ -268,7 +262,7 @@ class App_model
         return $this->db->table('states')->where('id', (int) $id)->get()->getRowArray();
     }
 
-    // Returns the is_initial state; falls back to the first state by sort_order.
+    // Returns the is_initial state; falls back to first by sort_order.
     public function stateGetInitial($flow_id)
     {
         $row = $this->db->table('states')->where('flow_id', (int) $flow_id)->where('is_initial', 1)->get()->getRowArray();
@@ -278,60 +272,158 @@ class App_model
         return $this->db->table('states')->where('flow_id', (int) $flow_id)->orderBy('sort_order', 'asc')->orderBy('id', 'asc')->get()->getRowArray();
     }
 
-    // True if the flow uses parent_state_id tree topology. When true, the
-    // linear sort_order fallback in stateGetNext() must NOT be used —
-    // leaf states are terminal and tickets there should be resolved/closed.
-    public function flowIsBranched($flow_id)
+    // Returns transitions from a state, optionally filtered by type ('forward'|'backward'|'rework'|null).
+    public function stateGetTransitions($flow_id, $from_state_id, $type = null)
     {
-        $n = $this->db->table('states')
-            ->where('flow_id', (int) $flow_id)
-            ->where('parent_state_id IS NOT NULL', null, false)
-            ->countAllResults();
-        return $n > 0;
+        $q = $this->db->table('state_transitions st')
+            ->select('st.*, s.name AS to_state_name, s.is_final AS to_is_final')
+            ->join('states s', 's.id = st.to_state_id', 'left')
+            ->where('st.flow_id', (int) $flow_id)
+            ->where('st.from_state_id', (int) $from_state_id)
+            ->orderBy('st.transition_type', 'asc')
+            ->orderBy('st.sort_order', 'asc')
+            ->orderBy('st.id', 'asc');
+        if ($type !== null) {
+            $q->where('st.transition_type', $type);
+        }
+        return $q->get()->getResultArray();
     }
 
-    // Returns the next state by sort_order for legacy flat flows ONLY.
-    // For tree-shaped flows the caller should rely on stateGetChildren().
-    public function stateGetNext($flow_id, $current_state_id)
+    // Returns all transitions for a flow (used by the vis-network diagram renderer).
+    public function stateGetAllTransitions($flow_id)
     {
-        // Safety: refuse to linear-fallback inside a branched flow — that
-        // would jump tickets between unrelated branches.
-        if ($this->flowIsBranched((int) $flow_id)) {
-            return null;
+        return $this->db->table('state_transitions')
+            ->where('flow_id', (int) $flow_id)
+            ->orderBy('transition_type', 'asc')
+            ->orderBy('sort_order', 'asc')
+            ->get()->getResultArray();
+    }
+
+    // Inserts or updates a state transition. Returns the row id.
+    public function stateTransitionSave($data)
+    {
+        $data['flow_id']       = (int) ($data['flow_id']       ?? 0);
+        $data['from_state_id'] = (int) ($data['from_state_id'] ?? 0);
+        $data['to_state_id']   = (int) ($data['to_state_id']   ?? 0);
+        $transType = isset($data['transition_type']) ? (string) $data['transition_type'] : '';
+        if (!in_array($transType, ['forward', 'backward', 'rework'], true)) {
+            $transType = 'forward';
         }
-        $current = $this->stateGetById($current_state_id);
+        $data['transition_type'] = $transType;
+        $data['requires_comment']   = (int) ($data['requires_comment'] ?? 0);
+        $data['sort_order']         = (int) ($data['sort_order'] ?? 0);
+        if (!empty($data['id'])) {
+            $id = (int) $data['id'];
+            unset($data['id'], $data['created_at']);
+            $this->db->table('state_transitions')->where('id', $id)->update($data);
+            return $id;
+        }
+        $data['created_at'] = date('Y-m-d H:i:s');
+        $this->db->table('state_transitions')->insert($data);
+        return $this->db->insertID();
+    }
+
+    public function stateTransitionDelete($id)
+    {
+        $this->db->table('state_transitions')->where('id', (int) $id)->delete();
+        return $this->db->affectedRows() > 0;
+    }
+
+    // Deletes backward transitions originating from a state (forward movement is implicit via sort_order).
+    public function stateDeleteFromTransitions($state_id)
+    {
+        $this->db->table('state_transitions')
+            ->where('from_state_id', (int) $state_id)
+            ->where('transition_type', 'backward')
+            ->delete();
+    }
+
+    // Deletes all transitions involving a state (called before removing the state itself).
+    public function stateTransitionDeleteForState($state_id)
+    {
+        $state_id = (int) $state_id;
+        $this->db->table('state_transitions')
+            ->groupStart()
+            ->where('from_state_id', $state_id)
+            ->orWhere('to_state_id', $state_id)
+            ->groupEnd()
+            ->delete();
+    }
+
+    public function stateGetChildren($flow_id, $parent_state_id)
+    {
+        $rows = $this->db->table('state_transitions st')
+            ->select('s.*')
+            ->join('states s', 's.id = st.to_state_id', 'inner')
+            ->where('st.flow_id', $flow_id)
+            ->where('st.from_state_id', $parent_state_id)
+            ->where('st.transition_type', 'forward')
+            ->orderBy('st.sort_order', 'asc')
+            ->orderBy('st.id', 'asc')
+            ->get()->getResultArray();
+        if (!empty($rows)) {
+            return $rows;
+        }
+
+        $children = $this->db->table('states')
+            ->where('flow_id', $flow_id)
+            ->where('parent_state_id', $parent_state_id)
+            ->orderBy('sort_order', 'asc')
+            ->orderBy('id', 'asc')
+            ->get()->getResultArray();
+        if (!empty($children)) {
+            return $children;
+        }
+
+        $treeFlow = $this->db->table('states')
+            ->where('flow_id', $flow_id)
+            ->where('parent_state_id IS NOT NULL', null, false)
+            ->countAllResults() > 0;
+
+        $current = $this->stateGetById($parent_state_id);
         if (empty($current)) {
-            return null;
+            return [];
         }
-        return $this->db->table('states')
+
+        if ($treeFlow) {
+            if (!empty($current['is_final'])) {
+                return [];
+            }
+            $closing = $this->db->table('states')
+                ->where('flow_id', $flow_id)
+                ->where('is_final', 1)
+                ->limit(1)
+                ->get()->getRowArray();
+            if ($closing) {
+                return [$closing];
+            }
+            return [];
+        }
+
+        if (!empty($current['is_final'])) {
+            return [];
+        }
+        $next = $this->db->table('states')
             ->where('flow_id', (int) $flow_id)
             ->groupStart()
             ->where('sort_order >', (int) $current['sort_order'])
             ->orGroupStart()
             ->where('sort_order', (int) $current['sort_order'])
-            ->where('id >', (int) $current_state_id)
+            ->where('id >', (int) $parent_state_id)
             ->groupEnd()
             ->groupEnd()
             ->orderBy('sort_order', 'asc')
             ->orderBy('id', 'asc')
             ->limit(1)
             ->get()->getRowArray();
-    }
-
-    // Returns direct child states for branching flows.
-    public function stateGetChildren(int $flow_id, int $parent_state_id): array
-    {
-        return $this->db->table('states')
-            ->where('flow_id', $flow_id)
-            ->where('parent_state_id', $parent_state_id)
-            ->orderBy('sort_order', 'asc')
-            ->orderBy('id', 'asc')
-            ->get()->getResultArray();
+        if ($next) {
+            return [$next];
+        }
+        return [];
     }
 
     public function stateSave($data)
     {
-        // JSON-encode level user_id arrays (strings after 2026-05-21 migration).
         foreach (['l1_user_ids', 'l2_user_ids', 'l3_user_ids', 'l4_user_ids'] as $f) {
             if (isset($data[$f]) && is_array($data[$f])) {
                 $cleaned = [];
@@ -348,10 +440,9 @@ class App_model
             $id = (int) $data['id'];
             unset($data['id']);
             $this->db->table('states')->where('id', $id)->update($data);
-            error_log("pview alert >> state save (update): query=[" . $this->db->getLastQuery() . "], id=[" . $id . "]");
+            log_message('debug', "pview alert >> state save (update): query=[" . $this->db->getLastQuery() . "], id=[" . $id . "]");
             return $id;
         }
-        // Auto sort_order = max + 1
         if (!isset($data['sort_order']) && !empty($data['flow_id'])) {
             $maxRow = $this->db->table('states')
                 ->selectMax('sort_order')
@@ -366,12 +457,11 @@ class App_model
         $data['created_at'] = date('Y-m-d H:i:s');
         $this->db->table('states')->insert($data);
         $newId = $this->db->insertID();
-        error_log("pview alert >> state save (insert): query=[" . $this->db->getLastQuery() . "], new_id=[" . $newId . "]");
+        log_message('debug', "pview alert >> state save (insert): query=[" . $this->db->getLastQuery() . "], new_id=[" . $newId . "]");
         return $newId;
     }
 
-    // Refuses to delete a state that still has child states or tickets
-    // pointing at it. Returns ['ok' => bool, 'reason' => string].
+    // Refuses deletion if the state has forward transitions or live tickets. Returns ['ok' => bool, 'reason' => string].
     public function stateDelete($id)
     {
         $id = (int) $id;
@@ -379,48 +469,65 @@ class App_model
         if (empty($state)) {
             return ['ok' => false, 'reason' => 'State not found'];
         }
-        $childCount = $this->db->table('states')->where('parent_state_id', $id)->countAllResults();
+        $childCount = $this->db->table('state_transitions')
+            ->where('from_state_id', $id)
+            ->where('transition_type', 'forward')
+            ->countAllResults();
+        if ($childCount === 0) {
+            $childCount = $this->db->table('states')->where('parent_state_id', $id)->countAllResults();
+        }
         if ($childCount > 0) {
-            error_log("pview alert >> state delete REJECTED (has children): id=[" . $id . "], children=[" . $childCount . "]");
-            return ['ok' => false, 'reason' => 'State has ' . $childCount . ' child state(s). Re-parent or delete them first.'];
+            log_message('debug', "pview alert >> state delete REJECTED (has forward transitions): id=[" . $id . "], children=[" . $childCount . "]");
+            return ['ok' => false, 'reason' => 'State has ' . $childCount . ' forward transition(s) from it. Remove them first.'];
         }
         $ticketCount = $this->db->table('tickets')->where('current_state_id', $id)->countAllResults();
         if ($ticketCount > 0) {
-            error_log("pview alert >> state delete REJECTED (tickets present): id=[" . $id . "], tickets=[" . $ticketCount . "]");
+            log_message('debug', "pview alert >> state delete REJECTED (tickets present): id=[" . $id . "], tickets=[" . $ticketCount . "]");
             return ['ok' => false, 'reason' => 'State is referenced by ' . $ticketCount . ' ticket(s). Move or close them first.'];
         }
+        $this->stateTransitionDeleteForState($id);
         $this->db->table('states')->where('id', $id)->delete();
         $this->db->table('escalation_matrix')->where('state_id', $id)->delete();
-        error_log("pview alert >> state delete OK (cascaded to escalation_matrix): query=[" . $this->db->getLastQuery() . "], id=[" . $id . "]");
+        log_message('debug', "pview alert >> state delete OK (cascaded to escalation_matrix): query=[" . $this->db->getLastQuery() . "], id=[" . $id . "]");
         return ['ok' => true, 'reason' => ''];
     }
 
-    // Returns the set of state IDs reachable downward from $state_id
-    // (children, grandchildren, etc). Used for cycle prevention when
-    // re-parenting a state. Caps recursion at 100 levels as a safety net.
+    // Returns state IDs reachable via forward transitions from $state_id (used for cycle detection).
     public function stateGetDescendantIds($flow_id, $state_id)
     {
         $flow_id  = (int) $flow_id;
         $state_id = (int) $state_id;
-        $all = $this->db->table('states')
+
+        // Build forward-adjacency map from transitions table.
+        $transRows = $this->db->table('state_transitions')
+            ->select('from_state_id, to_state_id')
+            ->where('flow_id', $flow_id)
+            ->where('transition_type', 'forward')
+            ->get()->getResultArray();
+        $fwdMap = [];
+        foreach ($transRows as $t) {
+            $fwdMap[(int) $t['from_state_id']][] = (int) $t['to_state_id'];
+        }
+
+        $allStates = $this->db->table('states')
             ->select('id, parent_state_id')
             ->where('flow_id', $flow_id)
             ->get()->getResultArray();
-        $childrenByParent = [];
-        foreach ($all as $row) {
+        foreach ($allStates as $row) {
             $pid = isset($row['parent_state_id']) ? (int) $row['parent_state_id'] : 0;
-            if ($pid > 0) {
-                $childrenByParent[$pid][] = (int) $row['id'];
+            if ($pid > 0 && !isset($fwdMap[$pid])) {
+                $fwdMap[$pid][] = (int) $row['id'];
             }
         }
-        $out  = [];
+
+        $out   = [];
         $stack = [$state_id];
         $guard = 0;
         while (!empty($stack) && $guard < 1000) {
             $guard++;
             $current = array_pop($stack);
-            if (isset($childrenByParent[$current])) {
-                foreach ($childrenByParent[$current] as $kid) {
+            if (!empty($fwdMap[$current])) {
+                foreach ($fwdMap[$current] as $kid) {
                     if (!isset($out[$kid])) {
                         $out[$kid] = true;
                         $stack[] = $kid;
@@ -431,8 +538,7 @@ class App_model
         return array_keys($out);
     }
 
-    // Clear is_initial=1 on every OTHER state in the same flow so only
-    // one initial state exists per flow.
+    // Clears is_initial on all other states so only one entry point exists per flow.
     public function stateClearOtherInitial($flow_id, $keep_state_id = 0)
     {
         $q = $this->db->table('states')
@@ -441,6 +547,17 @@ class App_model
             $q->where('id !=', (int) $keep_state_id);
         }
         $q->update(['is_initial' => 0]);
+    }
+
+    // Clears is_final on all other states so only one terminal state exists per flow.
+    public function stateClearOtherFinal($flow_id, $keep_state_id = 0)
+    {
+        $q = $this->db->table('states')
+            ->where('flow_id', (int) $flow_id);
+        if ((int) $keep_state_id > 0) {
+            $q->where('id !=', (int) $keep_state_id);
+        }
+        $q->update(['is_final' => 0]);
     }
 
     public function stateReorder($flow_id, $id_list)
@@ -455,7 +572,7 @@ class App_model
             ->whereIn('id', $ids)
             ->get()->getResultArray();
         if (count($owned) !== count($ids)) {
-            error_log("pview alert >> state reorder REJECTED for flow_id=[" . $flow_id . "] (state ids do not all belong to flow)");
+            log_message('debug', "pview alert >> state reorder REJECTED for flow_id=[" . $flow_id . "] (state ids do not all belong to flow)");
             return false;
         }
         $i = 1;
@@ -465,11 +582,11 @@ class App_model
                 ->where('flow_id', $flow_id)
                 ->update(['sort_order' => $i++]);
         }
-        error_log("pview alert >> state reorder OK: flow_id=[" . $flow_id . "], count=[" . count($ids) . "]");
+        log_message('debug', "pview alert >> state reorder OK: flow_id=[" . $flow_id . "], count=[" . count($ids) . "]");
         return true;
     }
 
-    // Decode the JSON user_id list for the given level from a state row.
+    // Decodes the JSON user_id list for the given level from a state row.
     public function stateLevelUsers($state, $level)
     {
         $key = 'l' . (int) $level . '_user_ids';
@@ -484,7 +601,6 @@ class App_model
         if (json_last_error() !== JSON_ERROR_NONE || !is_array($arr)) {
             return [];
         }
-        // Post-2026-05-21: user_ids are strings ("bobil.singh").
         return array_values(array_map('strval', $arr));
     }
 
@@ -532,7 +648,7 @@ class App_model
         $data['created_at'] = date('Y-m-d H:i:s');
         $this->db->table('alert_definitions')->insert($data);
         $id = $this->db->insertID();
-        error_log("pview alert >> alertdef save: query=[" . $this->db->getLastQuery() . "], new_id=[" . $id . "]");
+        log_message('debug', "pview alert >> alertdef save: query=[" . $this->db->getLastQuery() . "], new_id=[" . $id . "]");
         return $id;
     }
 
@@ -549,14 +665,14 @@ class App_model
             $data['notify_user_ids'] = json_encode(array_values(array_unique($cleaned)));
         }
         $ok = $this->db->table('alert_definitions')->where('id', (int) $id)->update($data);
-        error_log("pview alert >> alertdef update: query=[" . $this->db->getLastQuery() . "], id=[" . $id . "], ok=[" . (int) $ok . "]");
+        log_message('debug', "pview alert >> alertdef update: query=[" . $this->db->getLastQuery() . "], id=[" . $id . "], ok=[" . (int) $ok . "]");
         return $ok;
     }
 
     public function alertDeactivate($id)
     {
         $ok = $this->db->table('alert_definitions')->where('id', (int) $id)->update(['is_active' => 0]);
-        error_log("pview alert >> alertdef deactivate: query=[" . $this->db->getLastQuery() . "], id=[" . $id . "]");
+        log_message('debug', "pview alert >> alertdef deactivate: query=[" . $this->db->getLastQuery() . "], id=[" . $id . "]");
         return $ok;
     }
 
@@ -602,14 +718,14 @@ class App_model
         $data['created_by'] = (string) session('user_id');
         $this->db->table('escalation_matrix')->insert($data);
         $id = $this->db->insertID();
-        error_log("pview alert >> escalation save: query=[" . $this->db->getLastQuery() . "], new_id=[" . $id . "]");
+        log_message('debug', "pview alert >> escalation save: query=[" . $this->db->getLastQuery() . "], new_id=[" . $id . "]");
         return $id;
     }
 
     public function escalationDelete($id)
     {
         $ok = $this->db->table('escalation_matrix')->where('id', (int) $id)->delete();
-        error_log("pview alert >> escalation delete: query=[" . $this->db->getLastQuery() . "], id=[" . $id . "]");
+        log_message('debug', "pview alert >> escalation delete: query=[" . $this->db->getLastQuery() . "], id=[" . $id . "]");
         return $ok;
     }
 
@@ -641,9 +757,7 @@ class App_model
         return $this->db->table('api_keys')->where('id', (int) $id)->get()->getRowArray();
     }
 
-    // Returns the key row only when the bound project is still active
-    // and not soft-deleted; rejects keys for archived projects so
-    // external telemetry can't keep raising tickets after a decommission.
+    // Returns the API key row only when the bound project is active; rejects keys for archived projects.
     public function apiKeyGetByKey($key)
     {
         return $this->db->table('api_keys k')
@@ -667,7 +781,7 @@ class App_model
             'created_by' => (string) session('user_id'),
             'created_at' => date('Y-m-d H:i:s'),
         ]);
-        error_log("pview alert >> api key generated: project_id=[" . $project_id . "]");
+        log_message('debug', "pview alert >> api key generated: project_id=[" . $project_id . "]");
         return $key;
     }
 
@@ -683,7 +797,7 @@ class App_model
             $newState = 1;
         }
         $this->db->table('api_keys')->where('id', (int) $id)->update(['is_active' => $newState]);
-        error_log("pview alert >> api key toggle: id=[" . $id . "], new_state=[" . $newState . "]");
+        log_message('debug', "pview alert >> api key toggle: id=[" . $id . "], new_state=[" . $newState . "]");
         return true;
     }
 
@@ -692,10 +806,9 @@ class App_model
         $this->db->table('api_keys')->where('id', (int) $id)->update(['last_used' => date('Y-m-d H:i:s')]);
     }
 
-    // Standard SELECT with JOINs for all ticket list/detail queries.
+    // Base SELECT with JOINs for all ticket list/detail queries.
     private function ticketSelect()
     {
-        // After migration 2026-05-21, join key for users is user_id string, not PK.
         return $this->db->table('tickets t')->select("t.*,p.name AS project_name,f.name AS flow_name,s.name AS state_name,s.is_final AS state_is_final,s.l1_tat_minutes, s.l2_tat_minutes, s.l3_tat_minutes, s.l4_tat_minutes, s.l1_user_ids, s.l2_user_ids, s.l3_user_ids, s.l4_user_ids,ua.name AS assignee_name,ur.name AS raised_by_name", false)
             ->join('projects p', 'p.id = t.project_id', 'left')
             ->join('flows f',    'f.id = t.flow_id',    'left')
@@ -709,20 +822,23 @@ class App_model
         return $this->ticketSelect()->where('t.alarm_id', $alarm_id)->get()->getRowArray();
     }
 
-    public function ticketRecent($limit = 10, $userPk = null, $isAdmin = false, $projectId = 0)
+    public function ticketRecent($limit = 5, $userPk = null, $isAdmin = false, $projectId = 0)
     {
         $q = $this->ticketSelect();
         $this->applyUserScope($q, 't', $userPk, $isAdmin, 's');
         if ((int) $projectId > 0) {
             $q->where('t.project_id', (int) $projectId);
         }
-        return $q->orderBy('t.created_at', 'desc')->limit((int) $limit)->get()->getResultArray();
+        // Active tickets only — resolved/closed need no action.
+        $q->whereIn('t.status', ['open', 'in_progress', 'escalated']);
+        // Urgency order: escalated first → in_progress → open;
+        // within each group oldest state_entered_at first (soonest TAT breach).
+        $q->orderBy("CASE t.status WHEN 'escalated' THEN 0 WHEN 'in_progress' THEN 1 ELSE 2 END", 'ASC', false)
+            ->orderBy('t.state_entered_at', 'ASC');
+        return $q->limit((int) $limit)->get()->getResultArray();
     }
 
-    // Adds the user-scope JOIN+WHERE (raised_by / assignee / level user lists)
-    // to a tickets query. No-op when $isAdmin or $userPk is empty.
-    // $tAlias    = the tickets table alias used by the caller ('tickets' or 't').
-    // $sAlias    = an existing states alias to reuse, or null to JOIN states as 'us_s'.
+    // Adds user-scope WHERE clauses to a ticket query (raised_by/assignee/level pools). No-op for admins.
     private function applyUserScope($q, $tAlias, $userPk, $isAdmin, $sAlias = null)
     {
         if ($isAdmin === true) {
@@ -759,10 +875,7 @@ class App_model
             $q->where('t.flow_id', (int) $filters['flow_id']);
         }
         if (!empty($filters['status'])) {
-            // Special value `active` is a convenience alias for
-            // "anything still needing attention" — i.e. open,
-            // in_progress, or escalated. It lets KPI cards link
-            // directly to the same set their count represents.
+            // 'active' is a convenience alias for open|in_progress|escalated (used by KPI card links).
             if ($filters['status'] === 'active') {
                 $q->whereIn('t.status', ['open', 'in_progress', 'escalated']);
             } else {
@@ -775,9 +888,13 @@ class App_model
         if (!empty($filters['priority'])) {
             $q->where('t.priority', $filters['priority']);
         }
+        if (!empty($filters['f_from'])) {
+            $q->where('t.created_at >=', $filters['f_from'] . ' 00:00:00');
+        }
+        if (!empty($filters['f_to'])) {
+            $q->where('t.created_at <=', $filters['f_to'] . ' 23:59:59');
+        }
         if (!empty($filters['user_id'])) {
-            // user_id is a string after the 2026-05-21 migration.
-            // JSON_CONTAINS needs a JSON-encoded needle (with quotes); db->escape() wraps it in single quotes.
             $uid = (string) $filters['user_id'];
             $jsonNeedle = $this->db->escape(json_encode($uid));
             $q->groupStart()
@@ -851,8 +968,6 @@ class App_model
             $search = (string) $args['search'];
         }
         if ($search !== '') {
-            // UX-02: extend search across all visible text columns so operators
-            // can find tickets by project, flow, state, or assignee name.
             $q->groupStart()
                 ->like('t.alarm_id',  $search)
                 ->orLike('t.title',   $search)
@@ -865,8 +980,6 @@ class App_model
 
         $rows = $q->orderBy($orderCol, $orderDir)->limit($length, $start)->get()->getResultArray();
 
-        // Scope the "total" badge to what the user can actually see so the
-        // DataTables footer doesn't leak the system-wide count to non-admins.
         $scopeUserPk = null;
         $scopeIsAdmin = false;
         if (isset($args['scope_user_pk'])) {
@@ -878,7 +991,7 @@ class App_model
         $totalAll      = $this->ticketCountAll($scopeUserPk, $scopeIsAdmin);
         $totalFiltered = $this->ticketCountFiltered($filters, $search);
 
-        error_log("pview alert >> ticket dataTable page: query=[" . $this->db->getLastQuery() . "], start=[" . $start . "], length=[" . $length . "], rows=[" . count($rows) . "], total_all=[" . $totalAll . "], total_filtered=[" . $totalFiltered . "]");
+        log_message('debug', "pview alert >> ticket dataTable page: query=[" . $this->db->getLastQuery() . "], start=[" . $start . "], length=[" . $length . "], rows=[" . count($rows) . "], total_all=[" . $totalAll . "], total_filtered=[" . $totalFiltered . "]");
 
         return [
             'rows'           => $rows,
@@ -887,11 +1000,7 @@ class App_model
         ];
     }
 
-    // Returns the total ticket count visible to the caller. Admins see
-    // every ticket; ordinary users see only what applyUserScope() allows
-    // (raised_by / current_assignee / current state level pools).
-    // Used as DataTables' recordsTotal so the footer stops leaking the
-    // system-wide ticket count to non-admin users.
+    // Returns the total ticket count visible to the caller (scoped for non-admins via applyUserScope).
     public function ticketCountAll($userPk = null, $isAdmin = false)
     {
         $q = $this->db->table('tickets');
@@ -901,8 +1010,6 @@ class App_model
 
     public function ticketCountFiltered($filters, $search = '')
     {
-        // UX-02: join the same tables as ticketSelect() so the search
-        // count accurately mirrors the row query when filtering by name.
         $q = $this->db->table('tickets t')
             ->join('projects p', 'p.id = t.project_id',          'left')
             ->join('flows f',    'f.id = t.flow_id',             'left')
@@ -1023,7 +1130,6 @@ class App_model
         $params = [];
 
         if (!$isAdmin && !empty($userPk)) {
-            // $userPk is the user_id string after migration (kept param name for back-compat).
             $from  .= " LEFT JOIN states s ON s.id = t.current_state_id";
             $where .= " AND (t.raised_by = ?"
                 . " OR t.current_assignee = ?"
@@ -1042,7 +1148,7 @@ class App_model
         try {
             $row = $this->db->query($sql, $params)->getRow();
         } catch (\Throwable $e) {
-            error_log("pview alert >> ticketCountActionable() failed: " . $e->getMessage());
+            log_message('debug', "pview alert >> ticketCountActionable() failed: " . $e->getMessage());
             return ['total' => 0, 'escalated' => 0, 'critical_open' => 0];
         }
 
@@ -1059,31 +1165,37 @@ class App_model
         $data['state_entered_at'] = date('Y-m-d H:i:s');
         $this->db->table('tickets')->insert($data);
         $id = $this->db->insertID();
-        error_log("pview alert >> ticket save: query=[" . $this->db->getLastQuery() . "], new_id=[" . $id . "], alarm_id=[" . (isset($data["alarm_id"]) ? $data["alarm_id"] : "") . "]");
+        log_message('debug', "pview alert >> ticket save: query=[" . $this->db->getLastQuery() . "], new_id=[" . $id . "], alarm_id=[" . (isset($data["alarm_id"]) ? $data["alarm_id"] : "") . "]");
         return $id;
     }
 
     public function ticketUpdate($id, $data)
     {
         $ok = $this->db->table('tickets')->where('id', (int) $id)->update($data);
-        error_log("pview alert >> ticket update: query=[" . $this->db->getLastQuery() . "], id=[" . $id . "], ok=[" . (int) $ok . "]");
+        log_message('debug', "pview alert >> ticket update: query=[" . $this->db->getLastQuery() . "], id=[" . $id . "], ok=[" . (int) $ok . "]");
         return $ok;
     }
 
     public function ticketMoveToState($ticket_id, $new_state_id)
     {
+        $this->db->transStart();
+        // FOR UPDATE prevents concurrent requests from producing duplicate state moves.
+        $current = $this->db->query(
+            'SELECT id, status FROM tickets WHERE id = ? FOR UPDATE',
+            [(int) $ticket_id]
+        )->getRowArray();
+        $newStatus = ($current && (string) $current['status'] === 'escalated') ? 'escalated' : 'in_progress';
         $this->db->table('tickets')->where('id', (int) $ticket_id)->update([
             'current_state_id'   => (int) $new_state_id,
             'current_level'      => 1,
             'state_entered_at'   => date('Y-m-d H:i:s'),
-            'status'             => 'in_progress',
-            // The pre-breach warning is a per-state-per-level signal — a
-            // state change starts a fresh SLA window so the warning is
-            // eligible to fire again at L1 of the new state.
+            'status'             => $newStatus,
+            // Reset so the next level is eligible for its 80% TAT warning.
             'last_tat_warn_level' => 0,
             'updated_at'         => date('Y-m-d H:i:s'),
         ]);
-        error_log("pview alert >> ticket moveToState: ticket_id=[" . $ticket_id . "], new_state_id=[" . $new_state_id . "]");
+        $this->db->transComplete();
+        log_message('debug', "pview alert >> ticket moveToState: ticket_id=[{$ticket_id}], new_state_id=[{$new_state_id}]");
     }
 
     public function ticketEscalateLevel($ticket_id, $new_level)
@@ -1097,31 +1209,23 @@ class App_model
             'current_level'      => (int) $new_level,
             'state_entered_at'   => date('Y-m-d H:i:s'),
             'status'             => $newStatus,
-            // Reset so the next level becomes eligible for its own 80% warning.
             'last_tat_warn_level' => 0,
             'updated_at'         => date('Y-m-d H:i:s'),
         ]);
-        error_log("pview alert >> ticket escalateLevel: query=[" . $this->db->getLastQuery() . "], ticket_id=[" . $ticket_id . "], new_level=[" . $new_level . "], status=[" . $newStatus . "]");
+        log_message('debug', "pview alert >> ticket escalateLevel: query=[" . $this->db->getLastQuery() . "], ticket_id=[" . $ticket_id . "], new_level=[" . $new_level . "], status=[" . $newStatus . "]");
     }
 
-    // Tickets eligible for the TAT-monitor cron sweep. Final-state tickets
-    // are skipped — a workflow that has reached its terminal node has no
-    // further escalation path, and waking the operator with auto-escalation
-    // alerts on a "logically done" ticket creates false noise.
+    // Returns open/in_progress tickets for the TAT cron sweep; excludes final-state tickets.
     public function ticketActiveForTatCheck()
     {
         return $this->ticketSelect()
+            ->select('COALESCE(f.tat_level_count, 4) AS tat_level_count', false)
             ->whereIn('t.status', ['open', 'in_progress'])
             ->where('(s.is_final IS NULL OR s.is_final = 0)', null, false)
             ->get()->getResultArray();
     }
 
-    // Returns the escalation_matrix override for (flow, state, level), or
-    // null when none is configured. When present, the override supplies the
-    // TAT minutes and the notify-user list; otherwise the state's own
-    // lN_tat_minutes / lN_user_ids are used. Single source of truth for
-    // the cron — admins can configure per-state overrides via the
-    // Escalation UI without re-editing the state.
+    // Returns the escalation_matrix override for (flow, state, level), or null if none configured.
     public function escalationRule($flow_id, $state_id, $level)
     {
         $row = $this->db->table('escalation_matrix')
@@ -1150,8 +1254,6 @@ class App_model
 
     public function ticketLogAction($ticket_id, $action_type, $extra = [])
     {
-        // performed_by stores user_id string after the 2026-05-21
-        // migration; session('user_id') is already that string.
         $row = array_merge([
             'ticket_id'    => (int) $ticket_id,
             'action_type'  => $action_type,
@@ -1159,13 +1261,11 @@ class App_model
             'performed_by' => (string) session('user_id'),
         ], $extra);
         $this->db->table('ticket_actions')->insert($row);
-        error_log("pview alert >> ticket action logged: ticket_id=[" . $ticket_id . "], action=[" . $action_type . "]");
+        log_message('debug', "pview alert >> ticket action logged: ticket_id=[" . $ticket_id . "], action=[" . $action_type . "]");
     }
 
     public function ticketTimeline($ticket_id)
     {
-        // performed_by stores the user_id string after the
-        // 2026-05-21 migration — join key is users.user_id.
         $sql = "SELECT ta.*, u.name AS performer_name, u.user_id AS performer_uid,"
             . " fs.name AS from_state_name, ts.name AS to_state_name"
             . " FROM ticket_actions ta"
@@ -1182,6 +1282,65 @@ class App_model
         return $this->db->table('notification_logs')->where('ticket_id', (int) $ticket_id)->orderBy('id', 'desc')->limit((int) $limit)->get()->getResultArray();
     }
 
+    public function ticketAttachmentCount($ticket_id)
+    {
+        return (int) $this->db->table('ticket_actions')
+            ->where('ticket_id', (int) $ticket_id)
+            ->where('action_type', 'attachment')
+            ->countAllResults();
+    }
+
+    public function ticketGetAttachment($ticket_id, $action_id)
+    {
+        return $this->db->table('ticket_actions')
+            ->where('id', (int) $action_id)
+            ->where('ticket_id', (int) $ticket_id)
+            ->where('action_type', 'attachment')
+            ->get()->getRowArray();
+    }
+
+    public function notificationMentionsForUser($email, $cutoff, $limit = 50)
+    {
+        return $this->db->table('notification_logs nl')
+            ->select('nl.id, nl.subject, nl.created_at, nl.ticket_id, t.alarm_id, t.title, t.alert_type')
+            ->join('tickets t', 't.id = nl.ticket_id', 'left')
+            ->where('nl.recipient_email', (string) $email)
+            ->like('nl.subject', '[MENTION]', 'after')
+            ->where('nl.created_at >=', $cutoff)
+            ->orderBy('nl.created_at', 'desc')
+            ->limit((int) $limit)
+            ->get()->getResultArray();
+    }
+
+    // Returns distinct non-empty values for a given activity_logs column (allowlisted; for filter dropdowns).
+    public function activityLogsDistinctValues($column)
+    {
+        if (!in_array($column, ['module', 'action', 'user_role'], true)) {
+            return [];
+        }
+        $rows = $this->db->table('activity_logs')
+            ->select($column)
+            ->distinct()
+            ->orderBy($column)
+            ->get()->getResultArray();
+        $out = [];
+        foreach ($rows as $r) {
+            if (!empty($r[$column])) {
+                $out[] = (string) $r[$column];
+            }
+        }
+        return $out;
+    }
+
+    public function activityLogsProjectsForFilter()
+    {
+        return $this->db->table('projects')
+            ->select('id, name')
+            ->where('deleted_at IS NULL')
+            ->orderBy('name')
+            ->get()->getResultArray();
+    }
+
     // $userId accepts the user_id string (column renamed user_pk→user_id in 2026-05-21 migration).
     public function savedFilterList($userId, $scope = 'tickets')
     {
@@ -1195,9 +1354,12 @@ class App_model
     // Upsert a saved filter preset; replace existing same-named preset for the user.
     public function savedFilterSave($userId, $name, $queryParams, $scope = 'tickets')
     {
+        if (!in_array($scope, ['tickets', 'activity_logs'], true)) {
+            $scope = 'tickets';
+        }
         $row = [
             'user_id'      => (string) $userId,
-            'scope'        => (string) $scope,
+            'scope'        => $scope,
             'name'         => mb_substr((string) $name, 0, 100),
             'query_params' => (string) $queryParams,
             'created_at'   => date('Y-m-d H:i:s'),
@@ -1213,29 +1375,6 @@ class App_model
             ->where('id', (int) $id)
             ->where('user_id', (string) $userId)
             ->delete();
-    }
-
-    public function notificationsRecentForUser($userPk, $userEmail, $isAdmin = false, $limit = 10)
-    {
-        $limit = (int) $limit;
-        if ($limit < 1) {
-            $limit = 10;
-        }
-        if ($limit > 50) {
-            $limit = 50;
-        }
-
-        $builder = $this->db->table('notification_logs nl')
-            ->select('nl.id, nl.ticket_id, nl.recipient_email, nl.subject, nl.status, nl.sent_at, nl.created_at, t.alarm_id, t.title, t.alert_type, t.status AS ticket_status', false)
-            ->join('tickets t', 't.id = nl.ticket_id', 'left')
-            ->orderBy('nl.id', 'desc')
-            ->limit($limit);
-
-        if (!$isAdmin && $userEmail !== '') {
-            $builder->where('nl.recipient_email', $userEmail);
-        }
-
-        return $builder->get()->getResultArray();
     }
 
     // Tickets the bell badge counts as "actionable" — anything escalated, or
@@ -1280,7 +1419,7 @@ class App_model
         try {
             return $this->db->table('app_settings')->orderBy('setting_key', 'asc')->get()->getResultArray();
         } catch (\Throwable $e) {
-            error_log("pview alert >> settingGetAll() failed: " . $e->getMessage());
+            log_message('debug', "pview alert >> settingGetAll() failed: " . $e->getMessage());
             return [];
         }
     }
@@ -1319,7 +1458,7 @@ class App_model
                 'updated_by'    => $byVal,
             ]);
         }
-        error_log("pview alert >> setting saved: key=[" . $key . "], len=[" . strlen((string) $value) . "]");
+        log_message('debug', "pview alert >> setting saved: key=[" . $key . "], len=[" . strlen((string) $value) . "]");
     }
 
     public function projectsForDT($args)

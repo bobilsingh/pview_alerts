@@ -4,7 +4,6 @@ namespace App\Controllers;
 
 use App\Models\user_model;
 
-// Login accepts a user_id or email (auto-detected).
 class User extends BaseController
 {
     public $user_model;
@@ -15,13 +14,61 @@ class User extends BaseController
     }
 
     /** GET /login  → show form (or redirect if already logged in). */
+    public function maintenance()
+    {
+        if (!app_setting_bool('maintenance_mode', false)) {
+            return redirect()->to(site_url('login'));
+        }
+        $session = \Config\Services::session();
+        $session->start();
+        $role         = (string) $session->get('user_role');
+        $isSuperAdmin = ($session->get('user_id') && $role === 'super_admin');
+        $isAdminScope = ($session->get('user_id') && role_has_admin_scope($role));
+
+        // Non-super admins work normally; super_admin sees the maintenance page with a disable button.
+        if ($isAdminScope && !$isSuperAdmin) {
+            return redirect()->to(site_url('dashboard'));
+        }
+
+        $data = [
+            'title'        => 'Under Maintenance',
+            'isSuperAdmin' => $isSuperAdmin,
+        ];
+        echo view('templates/auth_header', $data);
+        echo view('maintenance', $data);
+        echo view('templates/auth_footer');
+    }
+
+    public function maintenance_disable()
+    {
+        $session = \Config\Services::session();
+        $session->start();
+        // Only super_admin can disable maintenance mode from this endpoint.
+        if (!$session->get('user_id') || (string) $session->get('user_role') !== 'super_admin') {
+            return redirect()->to(site_url('maintenance'));
+        }
+        $db = \Config\Database::connect();
+        $db->table('app_settings')
+            ->where('setting_key', 'maintenance_mode')
+            ->update(['setting_value' => '0', 'updated_at' => date('Y-m-d H:i:s'), 'updated_by' => (string) $session->get('user_id')]);
+        app_settings_clear_cache();
+        activity_log('settings', 'update', null, null, 'Disabled maintenance mode via maintenance page');
+        return redirect()->to(site_url('dashboard'));
+    }
+
     public function login()
     {
         $session = \Config\Services::session();
         $session->start();
 
         if ($session->get('user_pk') || $session->get('user_id')) {
-            return redirect()->to(site_url('dashboard'));
+            // Destroy a non-admin session during maintenance to break the redirect loop.
+            if (app_setting_bool('maintenance_mode', false)
+                && !role_has_admin_scope((string) $session->get('user_role'))) {
+                $session->destroy();
+            } else {
+                return redirect()->to(site_url('dashboard'));
+            }
         }
 
         $data = [
@@ -43,7 +90,6 @@ class User extends BaseController
         $session = \Config\Services::session();
         $session->start();
 
-        // Accept legacy `email` field in addition to `login`.
         $login = trim((string) $this->request->getPost('login'));
         if ($login === '') {
             $login = trim((string) $this->request->getPost('email'));
@@ -51,20 +97,18 @@ class User extends BaseController
         $password = (string) $this->request->getPost('password');
 
         if ($login === '' || $password === '') {
-            error_log("pview alert >> Login attempt rejected: empty login or password (login=[" . $login . "])");
+            log_message('warning', "pview alert >> Login attempt rejected: empty login or password (login=[" . $login . "])");
             $session->setFlashdata('error', 'User ID / email and password are required.');
             $session->setFlashdata('old_login', $login);
             return redirect()->to(site_url('login'));
         }
 
-        // Rate-limit check. We check BEFORE password verification so a
-        // locked-out user gets the same error whether their guess was
-        // right or wrong — no oracle for attackers.
+        // Check lockout BEFORE password verification to avoid leaking credentials via timing.
         $ip = client_ip();
         $lock = login_is_locked($ip, $login);
         if ($lock['locked']) {
             $mins = (int) ceil($lock['remaining_seconds'] / 60);
-            error_log("pview alert >> Login locked out: login=[" . $login . "], ip=[" . $ip . "], attempts=[" . $lock['attempts'] . "], remaining_min=[" . $mins . "]");
+            log_message('warning', "pview alert >> Login locked out: login=[" . $login . "], ip=[" . $ip . "], attempts=[" . $lock['attempts'] . "], remaining_min=[" . $mins . "]");
             $session->setFlashdata('error', 'Too many failed attempts. Try again in ' . $mins . ' minute(s).');
             $session->setFlashdata('old_login', $login);
             return redirect()->to(site_url('login'));
@@ -73,10 +117,11 @@ class User extends BaseController
         $user = $this->user_model->checkLogin($login, $password);
         if (empty($user)) {
             login_attempt_record($ip, $login, false);
-            // Record failed login so brute-force / credential-stuffing
-            // attempts are visible in the activity feed even without an
-            // authenticated session.
-            activity_log('auth', 'login_failed', 'user', null,
+            activity_log(
+                'auth',
+                'login_failed',
+                'user',
+                null,
                 'Failed login for "' . $login . '"',
                 ['login_tried' => $login],
                 ['user_id' => '', 'user_name' => '', 'user_role' => '', 'status' => 'fail']
@@ -86,30 +131,33 @@ class User extends BaseController
             return redirect()->to(site_url('login'));
         }
 
-        // Success — clear the failed-attempt counter.
         login_attempt_record($ip, $login, true);
         login_attempts_clear($ip, $login);
 
         $this->user_model->setSession($user);
-        error_log("pview alert >> Login complete: login=[" . $login . "], user_pk=[" . $user['id'] . "], user_id=[" . (isset($user['user_id']) ? $user['user_id'] : '') . "], role=[" . $user['role'] . "]");
-        activity_log('auth', 'login', 'user', (string) $user['id'],
+        log_message('debug', "pview alert >> Login complete: login=[" . $login . "], user_pk=[" . $user['id'] . "], user_id=[" . (isset($user['user_id']) ? $user['user_id'] : '') . "], role=[" . $user['role'] . "]");
+        activity_log(
+            'auth',
+            'login',
+            'user',
+            (string) $user['id'],
             'Login: ' . (isset($user['name']) ? $user['name'] : $login)
         );
 
-        // Drop the user on the first module their role can actually
-        // reach — walked in sidebar order. This way the landing page
-        // mirrors the first nav link the user would have clicked, and
-        // a role whose dashboard permission has been revoked won't get
-        // bounced through an access-denied screen on every login.
+        // Land on the first module the role can access (mirrors the first sidebar link).
         return redirect()->to(first_accessible_module_url());
     }
 
     /** GET /logout */
     public function logout()
     {
-        // Log BEFORE destroying the session so the row is attributed.
-        activity_log('auth', 'logout', 'user', (string) logged_user_id(),
-            'Logout');
+        activity_log(
+            'auth',
+            'logout',
+            'user',
+            (string) logged_user_id(),
+            'Logout'
+        );
         $this->user_model->logout();
         return redirect()->to(site_url('login'));
     }
@@ -162,26 +210,26 @@ class User extends BaseController
             return redirect()->to(site_url('password/change'));
         }
 
-        // Verify the current password against the DB row.
         $userPk = (int) $session->get('user_pk');
         $row = $this->user_model->getById($userPk);
         if (empty($row) || !password_verify($current, (string) $row['password'])) {
-            error_log('pview alert >> password_change rejected: bad current password, user_pk=[' . $userPk . ']');
+            log_message('warning', 'pview alert >> password_change rejected: bad current password, user_pk=[' . $userPk . ']');
             $session->setFlashdata('error', 'Current password is incorrect.');
             return redirect()->to(site_url('password/change'));
         }
 
-        // Update + clear the rotate flag so the user can navigate again.
         $this->user_model->update($userPk, ['password' => $new]);
         $session->remove('password_must_rotate');
         $session->setFlashdata('success', 'Password updated.');
-        error_log('pview alert >> password_change complete: user_pk=[' . $userPk . ']');
-        activity_log('auth', 'password_change', 'user', (string) $userPk,
-            'Password changed');
+        log_message('debug', 'pview alert >> password_change complete: user_pk=[' . $userPk . ']');
+        activity_log(
+            'auth',
+            'password_change',
+            'user',
+            (string) $userPk,
+            'Password changed'
+        );
 
-        // Same dynamic landing as login — first sidebar module the user
-        // can actually access — so role-permission edits to dashboard or
-        // tickets don't surprise the operator post-password-change.
         return redirect()->to(first_accessible_module_url());
     }
 
@@ -189,7 +237,7 @@ class User extends BaseController
     public function index()
     {
         check_module_access('users', 'view');
-        error_log("pview alert >> users index page open");
+        log_message('debug', "pview alert >> users index page open");
         activity_log('users', 'view', null, null, 'Opened Users page');
 
         $data = [
@@ -208,9 +256,6 @@ class User extends BaseController
     public function add()
     {
         check_module_access('users', 'add');
-        // Pre-filter the role list to what THIS actor is allowed to
-        // assign. The view trusts this list and the server-side save()
-        // re-validates against the same helper — defence in depth.
         $allowed = assignable_role_keys();
         $rolesFiltered = [];
         foreach ($this->user_model->getAllRoles() as $r) {
@@ -241,7 +286,7 @@ class User extends BaseController
         $pass    = (string) $this->request->getPost('password');
 
         if ($user_id === '' || $email === '' || $name === '' || $pass === '') {
-            error_log("pview alert >> users save rejected: missing required field (user_id=[" . $user_id . "], email=[" . $email . "])");
+            log_message('warning', "pview alert >> users save rejected: missing required field (user_id=[" . $user_id . "], email=[" . $email . "])");
             $this->session->setFlashdata('error', 'User ID, name, email and password are required.');
             return redirect()->to(site_url('users/add'));
         }
@@ -269,21 +314,13 @@ class User extends BaseController
 
         $role = $this->request->getPost('role');
         $role = or_default($role, 'user');
-        // Validate against the roles table so custom roles defined under
-        // /roles (e.g. vendor_lead) are accepted, not just the three
-        // built-ins. Falls back to a strict deny if the posted key is
-        // missing or doesn't match a real row.
         if (!$this->user_model->roleKeyExists($role)) {
             $this->session->setFlashdata('error', 'Invalid role selected.');
             return redirect()->to(site_url('users/add'));
         }
-        // Privilege-escalation guard. Reject any role the current actor
-        // is NOT allowed to assign — e.g. an admin-tier user creating a
-        // super_admin, or a non-admin-scope user creating an admin-tier
-        // user. The form dropdown already hides these options client-side;
-        // this is the server-side enforcement against direct POSTs.
+        // Server-side escalation guard — the dropdown hides these options but direct POSTs can bypass it.
         if (!in_array($role, assignable_role_keys(), true)) {
-            error_log('pview alert >> users save BLOCKED: actor=[' . logged_user_id() . '] role=[' . logged_user_role() . '] tried to assign role=[' . $role . ']');
+            log_message('warning', 'pview alert >> users save BLOCKED: actor=[' . logged_user_id() . '] role=[' . logged_user_role() . '] tried to assign role=[' . $role . ']');
             $this->session->setFlashdata('error', 'You do not have permission to assign that role.');
             return redirect()->to(site_url('users/add'));
         }
@@ -297,9 +334,14 @@ class User extends BaseController
             'phone'     => (string) $this->request->getPost('phone'),
             'is_active' => 1,
         ]);
-        activity_log('users', 'create', 'user', (string) $newId,
+        activity_log(
+            'users',
+            'create',
+            'user',
+            (string) $newId,
             'Created user "' . $name . '" (' . $user_id . ', ' . $role . ')',
-            ['user_id' => $user_id, 'name' => $name, 'email' => $email, 'role' => $role]);
+            ['user_id' => $user_id, 'name' => $name, 'email' => $email, 'role' => $role]
+        );
         $this->session->setFlashdata('success', 'User "' . $name . '" created.');
         return redirect()->to(site_url('users'));
     }
@@ -313,19 +355,14 @@ class User extends BaseController
             return redirect()->to(site_url('users'));
         }
 
-        // Privilege-escalation guard. If the target user's role outranks
-        // the actor's assignable list, refuse to open the edit form at
-        // all — opening it would expose a path to change the target's
-        // email / password and hijack the account. The update() endpoint
-        // also re-checks server-side.
+        // Refuse to open the edit form if the target's role is outside the actor's assignable list.
         $allowed = assignable_role_keys();
         if (!in_array((string) $user['role'], $allowed, true)) {
-            error_log('pview alert >> users edit BLOCKED: actor=[' . logged_user_id() . '] role=[' . logged_user_role() . '] tried to edit user_pk=[' . $id . '] with role=[' . $user['role'] . ']');
+            log_message('warning', 'pview alert >> users edit BLOCKED: actor=[' . logged_user_id() . '] role=[' . logged_user_role() . '] tried to edit user_pk=[' . $id . '] with role=[' . $user['role'] . ']');
             $this->session->setFlashdata('error', 'You do not have permission to edit a user with this role.');
             return redirect()->to(site_url('users'));
         }
 
-        // Pre-filter the role dropdown — same filter as add().
         $rolesFiltered = [];
         foreach ($this->user_model->getAllRoles() as $r) {
             if (in_array((string) $r['role_key'], $allowed, true)) {
@@ -355,9 +392,7 @@ class User extends BaseController
         $email   = trim((string) $this->request->getPost('email'));
         $pass    = (string) $this->request->getPost('password');
 
-        // Self-protection: a super_admin editing their OWN row cannot
-        // demote themselves or deactivate the account — that's a one-way
-        // self-lockout. They can still edit other fields.
+        // Self-edit guard: super_admin cannot demote or deactivate their own account.
         $sessionPk = (int) $this->session->get('user_pk');
         $isSelfEdit = ($sessionPk > 0 && $sessionPk === $id);
         $currentRow = $this->user_model->getById($id);
@@ -392,39 +427,30 @@ class User extends BaseController
 
         $role = $this->request->getPost('role');
         $role = or_default($role, 'user');
-        // See save() — validate against the live roles table so custom
-        // roles can be assigned via the edit form, not just built-ins.
         if (!$this->user_model->roleKeyExists($role)) {
             $this->session->setFlashdata('error', 'Invalid role selected.');
             return redirect()->to(site_url('users/edit/' . $id));
         }
 
-        // Privilege-escalation guards.
-        //   1. The target's CURRENT role must be assignable by the actor
-        //      — otherwise a lower-tier user could edit (and thereby
-        //      modify email / password of) a higher-tier user's row.
-        //   2. The new role being assigned must also be in the actor's
-        //      assignable list — blocks promotion to super_admin etc.
-        // Both checks together prevent every direct-POST escalation path.
+        // Both current role and new role must be in the actor's assignable list (prevents all escalation paths).
         $allowedRoles = assignable_role_keys();
         $currentRoleKey = '';
         if (!empty($currentRow) && isset($currentRow['role'])) {
             $currentRoleKey = (string) $currentRow['role'];
         }
         if ($currentRoleKey !== '' && !in_array($currentRoleKey, $allowedRoles, true)) {
-            error_log('pview alert >> users update BLOCKED: actor=[' . logged_user_id() . '] role=[' . logged_user_role() . '] tried to edit user_pk=[' . $id . '] with role=[' . $currentRoleKey . ']');
+            log_message('warning', 'pview alert >> users update BLOCKED: actor=[' . logged_user_id() . '] role=[' . logged_user_role() . '] tried to edit user_pk=[' . $id . '] with role=[' . $currentRoleKey . ']');
             $this->session->setFlashdata('error', 'You do not have permission to edit a user with this role.');
             return redirect()->to(site_url('users'));
         }
         if (!in_array($role, $allowedRoles, true)) {
-            error_log('pview alert >> users update BLOCKED: actor=[' . logged_user_id() . '] role=[' . logged_user_role() . '] tried to assign role=[' . $role . '] to user_pk=[' . $id . ']');
+            log_message('warning', 'pview alert >> users update BLOCKED: actor=[' . logged_user_id() . '] role=[' . logged_user_role() . '] tried to assign role=[' . $role . '] to user_pk=[' . $id . ']');
             $this->session->setFlashdata('error', 'You do not have permission to assign that role.');
             return redirect()->to(site_url('users/edit/' . $id));
         }
 
         $isActive = bool_int($this->request->getPost('is_active'));
 
-        // Self-protection: super_admin cannot demote/deactivate own row.
         if ($isSelfEdit && !empty($currentRow) && $currentRow['role'] === 'super_admin') {
             if ($role !== 'super_admin') {
                 $this->session->setFlashdata('error', 'You cannot demote your own super-admin role.');
@@ -436,9 +462,7 @@ class User extends BaseController
             }
         }
 
-        // Last-super-admin guard: if this edit would demote the only
-        // remaining super_admin, refuse — locks everyone out of /settings
-        // and /module_control_panel.
+        // Refuse if this would demote the last active super_admin.
         if (!empty($currentRow) && $currentRow['role'] === 'super_admin' && $role !== 'super_admin') {
             $remaining = $this->user_model->countActiveSuperAdmins($id);
             if ($remaining < 1) {
@@ -451,19 +475,25 @@ class User extends BaseController
             'user_id'   => $user_id,
             'name'      => $name,
             'email'     => $email,
-            'password'  => $pass, // empty = unchanged (handled inside the model)
+            'password'  => $pass,
             'role'      => $role,
             'phone'     => (string) $this->request->getPost('phone'),
             'is_active' => $isActive,
         ];
         $this->user_model->update($id, $after);
-        error_log("pview alert >> user update: id=[" . $id . "], user_id=[" . $user_id . "], by=[" . logged_user_id() . "]");
+        log_message('debug', "pview alert >> user update: id=[" . $id . "], user_id=[" . $user_id . "], by=[" . logged_user_id() . "]");
         $diff = activity_diff($currentRow, $after, ['user_id', 'name', 'email', 'role', 'phone', 'is_active']);
         if ($pass !== '') {
             $diff['password'] = ['(hidden)', '(reset)'];
         }
-        activity_log('users', 'update', 'user', (string) $id,
-            'Updated user "' . $name . '"', $diff);
+        activity_log(
+            'users',
+            'update',
+            'user',
+            (string) $id,
+            'Updated user "' . $name . '"',
+            $diff
+        );
         $this->session->setFlashdata('success', 'User "' . $name . '" updated.');
         return redirect()->to(site_url('users'));
     }
@@ -472,8 +502,6 @@ class User extends BaseController
     public function delete($id)
     {
         check_module_access('users', 'delete');
-
-        // Self-protection: a user cannot delete themselves.
         $sessionPk = (int) $this->session->get('user_pk');
         if ($sessionPk > 0 && $sessionPk === (int) $id) {
             $this->session->setFlashdata('error', 'You cannot delete your own account.');
@@ -481,21 +509,16 @@ class User extends BaseController
         }
 
         $row = $this->user_model->getById($id);
-
-        // Privilege-escalation guard. The target's role must be in the
-        // actor's assignable list — otherwise a lower-tier user could
-        // delete a higher-tier user (effectively account takeover via
-        // recreation, or denial-of-service against the rightful admin).
         if (!empty($row) && isset($row['role'])) {
             $targetRole = (string) $row['role'];
             if (!in_array($targetRole, assignable_role_keys(), true)) {
-                error_log('pview alert >> users delete BLOCKED: actor=[' . logged_user_id() . '] role=[' . logged_user_role() . '] tried to delete user_pk=[' . $id . '] with role=[' . $targetRole . ']');
+                log_message('warning', 'pview alert >> users delete BLOCKED: actor=[' . logged_user_id() . '] role=[' . logged_user_role() . '] tried to delete user_pk=[' . $id . '] with role=[' . $targetRole . ']');
                 $this->session->setFlashdata('error', 'You do not have permission to delete a user with this role.');
                 return redirect()->to(site_url('users'));
             }
         }
 
-        // Last-super-admin guard.
+        // Refuse if this would remove the last active super_admin.
         if (!empty($row) && $row['role'] === 'super_admin') {
             $remaining = $this->user_model->countActiveSuperAdmins((int) $id);
             if ($remaining < 1) {
@@ -504,12 +527,17 @@ class User extends BaseController
             }
         }
 
-        error_log("pview alert >> users delete request: id=[" . $id . "]");
+        log_message('debug', "pview alert >> users delete request: id=[" . $id . "]");
         $this->user_model->softDelete($id);
         $deletedName = isset($row['name']) ? (string) $row['name'] : '';
-        activity_log('users', 'delete', 'user', (string) $id,
+        activity_log(
+            'users',
+            'delete',
+            'user',
+            (string) $id,
             'Removed user "' . $deletedName . '"',
-            ['user_id' => isset($row['user_id']) ? $row['user_id'] : '', 'name' => $deletedName]);
+            ['user_id' => isset($row['user_id']) ? $row['user_id'] : '', 'name' => $deletedName]
+        );
         $this->session->setFlashdata('success', 'User removed.');
         return redirect()->to(site_url('users'));
     }
@@ -534,10 +562,6 @@ class User extends BaseController
     public function data_table()
     {
         check_module_access('users', 'view');
-
-        // Visible columns: User ID | Name | Email | Role | Phone | Active | Created | Actions
-        // Phone is a free-form column without an index; Actions is not sortable.
-        // The old map collapsed both onto 'name' which was misleading on click.
         $colMap = [
             0 => 'user_id',
             1 => 'name',
@@ -551,10 +575,6 @@ class User extends BaseController
         $params = dt_parse_request($this->request, $colMap);
         $result = $this->user_model->usersForDT($params);
 
-        // Pull the actor's assignable role list once so we can hide
-        // Edit/Delete on rows the actor can't manage — the controller
-        // already rejects those requests; this just keeps the table
-        // honest (no buttons that bounce back with an error).
         $assignable = assignable_role_keys();
         $canEdit    = has_module_access('users', 'edit')   === true;
         $canDelete  = has_module_access('users', 'delete') === true;
@@ -569,7 +589,6 @@ class User extends BaseController
             $uid   = isset($u['user_id']) ? (string) $u['user_id'] : '';
             $role  = isset($u['role']) ? str_replace('_', ' ', strtoupper((string) $u['role'])) : '';
 
-            // Determine if the actor is allowed to operate on this row.
             $rowRoleKey = isset($u['role']) ? (string) $u['role'] : '';
             $allowedRow = ($rowRoleKey !== '' && in_array($rowRoleKey, $assignable, true));
 
@@ -610,28 +629,33 @@ class User extends BaseController
             return json_fail('Invalid theme preference');
         }
 
-        // Update session
         $session->set('theme', $theme);
-
-        // Update database if logged in
         $userPk = (int) $session->get('user_pk');
         if ($userPk > 0) {
             $this->user_model->update($userPk, ['theme' => $theme]);
-            error_log("pview alert >> user theme updated to=[" . $theme . "] for user_pk=[" . $userPk . "]");
-            activity_log('me', 'theme_change', 'user', (string) $userPk,
-                'Theme changed to ' . $theme, ['theme' => $theme]);
+            log_message('debug', "pview alert >> user theme updated to=[" . $theme . "] for user_pk=[" . $userPk . "]");
+            activity_log(
+                'me',
+                'theme_change',
+                'user',
+                (string) $userPk,
+                'Theme changed to ' . $theme,
+                ['theme' => $theme]
+            );
         }
 
         return json_ok([], 'Theme preference updated');
     }
 
-    /** GET /users/active_json — lightweight list of active users for
-     *  mention autocomplete. Returns user_id + name; ticket detail page
-     *  caches this client-side for the lifetime of the page. */
+    /** GET /users/active_json — lightweight user list for @mention autocomplete. */
     public function active_json()
     {
         check_isvalidated();
-        $rows = $this->user_model->getActive();
+        if (has_module_access('users', 'view')) {
+            $rows = $this->user_model->getActive();
+        } else {
+            $rows = $this->user_model->getPoolUsers(logged_user_id());
+        }
         $out = [];
         foreach ($rows as $u) {
             $out[] = [
@@ -669,7 +693,6 @@ class User extends BaseController
             return redirect()->to(site_url('login'));
         }
 
-        // Sanitise each field; never trust raw POST.
         $defaultProjectId = (int) $this->request->getPost('default_project_id');
         if ($defaultProjectId < 0) {
             $defaultProjectId = 0;
@@ -678,16 +701,13 @@ class User extends BaseController
         $kpiKeys = ['open', 'critical', 'major', 'resolved'];
         $kpiVisible = [];
         foreach ($kpiKeys as $k) {
-            // Checkbox is only present in the POST when checked. Default to
-            // visible if the operator wiped the form clean.
             if ($this->request->getPost('kpi_' . $k) !== null) {
                 $kpiVisible[$k] = 1;
             } else {
                 $kpiVisible[$k] = 0;
             }
         }
-        // Don't let the operator hide ALL four KPI cards — that breaks the
-        // dashboard layout. Force at least Open Tickets back on.
+        // Ensure at least one KPI card is visible to prevent a broken layout.
         if ($kpiVisible['open'] + $kpiVisible['critical'] + $kpiVisible['major'] + $kpiVisible['resolved'] === 0) {
             $kpiVisible['open'] = 1;
         }
@@ -702,7 +722,7 @@ class User extends BaseController
             }
         }
         if (!in_array($defaultTrendRange, $allowedInt, true)) {
-            $defaultTrendRange = 0; // means "no explicit default — use the system default"
+            $defaultTrendRange = 0;
         }
 
         $layout = [
@@ -713,12 +733,17 @@ class User extends BaseController
 
         $this->user_model->update($userPk, ['dashboard_layout' => json_encode($layout)]);
 
-        // Refresh session so the change is visible on the very next render.
         $this->session->set('dashboard_layout', $layout);
 
-        error_log("pview alert >> me_dashboard saved: user_pk=[" . $userPk . "], layout=[" . json_encode($layout) . "]");
-        activity_log('me', 'prefs_save', 'user', (string) $userPk,
-            'Saved dashboard preferences', $layout);
+        log_message('debug', "pview alert >> me_dashboard saved: user_pk=[" . $userPk . "], layout=[" . json_encode($layout) . "]");
+        activity_log(
+            'me',
+            'prefs_save',
+            'user',
+            (string) $userPk,
+            'Saved dashboard preferences',
+            $layout
+        );
         $this->session->setFlashdata('success', 'Dashboard preferences updated.');
         return redirect()->to(site_url('dashboard'));
     }
@@ -731,8 +756,6 @@ class User extends BaseController
         $appModel = new \App\Models\app_model();
         $userId   = (string) $this->session->get('user_id');
 
-        // Load existing rows keyed by "project_id|severity" for fast lookup
-        // in the view. Lenient default applies when no row is found.
         $existing = [];
         $rows = $this->db->table('user_notification_settings')
             ->where('user_id', $userId)
@@ -766,9 +789,7 @@ class User extends BaseController
         $appModel = new \App\Models\app_model();
         $projects = $appModel->projectGetActive();
 
-        // Build the canonical (project_id, severity) list we expect to see:
-        //   project_id = 0 row stands for "all projects" catch-all
-        //   plus one row per active project.
+        // project_id = 0 is the "all projects" catch-all row.
         $projectIds = [0];
         foreach ($projects as $p) {
             $projectIds[] = (int) $p['id'];
@@ -778,9 +799,6 @@ class User extends BaseController
         $now = date('Y-m-d H:i:s');
         foreach ($projectIds as $pid) {
             foreach ($severities as $sev) {
-                // Checkboxes are only present in POST when checked. We treat
-                // a missing key as "disabled" so the user can opt out by
-                // unchecking — that's the whole point of the page.
                 $fieldName = 'pref_' . $pid . '_' . $sev;
                 $enabled = 0;
                 if ($this->request->getPost($fieldName) !== null) {
@@ -812,23 +830,24 @@ class User extends BaseController
             }
         }
 
-        error_log("pview alert >> me_notifications saved: user_id=[" . $userId . "]");
-        activity_log('me', 'prefs_save', 'user', $userId,
-            'Saved notification preferences');
+        log_message('debug', "pview alert >> me_notifications saved: user_id=[" . $userId . "]");
+        activity_log(
+            'me',
+            'prefs_save',
+            'user',
+            $userId,
+            'Saved notification preferences'
+        );
         $this->session->setFlashdata('success', 'Notification preferences updated.');
         return redirect()->to(site_url('me/notifications'));
     }
 
-    /** GET /roles — role list. Now permission-gated via the Module
-     *  Control Panel ('roles' module) instead of hardcoded super_admin,
-     *  so an admin can delegate role administration to a custom role. */
+    /** GET /roles — role list. */
     public function roles()
     {
         check_module_access('roles', 'view');
         activity_log('roles', 'view', null, null, 'Opened Roles page');
         $rows = $this->user_model->getAllRoles();
-        // Sprinkle a user count next to each row so the admin knows who's
-        // assigned where before they consider a delete.
         foreach ($rows as &$r) {
             $r['user_count'] = $this->user_model->countUsersWithRole($r['role_key']);
         }
@@ -866,7 +885,6 @@ class User extends BaseController
             $this->session->setFlashdata('error', 'Role key and label are required.');
             return redirect()->to(site_url('roles/add'));
         }
-        // Same grammar as user_id — keeps everything URL/HTML-safe.
         if (!preg_match('/^[a-z][a-z0-9_]{1,49}$/', $roleKey)) {
             $this->session->setFlashdata('error', 'Role key must start with a letter and contain only lowercase letters, digits, or underscore (2-50 chars).');
             return redirect()->to(site_url('roles/add'));
@@ -877,7 +895,6 @@ class User extends BaseController
             return redirect()->to(site_url('roles/add'));
         }
 
-        // Checkbox is only present in POST when checked; treat missing as 0.
         $isAdminScope = 0;
         if ($this->request->getPost('is_admin_scope') !== null) {
             $isAdminScope = 1;
@@ -890,14 +907,16 @@ class User extends BaseController
             'is_admin_scope' => $isAdminScope,
             'sort_order'     => 100,
         ]);
-        // Seed empty module_permissions rows so the Module Control Panel
-        // shows this role in its grid right away. All zeros — admin toggles
-        // what the role can do.
         $this->user_model->seedDefaultPermissions($roleKey);
 
-        activity_log('roles', 'create', 'role', $roleKey,
+        activity_log(
+            'roles',
+            'create',
+            'role',
+            $roleKey,
             'Created role "' . $label . '" (' . $roleKey . ')',
-            ['role_key' => $roleKey, 'label' => $label, 'is_admin_scope' => $isAdminScope]);
+            ['role_key' => $roleKey, 'label' => $label, 'is_admin_scope' => $isAdminScope]
+        );
 
         $this->session->setFlashdata('success', 'Role "' . $label . '" created.');
         return redirect()->to(site_url('roles'));
@@ -931,19 +950,21 @@ class User extends BaseController
         if ($this->request->getPost('is_admin_scope') !== null) {
             $isAdminScope = 1;
         }
-        // super_admin always carries admin-scope as a safety net — never
-        // accept the form's value for it. UI also disables the field for
-        // built-ins, but the server-side guard is what actually protects
-        // against direct POSTs.
+        // super_admin is always admin-scope regardless of form value.
         if ($role_key === 'super_admin') {
             $isAdminScope = 1;
         }
 
         $this->user_model->updateRoleLabel($role_key, $label);
         $this->user_model->updateRoleAdminScope($role_key, $isAdminScope);
-        activity_log('roles', 'update', 'role', (string) $role_key,
+        activity_log(
+            'roles',
+            'update',
+            'role',
+            (string) $role_key,
             'Updated role "' . $role_key . '" → "' . $label . '"',
-            ['role_key' => $role_key, 'label' => $label, 'is_admin_scope' => $isAdminScope]);
+            ['role_key' => $role_key, 'label' => $label, 'is_admin_scope' => $isAdminScope]
+        );
         $this->session->setFlashdata('success', 'Role updated.');
         return redirect()->to(site_url('roles'));
     }
@@ -967,9 +988,14 @@ class User extends BaseController
             return redirect()->to(site_url('roles'));
         }
         $this->user_model->deleteRole($role_key);
-        activity_log('roles', 'delete', 'role', (string) $role_key,
+        activity_log(
+            'roles',
+            'delete',
+            'role',
+            (string) $role_key,
             'Removed role "' . $role['label'] . '" (' . $role_key . ')',
-            ['role_key' => $role_key, 'label' => $role['label']]);
+            ['role_key' => $role_key, 'label' => $role['label']]
+        );
         $this->session->setFlashdata('success', 'Role "' . $role['label'] . '" removed.');
         return redirect()->to(site_url('roles'));
     }

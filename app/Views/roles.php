@@ -149,12 +149,12 @@ if (!isset($view) || $view === '') {
           </div>
         <?php } ?>
 
-        <div class="mt-3">
+        <div class="mt-3 d-flex justify-content-end gap-2">
+          <a href="<?= site_url('roles'); ?>" class="btn btn-light">Cancel</a>
           <button type="submit" class="btn btn-primary">
             <i class="bi bi-check-lg"></i>
             <?php if ($isEdit) { ?>Update<?php } else { ?>Create<?php } ?>
           </button>
-          <a href="<?= site_url('roles'); ?>" class="btn btn-light">Cancel</a>
         </div>
       </form>
     </div>

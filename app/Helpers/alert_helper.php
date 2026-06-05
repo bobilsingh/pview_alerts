@@ -1,10 +1,6 @@
 <?php
 
-// Alert system helper — utility functions used by controllers and views.
-
-
-// Two-layer cache: static (per-request) + file cache (5-min TTL).
-// app_settings_clear_cache() is called after saves so changes are immediate.
+// App settings and alert system helpers. Two-layer cache (per-request static + 5-min file cache).
 if (!function_exists('app_settings_all')) {
     function app_settings_all()
     {
@@ -19,7 +15,7 @@ if (!function_exists('app_settings_all')) {
         if (is_file($cacheFile) && (time() - filemtime($cacheFile)) < $cacheTtl) {
             $payload = @file_get_contents($cacheFile);
             if ($payload !== false) {
-                $decoded = @unserialize($payload);
+                $decoded = json_decode($payload, true);
                 if (is_array($decoded)) {
                     $cache = $decoded;
                     return $cache;
@@ -35,16 +31,16 @@ if (!function_exists('app_settings_all')) {
             foreach ($rows as $r) {
                 $cache[(string) $r['setting_key']] = (string) $r['setting_value'];
             }
-            @file_put_contents($cacheFile, serialize($cache), LOCK_EX);
+            @file_put_contents($cacheFile, json_encode($cache), LOCK_EX);
         } catch (\Throwable $e) {
-            error_log('pview alert >> app_settings_all() failed: ' . $e->getMessage());
+            log_message('error', 'pview alert >> app_settings_all() failed: ' . $e->getMessage());
         }
         return $cache;
     }
 }
 
 if (!function_exists('app_settings_clear_cache')) {
-    // Delete the file cache so the next request re-reads settings from DB.
+    // Deletes the file cache so the next request re-reads settings from DB.
     function app_settings_clear_cache()
     {
         $cacheFile = WRITEPATH . 'cache/app_settings.cache';
@@ -54,7 +50,7 @@ if (!function_exists('app_settings_clear_cache')) {
     }
 }
 if (!function_exists('app_setting')) {
-    // Get a single app setting by key, with optional fallback.
+    // Returns a single app setting by key with optional fallback.
     function app_setting($key, $default = null)
     {
         $map = app_settings_all();
@@ -95,7 +91,7 @@ if (!function_exists('app_setting_csv')) {
 }
 
 if (!function_exists('or_default')) {
-    // Return $value if non-empty, otherwise $default.
+    // Returns $value when non-empty, otherwise $default.
     function or_default($value, $default)
     {
         if (empty($value)) {
@@ -106,7 +102,7 @@ if (!function_exists('or_default')) {
 }
 
 if (!function_exists('bool_int')) {
-    // Convert truthy/falsy to 1/0 for DB boolean columns.
+    // Converts truthy/falsy to 1/0 for DB boolean columns.
     function bool_int($value)
     {
         if ($value) {
@@ -122,10 +118,36 @@ if (!function_exists('check_isvalidated')) {
     {
         $session = \Config\Services::session();
         $session->start();
-        if (!$session->get('user_id')) {
-            redirect()->to(site_url('login'))->send();
+        if (logged_user_id() === '') {
+            $session->destroy();
+            redirect()->to(site_url('login'))->with('error', 'Your session has expired. Please sign in again.')->send();
             exit;
         }
+        // Maintenance mode — bounce non-admin users to the maintenance page.
+        if (app_setting_bool('maintenance_mode', false)) {
+            $role = (string) $session->get('user_role');
+            if (!role_has_admin_scope($role)) {
+                $path = (string) service('request')->getUri()->getPath();
+                if (
+                    strpos($path, 'maintenance') === false
+                    && strpos($path, 'logout') === false
+                ) {
+                    redirect()->to(site_url('maintenance'))->send();
+                    exit;
+                }
+            }
+        }
+        // Idle session timeout — 0 means disabled (default).
+        $timeoutMin = app_setting_int('session_timeout_minutes', 0);
+        if ($timeoutMin > 0) {
+            $lastActivity = (int) $session->get('last_activity');
+            if ($lastActivity > 0 && (time() - $lastActivity) > ($timeoutMin * 60)) {
+                $session->destroy();
+                redirect()->to(site_url('login'))->with('error', 'Your session has expired. Please log in again.')->send();
+                exit;
+            }
+        }
+        $session->set('last_activity', time());
         // Force password change if flagged; exempt /password/change and /logout
         // to avoid a redirect loop.
         if ($session->get('password_must_rotate')) {
@@ -140,7 +162,6 @@ if (!function_exists('check_isvalidated')) {
     }
 }
 
-// super_admin only — for users/settings/api-keys endpoints.
 if (!function_exists('check_issuperadmin')) {
     function check_issuperadmin()
     {
@@ -154,30 +175,7 @@ if (!function_exists('check_issuperadmin')) {
     }
 }
 
-if (!function_exists('is_super_admin')) {
-    /** Plain boolean check for views / templates. No redirect. */
-    function is_super_admin()
-    {
-        return \Config\Services::session()->get('user_role') === 'super_admin';
-    }
-}
-
-// Returns the list of role_keys the current actor is allowed to assign
-// to a user (in the Add User form) or to act on (Edit / Delete a user
-// who currently holds that role).
-//
-// Hierarchy:
-//   super_admin            → any role
-//   admin-scope non-super  → all roles except super_admin
-//   non-admin-scope        → only other non-admin-scope roles
-//
-// This is the single source of truth for both the form dropdown
-// (filter what the user sees) and server-side validation (reject
-// privilege escalation attempts via direct POST). Use it everywhere a
-// role assignment or a user-row mutation is being authorised.
-//
-// $actor_role defaults to the logged-in user's role; pass an explicit
-// key only when the actor isn't the session user (rare).
+// Returns role keys the current actor may assign: super_admin = all, admin-scope = non-super, else = non-admin only.
 if (!function_exists('assignable_role_keys')) {
     function assignable_role_keys($actor_role = null)
     {
@@ -189,9 +187,7 @@ if (!function_exists('assignable_role_keys')) {
             return [];
         }
 
-        // Per-request cache so calling this from view + controller in
-        // the same render doesn't double-query the roles table.
-        static $cache = [];
+            static $cache = [];
         if (isset($cache[$actor_role])) {
             return $cache[$actor_role];
         }
@@ -211,36 +207,22 @@ if (!function_exists('assignable_role_keys')) {
                 $isAdminScope   = ((int) ($r['is_admin_scope'] ?? 0)) === 1;
 
                 if ($isSuper && !$actorIsSuper) {
-                    // super_admin is gated to existing super_admins only.
                     continue;
                 }
                 if ($isAdminScope && !$actorIsAdminScope) {
-                    // A non-admin-scope actor cannot grant admin-tier roles
-                    // (would be a clear privilege-escalation path).
                     continue;
                 }
                 $allowed[] = $key;
             }
         } catch (\Throwable $e) {
-            error_log('assignable_role_keys() lookup failed: ' . $e->getMessage());
+            log_message('error', 'assignable_role_keys() lookup failed: ' . $e->getMessage());
         }
         $cache[$actor_role] = $allowed;
         return $allowed;
     }
 }
 
-// Returns true when the given role key carries admin-tier scope —
-// i.e. sees all tickets globally rather than only their own. Replaces
-// the hardcoded `in_array($role, ['admin','super_admin'])` checks that
-// were scattered across the codebase, so custom roles like 'vendor_lead'
-// can be configured as admin-scope via the role form.
-//
-// super_admin is short-circuited true so the hardcoded master role stays
-// admin-scope even if its DB row gets accidentally unflagged — the same
-// safety-net rationale used elsewhere for that role.
-//
-// $role defaults to the logged-in user's role; pass an explicit role_key
-// for service code or cron paths that aren't in a session context.
+// Returns true when the role has admin-scope (sees all tickets). super_admin is always true as a safety net.
 if (!function_exists('role_has_admin_scope')) {
     function role_has_admin_scope($role = null)
     {
@@ -270,15 +252,13 @@ if (!function_exists('role_has_admin_scope')) {
                     }
                 }
             } catch (\Throwable $e) {
-                error_log('role_has_admin_scope() lookup failed: ' . $e->getMessage());
+                log_message('error', 'role_has_admin_scope() lookup failed: ' . $e->getMessage());
             }
         }
         if (isset($cache[$role])) {
             return $cache[$role];
         }
-        // Defensive fallback for installs where the migration hasn't run
-        // yet: keep the historical built-in admin tier working so nobody
-        // gets unexpectedly downgraded before the DB column appears.
+        // Fallback for older installs before the is_admin_scope column was added.
         return ($role === 'admin');
     }
 }
@@ -295,25 +275,28 @@ if (!function_exists('safe_alarm_id')) {
     }
 }
 
-// Access: admins pass; others must be assignee, raised_by, or in a level user list.
 if (!function_exists('verify_ticket_access')) {
     function verify_ticket_access($ticket)
     {
-        if (empty($ticket)) return false;
+        if (empty($ticket)) {
+            return false;
+        }
 
         $role = logged_user_role();
-        if (role_has_admin_scope($role)) return $ticket;
+        if (role_has_admin_scope($role)) {
+            return $ticket;
+        }
 
-        // After the 2026-05-21 migration, user references everywhere
-        // are the human user_id string (e.g. "bobil.singh"), not the
-        // numeric PK. Compare as strings.
         $uid = (string) logged_user_id();
         $assignee = (string) (isset($ticket['current_assignee']) ? $ticket['current_assignee'] : '');
         $raisedBy = (string) (isset($ticket['raised_by']) ? $ticket['raised_by'] : '');
-        if ($uid !== '' && $assignee === $uid) return $ticket;
-        if ($uid !== '' && $raisedBy === $uid) return $ticket;
+        if ($uid !== '' && $assignee === $uid) {
+            return $ticket;
+        }
+        if ($uid !== '' && $raisedBy === $uid) {
+            return $ticket;
+        }
 
-        // Check the current state's level user lists (JSON of strings).
         $db = \Config\Database::connect();
         $state = $db->table('states')
             ->where('id', (int) (isset($ticket['current_state_id']) ? $ticket['current_state_id'] : 0))
@@ -328,7 +311,6 @@ if (!function_exists('verify_ticket_access')) {
             }
         }
 
-        // Check historical ticket participation (comments, state changes, etc.).
         if ($uid !== '') {
             $historyCount = $db->table('ticket_actions')
                 ->where('ticket_id', (int) $ticket['id'])
@@ -343,29 +325,11 @@ if (!function_exists('verify_ticket_access')) {
     }
 }
 
-// Logged-in user accessors.
-// After the 2026-05-21 migration, all FK columns store the user_id string
-// (e.g. "bobil.singh") — logged_user_id() returns that string directly.
 if (!function_exists('logged_user_id')) {
     function logged_user_id()
     {
-        $s = \Config\Services::session();
-        // Fall through to user_uid for sessions created before the migration.
-        $uid = $s->get('user_id');
-        if (!empty($uid)) {
-            return (string) $uid;
-        }
-        $alt = $s->get('user_uid');
-        if (!empty($alt)) {
-            return (string) $alt;
-        }
-        return '';
-    }
-}
-if (!function_exists('logged_user_uid')) {
-    function logged_user_uid()
-    {
-        return logged_user_id(); // alias kept for view compatibility
+        $uid = \Config\Services::session()->get('user_id');
+        return !empty($uid) ? (string) $uid : '';
     }
 }
 
@@ -390,10 +354,7 @@ if (!function_exists('logged_user_role')) {
     }
 }
 
-// Read one key out of the logged-in user's dashboard_layout JSON, with a
-// fallback when the key is missing or the user has never customised. The
-// JSON is loaded into session once at login by user_model::setSession(), so
-// this is a cheap session lookup — no DB hit per call.
+// Reads a key from the session's dashboard_layout JSON (loaded at login — no DB hit).
 if (!function_exists('user_dashboard_pref')) {
     function user_dashboard_pref($key, $default = null)
     {
@@ -426,7 +387,7 @@ if (!function_exists('generate_alarm_id')) {
     }
 }
 
-// Email template builder. Inline styles only — most email clients strip <style> tags.
+// Email template builders — inline styles only (email clients strip <style> tags).
 if (!function_exists('mail_subject')) {
     function mail_subject($event, $context)
     {
@@ -461,6 +422,26 @@ if (!function_exists('mail_subject')) {
                 return '[SLA WARNING L' . $lvl . '] ' . $alarm . ' approaching TAT breach';
         }
         return $tag . ' ' . $alarm;
+    }
+}
+
+if (!function_exists('mail_chip_span')) {
+    function mail_chip_span($text, $bg, $fg = '#FFFFFF')
+    {
+        return '<span style="display:inline-block;padding:3px 9px;border-radius:10px;font-size:11px;font-weight:700;letter-spacing:0.5px;background:' . $bg . ';color:' . $fg . ';">' . esc($text) . '</span>';
+    }
+}
+
+if (!function_exists('mail_kv_row')) {
+    function mail_kv_row($label, $value)
+    {
+        if ($value === '' || $value === null) {
+            $value = '—';
+        }
+        return '<tr>'
+            . '<td style="padding:6px 12px;border-bottom:1px solid #E2E8F0;color:#64748B;font-size:12px;text-transform:uppercase;letter-spacing:0.5px;width:35%;">' . esc($label) . '</td>'
+            . '<td style="padding:6px 12px;border-bottom:1px solid #E2E8F0;color:#0F172A;font-size:14px;">' . $value . '</td>'
+            . '</tr>';
     }
 }
 
@@ -542,47 +523,35 @@ if (!function_exists('mail_html_body')) {
                 $bannerBg = '#B91C1C';
                 break;
             case 'tat_warning':
-                // Fires when a ticket reaches 80% of its TAT window. The
-                // intent is proactive: alert the current level's supervisor
-                // pool BEFORE the breach so they can intervene rather than
-                // reacting after auto-escalation.
+                // Fires at 80% TAT consumed — proactive warning before auto-escalation triggers.
                 $headline = 'SLA warning — approaching breach (L' . $level . ')';
                 $lead     = 'This ticket has consumed 80% of its TAT window at level <strong>L' . $level . '</strong>. Please act now to prevent an auto-escalation.';
                 $bannerBg = '#B45309';
                 break;
         }
 
-        $chip = function ($text, $bg, $fg = '#FFFFFF') {
-            return '<span style="display:inline-block;padding:3px 9px;border-radius:10px;font-size:11px;font-weight:700;letter-spacing:0.5px;background:' . $bg . ';color:' . $fg . ';">' . esc($text) . '</span>';
-        };
-
-        $kv = function ($label, $value) {
-            if ($value === '' || $value === null) {
-                $value = '—';
-            }
-            return '<tr>'
-                . '<td style="padding:6px 12px;border-bottom:1px solid #E2E8F0;color:#64748B;font-size:12px;text-transform:uppercase;letter-spacing:0.5px;width:35%;">' . esc($label) . '</td>'
-                . '<td style="padding:6px 12px;border-bottom:1px solid #E2E8F0;color:#0F172A;font-size:14px;">' . $value . '</td>'
-                . '</tr>';
-        };
-
         $rows  = '';
-        $rows .= $kv('Alarm ID',  '<code style="font-family:Consolas,monospace;font-size:13px;background:#F1F5F9;padding:2px 6px;border-radius:4px;color:#0F172A;">' . esc($alarm) . '</code>');
-        $rows .= $kv('Severity',  $chip($sevLabel, $sevColor));
-        $rows .= $kv('Priority',  $chip($pp[1], $pp[0]));
-        $rows .= $kv('Project',   esc($project));
+        $rows .= mail_kv_row('Alarm ID',  '<code style="font-family:Consolas,monospace;font-size:13px;background:#F1F5F9;padding:2px 6px;border-radius:4px;color:#0F172A;">' . esc($alarm) . '</code>');
+        $rows .= mail_kv_row('Severity',  mail_chip_span($sevLabel, $sevColor));
+        $rows .= mail_kv_row('Priority',  mail_chip_span($pp[1], $pp[0]));
+        $rows .= mail_kv_row('Project',   esc($project));
         if ($flow !== '') {
-            $rows .= $kv('Flow', esc($flow));
+            $rows .= mail_kv_row('Flow', esc($flow));
         }
-        $rows .= $kv('State',     esc($state));
-        $rows .= $kv('Level',     'L' . $level);
+        $rows .= mail_kv_row('State',     esc($state));
+        $rows .= mail_kv_row('Level',     'L' . $level);
         if ($tatExp !== '') {
             $ts = strtotime($tatExp);
-            $when = $ts ? date('D, d M Y H:i', $ts) : $tatExp;
-            $rows .= $kv('TAT expires', esc($when));
+            $when = '';
+            if ($ts) {
+                $when = date('D, d M Y H:i', $ts);
+            } else {
+                $when = $tatExp;
+            }
+            $rows .= mail_kv_row('TAT expires', esc($when));
         }
         if ($comment !== '') {
-            $rows .= $kv('Note', '<em style="color:#475569;">' . esc($comment) . '</em>');
+            $rows .= mail_kv_row('Note', '<em style="color:#475569;">' . esc($comment) . '</em>');
         }
 
         $descBlock = '';
@@ -666,17 +635,14 @@ if (!function_exists('mail_html_body')) {
 if (!function_exists('send_email')) {
     function send_email($to, $subject, $body)
     {
-        // Load Config\Email so we have sane defaults to fall back to when
-        // a corresponding row is missing from app_settings.
         try {
             $emailConfig = new \Config\Email();
         } catch (\Throwable $e) {
-            error_log('send_email config load failed: ' . $e->getMessage());
+            log_message('error', 'send_email config load failed: ' . $e->getMessage());
             return false;
         }
 
-        // DB-first, config-fallback resolution. Lets admins re-point SMTP
-        // from the Settings page without touching .env / files.
+        // DB settings take priority so admins can reconfigure SMTP without touching .env.
         $protocol  = (string) app_setting('email_protocol',   $emailConfig->protocol);
         $host      = (string) app_setting('email_smtp_host',  $emailConfig->SMTPHost);
         $port      = (int)    app_setting('email_smtp_port',  $emailConfig->SMTPPort);
@@ -725,20 +691,14 @@ if (!function_exists('send_email')) {
             $mail->send();
             return true;
         } catch (\Throwable $e) {
-            error_log('send_email failed: ' . $e->getMessage());
+            log_message('error', 'send_email failed: ' . $e->getMessage());
             return false;
         }
     }
 }
 
 if (!function_exists('parse_mentions')) {
-    // Pull `@username` tokens out of a free-form comment, resolve each to
-    // an active user_id, dedupe, and exclude the user who wrote the comment
-    // (no point notifying yourself for @self). Returns an array of strings.
-    //
-    // Username grammar matches users.user_id: 3-64 chars, letters / digits /
-    // dot / underscore / hyphen. The trigger `@` must be at start-of-string
-    // or preceded by whitespace, mirroring the JS autocomplete.
+    // Extracts @username tokens from text, resolves to active user_ids, and excludes the author.
     function parse_mentions($text, $excludeUserId = '')
     {
         $text = (string) $text;
@@ -772,27 +732,17 @@ if (!function_exists('parse_mentions')) {
     }
 }
 
-// Highlights @username mentions inside a comment body for safe HTML
-// rendering. Escapes the whole string first (so the input is safe by
-// default), then wraps any "@user_id" patterns (matching the same
-// grammar as parse_mentions / the JS autocomplete) in a styled span so
-// mentions are visually distinct from regular text in the ticket
-// timeline. The output is HTML-safe — the only inserted markup is the
-// known span we control, and the rest is already escaped.
+// Wraps @username tokens in a styled span; HTML-escapes all other content first.
 if (!function_exists('highlight_mentions')) {
     function highlight_mentions($text)
     {
         $escaped = esc((string) $text);
-        // Same trigger rule as parse_mentions: @ must be at start of
-        // string OR preceded by whitespace; user_id grammar is 3-64
-        // chars of [a-zA-Z0-9._-].
         $replaced = preg_replace(
             '/(^|\s)@([a-zA-Z0-9._-]{3,64})/u',
             '$1<span class="mention-chip">@$2</span>',
             $escaped
         );
-        // preg_replace returns null on regex errors — fall back to the
-        // escaped (but unstyled) string so we never echo raw input.
+        // Fall back to the escaped string on regex failure.
         if ($replaced === null) {
             return $escaped;
         }
@@ -801,17 +751,7 @@ if (!function_exists('highlight_mentions')) {
 }
 
 if (!function_exists('user_notify_allowed')) {
-    // Returns true when the given user should receive an email notification
-    // for the given (project_id, severity) combination, based on the rows
-    // they have in user_notification_settings.
-    //
-    // Lookup order (most-specific first), default true on miss:
-    //   1. (user_id, project_id, severity)  — exact override
-    //   2. (user_id, 0,         severity)  — "all projects" override
-    //   3. fallback                          — allow
-    //
-    // Lenient by design: an operator who hasn't visited the prefs page yet
-    // never silently misses an alert.
+    // Returns true when this user allows notifications for the given project+severity (lenient default = allow).
     function user_notify_allowed($user_id, $project_id, $severity)
     {
         $user_id    = (string) $user_id;
@@ -820,8 +760,7 @@ if (!function_exists('user_notify_allowed')) {
         if ($user_id === '' || $severity === '') {
             return true;
         }
-        // Cache the per-user prefs map for the duration of a single request
-        // so a single tat_monitor cron tick doesn't re-query for every recipient.
+        // Per-request cache avoids re-querying for each recipient in a cron run.
         static $cache = [];
         if (!isset($cache[$user_id])) {
             try {
@@ -854,15 +793,7 @@ if (!function_exists('user_notify_allowed')) {
 }
 
 if (!function_exists('notify_users')) {
-    // Enqueue an email for each target user. SMTP delivery happens out of
-    // band — tat_monitor.php calls process_notification_queue() at the end
-    // of each cron run, so the request thread isn't held waiting on the
-    // mail server. notification_logs.status is already an enum
-    // ('sent','failed','pending') — we just start using 'pending'.
-    //
-    // Recipients are filtered through user_notify_allowed() based on the
-    // ticket's project + severity, so per-user opt-outs in
-    // user_notification_settings are honoured before any row is enqueued.
+    // Queues email rows in notification_logs for out-of-band delivery by tat_monitor.php.
     function notify_users($user_ids, $ticket_id, $subject, $body)
     {
         if (empty($user_ids)) {
@@ -877,9 +808,6 @@ if (!function_exists('notify_users')) {
             return;
         }
 
-        // Resolve project_id + severity from the ticket so the filter can
-        // honour per-user prefs. If we can't read the ticket (shouldn't
-        // happen in practice), skip filtering and behave as before.
         $project_id = 0;
         $severity   = '';
         if ((int) $ticket_id > 0) {
@@ -898,7 +826,7 @@ if (!function_exists('notify_users')) {
         foreach ($rows as $u) {
             // Filter through the per-user matrix. Lenient default = allow.
             if ($severity !== '' && !user_notify_allowed($u['user_id'], $project_id, $severity)) {
-                error_log("pview alert >> notify_users SKIP (user opted out): user=[" . $u['user_id'] . "], ticket=[" . $ticket_id . "], severity=[" . $severity . "]");
+                log_message('debug', "pview alert >> notify_users SKIP (user opted out): user=[" . $u['user_id'] . "], ticket=[" . $ticket_id . "], severity=[" . $severity . "]");
                 continue;
             }
             $db->table('notification_logs')->insert([
@@ -911,7 +839,7 @@ if (!function_exists('notify_users')) {
                 'sent_at'         => null,
                 'created_at'      => $now,
             ]);
-            error_log("pview alert >> email queued: ticket_id=[" . $ticket_id . "], to=[" . $u['email'] . "]");
+            log_message('debug', "pview alert >> email queued: ticket_id=[" . $ticket_id . "], to=[" . $u['email'] . "]");
         }
 
         // Keep the notification logs table bounded. Prune entries older than 90 days.
@@ -927,17 +855,7 @@ if (!function_exists('notify_users')) {
 }
 
 if (!function_exists('process_notification_queue')) {
-    // Drain pending notification_logs rows via send_email() and update each
-    // row to 'sent' or 'failed'. Called from tat_monitor.php at the end of
-    // each cron run so notifications enqueued by notify_users() go out of
-    // band rather than blocking the user-facing request that wrote them.
-    //
-    // $batch        — max rows to process per invocation (default 50)
-    // $maxAttempts  — give up after this many transient failures (default 5)
-    //
-    // Both knobs fall back to app_settings (notification_batch_size /
-    // notification_max_attempts) when the caller doesn't override.
-    //
+    // Drains pending notification_logs rows; marks each sent/failed. Called from tat_monitor.php.
     // Returns ['sent' => int, 'failed' => int, 'retried' => int].
     function process_notification_queue($batch = 0, $maxAttempts = 0)
     {
@@ -949,7 +867,6 @@ if (!function_exists('process_notification_queue')) {
         if ($maxAttempts < 1) {
             $maxAttempts = (int) app_setting('notification_max_attempts', 5);
         }
-        // Defensive floors / ceilings so a bad setting can't break the cron.
         if ($batch < 1) {
             $batch = 50;
         }
@@ -983,7 +900,7 @@ if (!function_exists('process_notification_queue')) {
             try {
                 $ok = send_email($recipient, (string) $row['subject'], (string) $row['body']);
             } catch (\Throwable $e) {
-                error_log('pview alert >> queue send threw: id=[' . $row['id'] . '], err=[' . $e->getMessage() . ']');
+                log_message('error', 'pview alert >> queue send threw: id=[' . $row['id'] . '], err=[' . $e->getMessage() . ']');
                 $ok = false;
             }
             if ($ok) {
@@ -993,12 +910,11 @@ if (!function_exists('process_notification_queue')) {
                     'error_message' => null,
                 ]);
                 $sent++;
-                error_log('pview alert >> queue sent: id=[' . $row['id'] . '], to=[' . $recipient . ']');
+                log_message('debug', 'pview alert >> queue sent: id=[' . $row['id'] . '], to=[' . $recipient . ']');
                 continue;
             }
 
-            // Track transient failures via the error_message tail "/N" so we
-            // can give up after $maxAttempts without adding a column.
+            // Track retry count via "/N" suffix in error_message to avoid adding a column.
             $attempts = 1;
             if (!empty($row['error_message']) && preg_match('#/(\d+)$#', (string) $row['error_message'], $m)) {
                 $attempts = (int) $m[1] + 1;
@@ -1009,7 +925,7 @@ if (!function_exists('process_notification_queue')) {
                     'error_message' => 'send failed after ' . $attempts . ' attempt(s)',
                 ]);
                 $failed++;
-                error_log('pview alert >> queue give-up: id=[' . $row['id'] . '], to=[' . $recipient . '], attempts=[' . $attempts . ']');
+                log_message('warning', 'pview alert >> queue give-up: id=[' . $row['id'] . '], to=[' . $recipient . '], attempts=[' . $attempts . ']');
             } else {
                 $db->table('notification_logs')->where('id', (int) $row['id'])->update([
                     'error_message' => 'transient send failure /' . $attempts,
@@ -1023,12 +939,8 @@ if (!function_exists('process_notification_queue')) {
 }
 
 if (!function_exists('notify_ticket_event')) {
-    // Convenience wrapper that builds the templated body via mail_html_body()
-    // and enqueues per-user notifications for a ticket lifecycle event.
-    // $event matches the keys mail_html_body() understands
-    // ('created' | 'state_changed' | 'level_escalated' | 'resolved' |
-    //  'closed' | 'assigned' | 'tat_breach').
-    function notify_ticket_event($event, array $ticket, array $extraContext = [], array $userIds = [])
+    // Builds a templated email body for a ticket lifecycle event and queues it via notify_users().
+    function notify_ticket_event($event, $ticket, $extraContext = [], $userIds = [])
     {
         if (empty($userIds)) {
             return;
@@ -1056,13 +968,7 @@ if (!function_exists('notify_ticket_event')) {
 }
 
 if (!function_exists('tat_expires_at')) {
-    // ISO 8601 timestamp when the TAT expires for the ticket's current level.
-    // Returns '' when there is no active TAT to count down to:
-    //   - ticket is resolved or closed (lifecycle has ended)
-    //   - current state is final (no further TAT applies)
-    //   - state row missing (cannot compute)
-    // $state is optional; falls back to TAT/final fields on $ticket itself
-    // (the standard joined row from App_model::ticketSelect() carries them).
+    // Returns the ISO 8601 TAT expiry timestamp, or '' for resolved/closed/final tickets.
     function tat_expires_at($ticket, $state = null)
     {
         if (empty($ticket)) {
@@ -1114,11 +1020,7 @@ if (!function_exists('tat_minutes_for_level')) {
 }
 
 if (!function_exists('tat_total_minutes')) {
-    // Total TAT window in minutes for the current ticket state+level.
-    // Used by the JS countdown to decide when to show the "warning" colour
-    // (last 25% of the window) vs the breached pulse. Returns 0 for tickets
-    // whose lifecycle has ended (resolved/closed/final state) so the JS can
-    // suppress the warning state entirely.
+    // Returns the TAT window in minutes for the current level; 0 for resolved/closed/final tickets.
     function tat_total_minutes($ticket, $state = null)
     {
         if (empty($ticket)) {
@@ -1156,7 +1058,6 @@ if (!function_exists('tat_total_minutes')) {
     }
 }
 
-// --- Badge renderers ---
 if (!function_exists('alert_badge')) {
     function alert_badge($type)
     {
@@ -1231,7 +1132,6 @@ if (!function_exists('level_badge')) {
     }
 }
 
-// --- Validation helpers ---
 if (!function_exists('validate_password')) {
     // Check password against admin-configured min length and character requirements.
     function validate_password($password)
@@ -1290,7 +1190,6 @@ if (!function_exists('password_must_rotate')) {
     }
 }
 
-// --- JSON / DataTables AJAX helpers ---
 if (!function_exists('json_ok')) {
     function json_ok($data = [], $message = 'Success')
     {
@@ -1306,6 +1205,7 @@ if (!function_exists('json_fail')) {
     {
         return service('response')->setStatusCode($code)->setJSON([
             'success' => false,
+            'data'    => [],
             'message' => $message,
         ]);
     }
@@ -1368,112 +1268,43 @@ if (!function_exists('dt_json_response')) {
     }
 }
 
+
 if (!function_exists('module_registry')) {
+    // Reads all registered modules from the `modules` table.
+    // Returns [module_key => [name, desc, is_builtin]] ordered by sort_order.
+    // Uses a static per-request cache so the DB is only queried once.
+    // Falls back to empty when the modules table does not exist yet.
     function module_registry()
     {
-        return [
-            'dashboard' => [
-                'name' => 'Dashboard',
-                'desc' => 'Main system status and active ticket overview charts.',
-                'defaults' => [
-                    'super_admin' => [1, 1, 1, 1],
-                    'admin'       => [1, 1, 1, 1],
-                    'user'        => [1, 0, 0, 0]
-                ]
-            ],
-            'projects' => [
-                'name' => 'Projects',
-                'desc' => 'Configure project namespaces and operational domains.',
-                'defaults' => [
-                    'super_admin' => [1, 1, 1, 1],
-                    'admin'       => [1, 1, 1, 1],
-                    'user'        => [0, 0, 0, 0]
-                ]
-            ],
-            'flows' => [
-                'name' => 'Flows',
-                'desc' => 'Define ticket state transition flow structures.',
-                'defaults' => [
-                    'super_admin' => [1, 1, 1, 1],
-                    'admin'       => [1, 1, 1, 1],
-                    'user'        => [0, 0, 0, 0]
-                ]
-            ],
-            'alerts' => [
-                'name' => 'Alert Defs',
-                'desc' => 'Map external telemetry thresholds to initial ticket states.',
-                'defaults' => [
-                    'super_admin' => [1, 1, 1, 1],
-                    'admin'       => [1, 1, 1, 1],
-                    'user'        => [0, 0, 0, 0]
-                ]
-            ],
-            'escalation' => [
-                'name' => 'Escalation Matrix',
-                'desc' => 'Set up auto-escalation matrix levels and breached-TAT rules.',
-                'defaults' => [
-                    'super_admin' => [1, 1, 1, 1],
-                    'admin'       => [1, 1, 1, 1],
-                    'user'        => [0, 0, 0, 0]
-                ]
-            ],
-            'tickets' => [
-                'name' => 'Tickets (My & Raise)',
-                'desc' => 'Create tickets manually and view assigned actionable lists.',
-                'defaults' => [
-                    'super_admin' => [1, 1, 1, 1],
-                    'admin'       => [1, 1, 1, 1],
-                    'user'        => [1, 1, 1, 0]
-                ]
-            ],
-            'tickets_all' => [
-                'name' => 'All Tickets',
-                'desc' => 'Comprehensive operational overview listing all ticket instances.',
-                'defaults' => [
-                    'super_admin' => [1, 1, 1, 1],
-                    'admin'       => [1, 1, 1, 1],
-                    'user'        => [0, 0, 0, 0]
-                ]
-            ],
-            'users' => [
-                'name' => 'Users',
-                'desc' => 'System operator accounts, passwords, and assigned user roles.',
-                'defaults' => [
-                    'super_admin' => [1, 1, 1, 1],
-                    'admin'       => [0, 0, 0, 0],
-                    'user'        => [0, 0, 0, 0]
-                ]
-            ],
-            'api_keys' => [
-                'name' => 'API Keys',
-                'desc' => 'Generate external telemetry system API keys for ticket injection.',
-                'defaults' => [
-                    'super_admin' => [1, 1, 1, 1],
-                    'admin'       => [0, 0, 0, 0],
-                    'user'        => [0, 0, 0, 0]
-                ]
-            ],
-            'roles' => [
-                'name' => 'Roles',
-                'desc' => 'Manage custom roles beyond the built-in super_admin / admin / user.',
-                'defaults' => [
-                    'super_admin' => [1, 1, 1, 1],
-                    'admin'       => [0, 0, 0, 0],
-                    'user'        => [0, 0, 0, 0]
-                ]
-            ],
-            'activity_logs' => [
-                'name' => 'Activity Log',
-                'desc' => 'Centralized audit + activity feed; read-only history of user events.',
-                'defaults' => [
-                    'super_admin' => [1, 0, 0, 0],
-                    'admin'       => [0, 0, 0, 0],
-                    'user'        => [0, 0, 0, 0]
-                ]
-            ]
-        ];
+        static $cache = null;
+        if ($cache !== null) {
+            return $cache;
+        }
+        $cache = [];
+        try {
+            $db = \Config\Database::connect();
+            $tableCheck = $db->query("SHOW TABLES LIKE 'modules'")->getResultArray();
+            if (empty($tableCheck)) {
+                return $cache;
+            }
+            $rows = $db->table('modules')
+                ->orderBy('sort_order', 'asc')
+                ->orderBy('id', 'asc')
+                ->get()->getResultArray();
+            foreach ($rows as $row) {
+                $cache[(string) $row['module_key']] = [
+                    'name'       => (string) $row['name'],
+                    'desc'       => (string) $row['description'],
+                    'is_builtin' => (int)    $row['is_builtin'],
+                ];
+            }
+        } catch (\Throwable $e) {
+            log_message('error', 'module_registry() failed: ' . $e->getMessage());
+        }
+        return $cache;
     }
 }
+
 
 if (!function_exists('has_module_access')) {
     function has_module_access($module_key, $action = 'view')
@@ -1483,8 +1314,8 @@ if (!function_exists('has_module_access')) {
             return false;
         }
 
-        // Module Control Panel and System Settings are always super_admin only
-        if ($module_key === 'module_control_panel' || $module_key === 'settings') {
+        // Settings is always super_admin only — excluded from role configuration by design.
+        if ($module_key === 'settings') {
             if ($role === 'super_admin') {
                 return true;
             }
@@ -1522,7 +1353,7 @@ if (!function_exists('has_module_access')) {
                     }
                 }
             } catch (\Throwable $e) {
-                error_log('has_module_access() database query failed: ' . $e->getMessage());
+                log_message('error', 'has_module_access() database query failed: ' . $e->getMessage());
             }
         }
 
@@ -1540,19 +1371,7 @@ if (!function_exists('has_module_access')) {
             }
         }
 
-        // Fallback to registry defaults only when no DB row exists for
-        // this (role, module_key) — e.g. a brand-new module was added to
-        // the registry after the admin last saved the panel.
-        $registry = module_registry();
-        if (isset($registry[$module_key]['defaults'][$role])) {
-            $map = ['view' => 0, 'add' => 1, 'edit' => 2, 'delete' => 3];
-            $idx = $map[$action] ?? null;
-            if ($idx !== null) {
-                $defs = $registry[$module_key]['defaults'][$role];
-                return (isset($defs[$idx]) && $defs[$idx] === 1);
-            }
-        }
-
+        // No DB row for this role + module combination means no access.
         return false;
     }
 }
@@ -1590,16 +1409,15 @@ if (!function_exists('_first_accessible_module')) {
             ['tickets_all',   'view', 'tickets/all',    'All Tickets'],
             // System group — order mirrors templates/sidebar.php exactly
             // so login landing / breadcrumb root pick the same first item
-            // the user sees in the menu. Module Permissions is still
-            // super_admin-only via the special case inside has_module_access,
-            // and Roles is now a fully managed module gated by its own
-            // module_permissions row.
-            ['api_keys',             'view', 'api_keys',             'API Keys'],
+            // the user sees in the menu.
             ['users',                'view', 'users',                'Users'],
-            ['roles',                'view', 'roles',                'Roles'],
+            ['api_keys',             'view', 'api_keys',             'API Keys'],
             ['activity_logs',        'view', 'activity_logs',        'Activity Log'],
-            ['module_control_panel', 'view', 'module_control_panel', 'Module Permissions'],
+            ['cron_panel',           'view', 'cron_panel',           'Cron Panel'],
+            // Administration group
             ['settings',             'view', 'settings',             'Settings'],
+            ['roles',                'view', 'roles',                'Roles'],
+            ['module_control_panel', 'view', 'module_control_panel', 'Module Permissions'],
         ];
         foreach ($candidates as $c) {
             if (has_module_access($c[0], $c[1]) === true) {
@@ -1640,7 +1458,7 @@ if (!function_exists('check_module_access')) {
         if ($allowed === false) {
             $user_id = logged_user_id();
             $user_role = logged_user_role();
-            error_log("pview alert >> ACCESS DENIED: user_id=[" . $user_id . "] role=[" . $user_role . "] module=[" . $module_key . "] action=[" . $action . "]");
+            log_message('warning', "pview alert >> ACCESS DENIED: user_id=[" . $user_id . "] role=[" . $user_role . "] module=[" . $module_key . "] action=[" . $action . "]");
 
             $session = \Config\Services::session();
             $session->setFlashdata('error', 'You do not have permission to access that module.');
@@ -1669,10 +1487,11 @@ if (!function_exists('activity_log')) {
             // Most rows pull performer from session; auth events (login,
             // login_failed) pass an explicit override so we still capture
             // the user_id they tried.
-            $userId   = isset($overrides['user_id'])   ? (string) $overrides['user_id']   : (string) logged_user_id();
-            $userName = isset($overrides['user_name']) ? (string) $overrides['user_name'] : (string) logged_user_name();
-            $userRole = isset($overrides['user_role']) ? (string) $overrides['user_role'] : (string) logged_user_role();
-            $status   = isset($overrides['status'])    ? (string) $overrides['status']    : 'success';
+            $userId    = isset($overrides['user_id'])    ? (string) $overrides['user_id']    : (string) logged_user_id();
+            $userName  = isset($overrides['user_name'])  ? (string) $overrides['user_name']  : (string) logged_user_name();
+            $userRole  = isset($overrides['user_role'])  ? (string) $overrides['user_role']  : (string) logged_user_role();
+            $status    = isset($overrides['status'])     ? (string) $overrides['status']     : 'success';
+            $projectId = isset($overrides['project_id']) ? ((int) $overrides['project_id'] ?: null) : null;
 
             $ip = '';
             if (isset($_SERVER['REMOTE_ADDR'])) {
@@ -1689,6 +1508,22 @@ if (!function_exists('activity_log')) {
             $method = '';
             if (isset($_SERVER['REQUEST_METHOD'])) {
                 $method = (string) $_SERVER['REQUEST_METHOD'];
+            }
+
+            // Parse a short browser name from the UA string.
+            $browser = null;
+            if ($ua !== '') {
+                if (strpos($ua, 'Edg/') !== false || strpos($ua, 'Edge/') !== false) {
+                    $browser = 'Edge';
+                } elseif (strpos($ua, 'Chrome/') !== false) {
+                    $browser = 'Chrome';
+                } elseif (strpos($ua, 'Firefox/') !== false) {
+                    $browser = 'Firefox';
+                } elseif (strpos($ua, 'Safari/') !== false) {
+                    $browser = 'Safari';
+                } else {
+                    $browser = substr($ua, 0, 40);
+                }
             }
 
             $metaJson = null;
@@ -1711,13 +1546,15 @@ if (!function_exists('activity_log')) {
                 'meta'        => $metaJson,
                 'ip_address'  => ($ip === '') ? null : substr($ip, 0, 45),
                 'user_agent'  => ($ua === '') ? null : $ua,
+                'browser'     => $browser,
+                'project_id'  => $projectId,
                 'url'         => ($url === '') ? null : $url,
                 'method'      => ($method === '') ? null : substr($method, 0, 10),
                 'status'      => ($status === '') ? null : substr($status, 0, 10),
                 'created_at'  => date('Y-m-d H:i:s'),
             ]);
         } catch (\Throwable $e) {
-            error_log('pview alert >> activity_log insert failed: ' . $e->getMessage());
+            log_message('error', 'pview alert >> activity_log insert failed: ' . $e->getMessage());
         }
     }
 }

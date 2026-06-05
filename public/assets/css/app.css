@@ -1,4 +1,8 @@
 @import url("../fonts/google-fonts.css");
+
+/* ============================================================
+   01. CSS VARIABLES — Design tokens
+   ============================================================ */
 :root {
   --primary: #0792cd;
   --primary-700: #0476a7;
@@ -48,7 +52,7 @@
 }
 
 /* ============================================================
-   COLLAPSIBLE SIDEBAR (desktop only)
+   02. SIDEBAR — collapse (desktop), mobile drawer, nav, brand
    ============================================================ */
 @media (min-width: 993px) {
   html[data-sidebar="collapsed"] {
@@ -138,7 +142,7 @@
 }
 
 /* ============================================================
-   BASE RESET
+   03. BASE RESET & TYPOGRAPHY
    ============================================================ */
 *,
 *::before,
@@ -194,7 +198,7 @@ samp {
 }
 
 /* ============================================================
-   SCROLLBARS
+   04. SCROLLBARS
    ============================================================ */
 *::-webkit-scrollbar {
   width: 6px;
@@ -206,13 +210,13 @@ samp {
 }
 
 *::-webkit-scrollbar-thumb {
-  background: var(--border-2);
+  background: rgba(100, 116, 139, 0.7);
   border-radius: 999px;
   background-clip: padding-box;
 }
 
 *::-webkit-scrollbar-thumb:hover {
-  background: var(--text-muted);
+  background: rgba(71, 85, 105, 0.9);
   background-clip: padding-box;
 }
 /* sidemenu scrollbar: slightly more visible, to hint at overflow when collapsed */
@@ -226,7 +230,7 @@ samp {
 }
 
 /* ============================================================
-   LAYOUT
+   05. LAYOUT — page shell, main area, topbar
    ============================================================ */
 .layout {
   display: flex;
@@ -260,7 +264,7 @@ samp {
 }
 
 /* ============================================================
-   SIDEBAR
+   02b. SIDEBAR — Full sidebar panel (mobile + inner)
    ============================================================ */
 .sidebar {
   width: var(--sidebar-w);
@@ -515,7 +519,7 @@ samp {
 }
 
 /* ============================================================
-   TOPBAR
+   05c. TOPBAR — Top navigation bar
    ============================================================ */
 .topbar {
   position: sticky;
@@ -587,6 +591,8 @@ samp {
 }
 .topbar-logout {
   text-decoration: none;
+  font: inherit;
+  cursor: pointer;
 }
 .theme-toggle {
   cursor: pointer;
@@ -783,7 +789,7 @@ samp {
 }
 
 /* ============================================================
-   PAGE HEAD & TYPOGRAPHY
+   06. PAGE HEAD & TYPOGRAPHY
    ============================================================ */
 .page-head {
   display: flex;
@@ -813,13 +819,14 @@ samp {
 }
 
 /* ============================================================
-   CARDS
+   07. CARDS
    ============================================================ */
 .card {
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--radius);
   box-shadow: var(--shadow-sm);
+  overflow: hidden;
   transition:
     transform 0.25s var(--ease-smooth),
     box-shadow 0.25s var(--ease-smooth),
@@ -851,7 +858,7 @@ samp {
 }
 
 /* ============================================================
-   KPI / STAT CARDS
+   12. DASHBOARD — KPI / stat cards
    ============================================================ */
 .kpi-grid {
   display: grid;
@@ -974,7 +981,7 @@ samp {
 }
 
 /* ============================================================
-   BUTTONS
+   10. BUTTONS
    ============================================================ */
 .btn {
   font-weight: 500;
@@ -984,6 +991,7 @@ samp {
   border: 1px solid transparent;
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: 6px;
   transition:
     transform 0.12s var(--ease-smooth),
@@ -996,17 +1004,21 @@ samp {
   transform: translateY(1px);
 }
 
-.btn:focus,
-.btn:focus-visible {
-  box-shadow: var(--polish-ring) !important;
+.btn:focus:not(:focus-visible) {
+  box-shadow: none;
   outline: 0;
+}
+.btn:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+  box-shadow: var(--polish-ring) !important;
 }
 
 .btn-primary {
   background: var(--grad-primary);
   border-color: transparent;
   color: #fff;
-  box-shadow: 0 6px 18px -8px rgba(7, 146, 205, 0.55);
+  /*box-shadow: 0 6px 18px -8px rgba(7, 146, 205, 0.55);*/
 }
 
 .btn-primary:hover,
@@ -1050,19 +1062,11 @@ samp {
   border-color: var(--border-2);
 }
 
-.btn-success {
-  background: var(--success);
-  border-color: var(--success);
-  color: #fff;
-}
 .btn-outline-success {
   color: var(--success);
   border-color: var(--success);
 }
-.btn-outline-success:hover {
-  background: var(--success);
-  color: #fff;
-}
+
 .btn-danger {
   background: var(--critical);
   border-color: var(--critical);
@@ -1088,7 +1092,7 @@ samp {
 }
 
 /* ============================================================
-   FORMS
+   09. FORMS — inputs, selects, labels
    ============================================================ */
 .form-control,
 .form-select {
@@ -1130,6 +1134,54 @@ textarea.form-control {
 
 .form-check-input {
   border: var(--bs-border-width) solid #828487;
+}
+
+/* ============================================================
+   INLINE FORM VALIDATION — is-invalid / is-valid states
+   ============================================================ */
+.form-control.is-invalid,
+.form-select.is-invalid {
+  border-color: #ef4444;
+  background-image: none;
+}
+
+.form-control.is-invalid:focus,
+.form-select.is-invalid:focus {
+  border-color: #ef4444;
+  box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.18);
+}
+
+.form-control.is-valid,
+.form-select.is-valid {
+  border-color: #10b981;
+  background-image: none;
+}
+
+.form-control.is-valid:focus,
+.form-select.is-valid:focus {
+  border-color: #10b981;
+  box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.18);
+}
+
+.invalid-feedback {
+  display: block;
+  font-size: 11.5px;
+  color: #ef4444;
+  margin-top: 4px;
+}
+
+[data-theme="dark"] .form-control.is-invalid,
+[data-theme="dark"] .form-select.is-invalid {
+  border-color: #f87171;
+}
+
+[data-theme="dark"] .form-control.is-invalid:focus,
+[data-theme="dark"] .form-select.is-invalid:focus {
+  box-shadow: 0 0 0 3px rgba(248, 113, 113, 0.2);
+}
+
+[data-theme="dark"] .invalid-feedback {
+  color: #f87171;
 }
 
 /* ============================================================
@@ -1279,7 +1331,7 @@ textarea.form-control {
 }
 
 /* ============================================================
-   BADGES
+   11. BADGES & STATUS PILLS
    ============================================================ */
 .badge {
   font-family: "Inter", sans-serif;
@@ -1379,7 +1431,7 @@ textarea.form-control {
 }
 
 /* ============================================================
-   TABLES & DATATABLES
+   08. TABLES & DATATABLES
    ============================================================ */
 .table {
   margin-bottom: 0;
@@ -1423,6 +1475,38 @@ textarea.form-control {
 .table tbody tr td.text-center.text-muted,
 .table tbody tr td[colspan].text-center {
   padding: 36px 16px !important;
+}
+
+/* Escalated row highlight — explicit text colors for both themes */
+.table tbody tr.row-escalated {
+  background-color: rgba(239, 68, 68, 0.1);
+}
+.table tbody tr.row-escalated td,
+.table tbody tr.row-escalated .fw-semibold,
+.table tbody tr.row-escalated .alarm-id {
+  color: #b91c1c;
+}
+.table tbody tr.row-escalated .text-muted {
+  color: #dc2626 !important;
+  opacity: 0.8;
+}
+.table tbody tr.row-escalated:hover {
+  background-color: rgba(239, 68, 68, 0.16);
+}
+[data-theme="dark"] .table tbody tr.row-escalated {
+  background-color: rgba(239, 68, 68, 0.15);
+}
+[data-theme="dark"] .table tbody tr.row-escalated td,
+[data-theme="dark"] .table tbody tr.row-escalated .fw-semibold,
+[data-theme="dark"] .table tbody tr.row-escalated .alarm-id {
+  color: #fca5a5;
+}
+[data-theme="dark"] .table tbody tr.row-escalated .text-muted {
+  color: #f87171 !important;
+  opacity: 0.85;
+}
+[data-theme="dark"] .table tbody tr.row-escalated:hover {
+  background-color: rgba(239, 68, 68, 0.22);
 }
 
 /* DataTables */
@@ -1593,6 +1677,13 @@ textarea.form-control {
   padding-top: 8px;
 }
 
+/* Export button injected into .dataTables_length by initComplete */
+.dataTables_length {
+  display: flex;
+  align-items: center;
+  gap: 0;
+}
+
 .dataTables_wrapper .dataTables_filter input {
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
@@ -1622,7 +1713,7 @@ textarea.form-control {
 }
 
 /* ============================================================
-   ALARM ID PILL
+   13. TICKETS — alarm ID pill & detail chrome
    ============================================================ */
 .alarm-id,
 .alarm-id-big {
@@ -1651,7 +1742,7 @@ textarea.form-control {
 }
 
 /* ============================================================
-   FLOW WIDGET (Mermaid + pan/zoom toolbar)
+   14. FLOWS — workflow diagram widget & controls
    ============================================================ */
 .flow-widget {
   --fw-bg-1: #0b1220;
@@ -1742,173 +1833,41 @@ textarea.form-control {
 }
 
 /* --- Canvas ------------------------------------------------ */
-.flow-widget .flow-mermaid-wrap {
+.flow-widget .flow-vis-wrap {
   position: relative;
   width: 100%;
   height: 250px;
-  /* Both axes need scroll-on-overflow so the user can pan around when
-     zoomed in — the previous `overflow-y: hidden` silently clipped any
-     vertical growth from the zoom controls, making them appear broken
-     on wide flow diagrams. */
-  overflow: auto;
+  overflow: hidden;
   background:
-    /* corner accents — soft cyan/violet glows */
     radial-gradient(ellipse 60% 50% at 0% 0%, rgba(14, 165, 233, 0.1), transparent 60%),
     radial-gradient(ellipse 50% 50% at 100% 100%, rgba(139, 92, 246, 0.1), transparent 60%),
-    /* fine dot grid */ radial-gradient(circle at 1px 1px, rgba(148, 163, 184, 0.16) 1px, transparent 0) 0 0 / 22px 22px,
-    /* coarser cross-grid lines */ linear-gradient(rgba(148, 163, 184, 0.05) 1px, transparent 1px) 0 0 / 110px 110px,
+    radial-gradient(circle at 1px 1px, rgba(148, 163, 184, 0.16) 1px, transparent 0) 0 0 / 22px 22px,
+    linear-gradient(rgba(148, 163, 184, 0.05) 1px, transparent 1px) 0 0 / 110px 110px,
     linear-gradient(90deg, rgba(148, 163, 184, 0.05) 1px, transparent 1px) 0 0 / 110px 110px,
-    /* base wash */ linear-gradient(180deg, #0b1220 0%, #0f172a 100%);
+    linear-gradient(180deg, #0b1220 0%, #0f172a 100%);
 }
-/* Subtle inner vignette so nodes pop off the canvas */
-.flow-widget .flow-mermaid-wrap::after {
+.flow-widget .flow-vis-wrap::after {
   content: "";
   position: absolute;
   inset: 0;
   pointer-events: none;
   box-shadow: inset 0 0 80px rgba(2, 6, 23, 0.35);
+  z-index: 1;
 }
-.flow-widget.is-fullscreen .flow-mermaid-wrap {
+.flow-widget.is-fullscreen .flow-vis-wrap {
   height: calc(100vh - 130px);
 }
-.flow-widget .flow-mermaid-wrap > svg {
-  max-width: none !important;
-  display: block;
+.flow-widget .flow-vis-container {
+  width: 100%;
+  height: 100%;
+  position: relative;
+  z-index: 0;
 }
-.flow-widget pre.mermaid {
-  visibility: hidden;
-  font-family: inherit;
-  margin: 0;
-  padding: 12px;
-  white-space: pre-wrap;
-  color: var(--fw-text-muted);
+.flow-widget .flow-vis-container canvas {
+  cursor: grab;
 }
-
-/* --- Mermaid node styling ---------------------------------- */
-.flow-widget .flow-mermaid-wrap g.node rect,
-.flow-widget .flow-mermaid-wrap g.node polygon {
-  rx: 12px;
-  ry: 12px;
-  stroke-width: 2px;
-  fill: rgba(30, 41, 59, 0.7) !important;
-  stroke: #334155 !important;
-  transition:
-    filter 0.25s ease,
-    transform 0.25s ease;
-}
-/* Node label text — explicitly target every element Mermaid emits
-   inside a node. `*` makes the override unconditional, beating
-   anything Mermaid injects via its inline <style> block in the SVG. */
-.flow-widget .flow-mermaid-wrap g.node *,
-.flow-widget .flow-mermaid-wrap g.node text,
-.flow-widget .flow-mermaid-wrap g.node tspan,
-.flow-widget .flow-mermaid-wrap g.node .label,
-.flow-widget .flow-mermaid-wrap g.node .nodeLabel,
-.flow-widget .flow-mermaid-wrap g.node foreignObject,
-.flow-widget .flow-mermaid-wrap g.node foreignObject div,
-.flow-widget .flow-mermaid-wrap g.node foreignObject span,
-.flow-widget .flow-mermaid-wrap g.node foreignObject p {
-  color: #f1f5f9 !important;
-  font-weight: 600 !important;
-}
-.flow-widget .flow-mermaid-wrap g.node text,
-.flow-widget .flow-mermaid-wrap g.node tspan {
-  fill: #f1f5f9 !important;
-}
-/* Edge labels (the small text on connector lines, e.g. "High Priority"). */
-.flow-widget .flow-mermaid-wrap .edgeLabel,
-.flow-widget .flow-mermaid-wrap .edgeLabel rect,
-.flow-widget .flow-mermaid-wrap .edgeLabel foreignObject,
-.flow-widget .flow-mermaid-wrap .edgeLabel foreignObject *,
-.flow-widget .flow-mermaid-wrap .edgeLabel span,
-.flow-widget .flow-mermaid-wrap .edgeLabel p {
-  color: var(--fw-text) !important;
-  fill: transparent !important;
-  background: transparent !important;
-}
-.flow-widget .flow-mermaid-wrap g.node:hover rect,
-.flow-widget .flow-mermaid-wrap g.node:hover polygon {
-  filter: brightness(1.15);
-}
-
-/* Initial state (green) — `html` prefix lifts specificity above the
-   generic light-theme override so the green fill / stroke / glow win. */
-html .flow-widget .flow-mermaid-wrap g.node.initialState rect,
-html .flow-widget .flow-mermaid-wrap g.node.initialState polygon {
-  fill: rgba(16, 185, 129, 0.22) !important;
-  stroke: var(--fw-initial) !important;
-  stroke-width: 1px !important;
-  filter: drop-shadow(0 0 10px rgba(16, 185, 129, 0.55));
-}
-/* Final state (slate) */
-html .flow-widget .flow-mermaid-wrap g.node.finalState rect,
-html .flow-widget .flow-mermaid-wrap g.node.finalState polygon {
-  fill: rgba(100, 116, 139, 0.22) !important;
-  stroke: var(--fw-final) !important;
-  stroke-width: 1px !important;
-  filter: drop-shadow(0 0 6px rgba(100, 116, 139, 0.45));
-}
-/* Process state (purple) */
-html .flow-widget .flow-mermaid-wrap g.node.processState rect {
-  fill: rgba(139, 92, 246, 0.16) !important;
-  stroke: var(--fw-process) !important;
-  stroke-width: 1px !important;
-  filter: drop-shadow(0 0 8px rgba(139, 92, 246, 0.45));
-}
-/* Ticket: passed (green) */
-html .flow-widget .flow-mermaid-wrap g.node.passed rect,
-html .flow-widget .flow-mermaid-wrap g.node.passed polygon {
-  fill: rgba(16, 185, 129, 0.22) !important;
-  stroke: var(--fw-passed) !important;
-  stroke-width: 1px !important;
-  filter: drop-shadow(0 0 8px rgba(16, 185, 129, 0.5));
-}
-/* Ticket: current (animated blue) */
-html .flow-widget .flow-mermaid-wrap g.node.current rect,
-html .flow-widget .flow-mermaid-wrap g.node.current polygon {
-  fill: rgba(14, 165, 233, 0.25) !important;
-  stroke: var(--fw-current) !important;
-  stroke-width: 1px !important;
-  filter: drop-shadow(0 0 14px rgba(14, 165, 233, 0.7));
-  animation: fw-node-pulse 2s ease-in-out infinite;
-}
-@keyframes fw-node-pulse {
-  0%,
-  100% {
-    filter: drop-shadow(0 0 10px rgba(14, 165, 233, 0.5));
-  }
-  50% {
-    filter: drop-shadow(0 0 18px rgba(14, 165, 233, 0.85));
-  }
-}
-/* Ticket: pending */
-html .flow-widget .flow-mermaid-wrap g.node.pending rect,
-html .flow-widget .flow-mermaid-wrap g.node.pending polygon {
-  fill: rgba(71, 85, 105, 0.22) !important;
-  stroke: var(--fw-pending) !important;
-  stroke-width: 2px !important;
-  opacity: 0.9;
-}
-
-/* --- Mermaid edge styling ---------------------------------- */
-.flow-widget .flow-mermaid-wrap .edgePath .path,
-.flow-widget .flow-mermaid-wrap .flowchart-link {
-  stroke: var(--fw-edge) !important;
-  stroke-width: 2px !important;
-  fill: none !important;
-  stroke-dasharray: 6 5;
-  animation: fw-edge-flow 1.6s linear infinite;
-  filter: drop-shadow(0 0 4px var(--fw-edge-glow));
-}
-@keyframes fw-edge-flow {
-  to {
-    stroke-dashoffset: -22;
-  }
-}
-.flow-widget .flow-mermaid-wrap .arrowheadPath,
-.flow-widget .flow-mermaid-wrap marker path {
-  fill: var(--fw-edge) !important;
-  stroke: var(--fw-edge) !important;
+.flow-widget .flow-vis-container canvas:active {
+  cursor: grabbing;
 }
 
 /* --- Legend ------------------------------------------------ */
@@ -1963,6 +1922,13 @@ html .flow-widget .flow-mermaid-wrap g.node.pending polygon {
   border-top: 4px solid transparent;
   border-bottom: 4px solid transparent;
 }
+.flow-widget .fw-lg-arrow--back {
+  background-image: repeating-linear-gradient(90deg, rgba(239, 68, 68, 0.9) 0, rgba(239, 68, 68, 0.9) 5px, transparent 5px, transparent 9px);
+  height: 3px;
+}
+.flow-widget .fw-lg-arrow--back::after {
+  border-left-color: rgba(239, 68, 68, 0.95);
+}
 
 /* --- Fullscreen ------------------------------------------- */
 .flow-widget.is-fullscreen,
@@ -1973,13 +1939,13 @@ html .flow-widget .flow-mermaid-wrap g.node.pending polygon {
   display: flex;
   flex-direction: column;
 }
-.flow-widget:fullscreen .flow-mermaid-wrap {
+.flow-widget:fullscreen .flow-vis-wrap {
   flex: 1 1 auto;
   height: auto;
 }
 
 /* ============================================================
-   FLOW GRAPH (legacy, kept for any non-flow page reuse)
+   14b. FLOWS — legacy flow graph display component
    ============================================================ */
 .flow-graph {
   display: flex;
@@ -2324,7 +2290,7 @@ html .flow-widget .flow-mermaid-wrap g.node.pending polygon {
 }
 
 /* ============================================================
-   LEVEL INDICATOR
+   13b. TICKETS — escalation level indicator
    ============================================================ */
 .level-indicator {
   display: inline-flex;
@@ -2362,7 +2328,7 @@ html .flow-widget .flow-mermaid-wrap g.node.pending polygon {
 }
 
 /* ============================================================
-   TAT COUNTDOWN
+   13c. TICKETS — TAT countdown display
    ============================================================ */
 .tat-countdown {
   display: inline-flex;
@@ -2430,7 +2396,7 @@ html .flow-widget .flow-mermaid-wrap g.node.pending polygon {
 }
 
 /* ============================================================
-   ACTIVITY TIMELINE
+   18b. ACTIVITY LOGS — timeline feed
    ============================================================ */
 .activity-feed {
   list-style: none;
@@ -2475,6 +2441,57 @@ html .flow-widget .flow-mermaid-wrap g.node.pending polygon {
   flex: 1;
   min-width: 0;
 }
+/* Analytics tab — card bodies scroll horizontally; cells don't wrap */
+#tab-analytics .card-body {
+  overflow-x: auto;
+}
+#tab-analytics .card-body td,
+#tab-analytics .card-body th {
+  white-space: nowrap;
+}
+
+/* Analytics row — fixed-height cards so the user list never pushes the
+   chart or session cards taller. Bootstrap's .card is already flex-column;
+   we just cap the height and let each card-body fill + scroll. */
+.analytics-card {
+  height: 380px;
+}
+.analytics-card-body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+}
+.analytics-chart-body {
+  overflow: hidden;
+  position: relative;
+  padding: 12px;
+}
+#analyticsModuleChart {
+  width: 100% !important;
+  height: 100% !important;
+  display: block;
+}
+
+/* Drilldown modal — Bootstrap modal-dialog-scrollable handles vertical scroll;
+   table-responsive handles horizontal; nowrap keeps rows single-line */
+#userDrilldownModal td,
+#userDrilldownModal th {
+  white-space: nowrap;
+}
+
+#userDrilldownModal .modal-dialog {
+  margin-top: calc(var(--topbar-h) + 0.75rem);
+  max-height: calc(100vh - var(--topbar-h) - 3rem);
+}
+.drilldown-modal-body {
+  overflow-y: auto;
+  max-height: calc(100vh - 200px);
+}
+#userDrilldownModal td,
+#userDrilldownModal th {
+  white-space: nowrap;
+}
+
 .activity-feed .activity-meta {
   display: flex;
   align-items: center;
@@ -2497,7 +2514,7 @@ html .flow-widget .flow-mermaid-wrap g.node.pending polygon {
 }
 
 /* ============================================================
-   STATE LIST
+   14c. FLOWS — state editor drag list
    ============================================================ */
 .state-list .state-item {
   background: var(--surface);
@@ -2515,13 +2532,34 @@ html .flow-widget .flow-mermaid-wrap g.node.pending polygon {
   border-color: var(--primary-300);
   box-shadow: var(--shadow);
 }
+/* Flash highlight when its node is clicked in the flow preview. */
+@keyframes state-focus-flash {
+  0% {
+    border-color: #0ea5e9;
+    box-shadow: 0 0 0 3px rgba(14, 165, 233, 0.5);
+    background: rgba(14, 165, 233, 0.15);
+  }
+  60% {
+    border-color: #0ea5e9;
+    box-shadow: 0 0 0 3px rgba(14, 165, 233, 0.5);
+    background: rgba(14, 165, 233, 0.15);
+  }
+  100% {
+    border-color: var(--border);
+    box-shadow: none;
+    background: var(--surface);
+  }
+}
+.state-list .state-item.state-item--focus {
+  animation: state-focus-flash 2s ease forwards;
+}
 .state-list .state-item.ui-sortable-helper {
   box-shadow: var(--shadow-lg);
   border-color: var(--primary);
 }
 
 /* ============================================================
-   EDITABLE INLINE
+   13d. TICKETS — inline editable fields
    ============================================================ */
 .editable-inline {
   cursor: text;
@@ -2543,7 +2581,7 @@ html .flow-widget .flow-mermaid-wrap g.node.pending polygon {
 }
 
 /* ============================================================
-   TICKET DETAIL TYPOGRAPHY
+   13e. TICKETS — detail page typography
    ============================================================ */
 .ticket-title {
   font-size: 22px;
@@ -2586,7 +2624,7 @@ html .flow-widget .flow-mermaid-wrap g.node.pending polygon {
 }
 
 /* ============================================================
-   NAV TABS
+   19. COMMON UI — nav tabs
    ============================================================ */
 .nav-tabs {
   border-bottom: 1px solid var(--border);
@@ -2623,7 +2661,7 @@ html .flow-widget .flow-mermaid-wrap g.node.pending polygon {
 }
 
 /* ============================================================
-   AUTH (LOGIN)
+   19b. AUTH — login page styles
    ============================================================ */
 .auth-body {
   background: radial-gradient(circle at 20% 20%, rgba(14, 165, 233, 0.18) 0%, transparent 50%), radial-gradient(circle at 80% 70%, rgba(2, 132, 199, 0.18) 0%, transparent 50%), var(--sidebar);
@@ -2753,7 +2791,7 @@ html .flow-widget .flow-mermaid-wrap g.node.pending polygon {
 }
 
 /* ============================================================
-   FLASH ALERTS
+   19c. COMMON UI — flash alert messages
    ============================================================ */
 .alert {
   border-radius: var(--radius);
@@ -2788,7 +2826,7 @@ html .flow-widget .flow-mermaid-wrap g.node.pending polygon {
 }
 
 /* ============================================================
-   FILTER PILLS
+   15. TICKETS — filter pills
    ============================================================ */
 .filter-pills {
   display: flex;
@@ -2817,7 +2855,7 @@ html .flow-widget .flow-mermaid-wrap g.node.pending polygon {
 }
 
 /* ============================================================
-   CHARTS
+   12b. DASHBOARD — charts (Chart.js)
    ============================================================ */
 .chart-card {
   padding: 18px;
@@ -2862,7 +2900,7 @@ html .flow-widget .flow-mermaid-wrap g.node.pending polygon {
 }
 
 /* ============================================================
-   SELECT2
+   07b. DROPDOWNS — Select2 custom styles
    ============================================================ */
 .select2-container--default .select2-selection--single,
 .select2-container--default .select2-selection--multiple {
@@ -2876,7 +2914,7 @@ html .flow-widget .flow-mermaid-wrap g.node.pending polygon {
 }
 
 /* ============================================================
-   MISC UTILITIES
+   19d. COMMON UI — miscellaneous utilities
    ============================================================ */
 :is(.text-muted, .text-secondary) {
   color: var(--text-3) !important;
@@ -2980,7 +3018,7 @@ body,
 }
 
 /* ============================================================
-   MOBILE SIDEBAR
+   02b. SIDEBAR — Mobile behaviour
    ============================================================ */
 .sidebar-toggle {
   display: inline-flex;
@@ -3029,7 +3067,7 @@ body,
 }
 
 /* ============================================================
-   RESPONSIVE
+   19e. RESPONSIVE — breakpoint overrides
    ============================================================ */
 @media (max-width: 992px) {
   .sidebar {
@@ -3128,7 +3166,7 @@ body,
 }
 
 /* ============================================================
-   UX HELPERS — char counter, caps-warn pill, clickable KPI link,
+   19f. UX HELPERS — char counter, caps-warn pill, clickable KPI link,
    active-filter pill. All purely additive; no override of
    existing rules.
    ============================================================ */
@@ -3172,28 +3210,6 @@ body,
   transition:
     transform 0.18s var(--ease-smooth),
     box-shadow 0.18s var(--ease-smooth);
-}
-
-/* "N filters active" pill above the tickets list filter form. */
-.filter-active-summary {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 12px;
-  color: var(--text-2);
-  background: var(--info-bg);
-  border: 1px solid rgba(14, 165, 233, 0.25);
-  padding: 3px 10px;
-  border-radius: 999px;
-  font-weight: 600;
-}
-.filter-active-summary .clear-link {
-  color: var(--critical);
-  text-decoration: none;
-  font-weight: 700;
-}
-.filter-active-summary .clear-link:hover {
-  text-decoration: underline;
 }
 
 /* Bell-icon notification dropdown. Wraps the existing bell pill
@@ -3507,15 +3523,28 @@ body,
   }
 }
 
-/* ------------------------------------------------------------
-   Keyboard-only focus outlines (a11y).
-   `:focus-visible` fires only for keyboard navigation, so mouse
-   users see no change. Reuses the brand primary so the outline
-   matches the existing hover treatment. Scoped to interactive
-   controls that don't already have their own focus shadow
-   (.form-control keeps its existing border-color + box-shadow).
-   ------------------------------------------------------------ */
-:is(.btn, .nav-link, .filter-pill, .pagination .page-link, .topbar-bell, .topbar-logout, .theme-toggle, .sidebar-toggle, .dropdown-item, .kpi-link, .bell-row, .clear-link, .saved-filter-link, a.alarm-id):focus-visible {
+/* Skip-to-content link — visually hidden until focused via keyboard */
+.skip-to-content {
+  position: fixed;
+  top: -100px;
+  left: 12px;
+  z-index: 9999;
+  padding: 8px 16px;
+  background: var(--primary);
+  color: #fff;
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+  font-weight: 600;
+  text-decoration: none;
+  transition: top 0.15s ease;
+}
+.skip-to-content:focus {
+  top: 12px;
+  outline: 2px solid #fff;
+  outline-offset: 2px;
+}
+
+:is(.btn, .nav-link, .filter-pill, .pagination .page-link, .topbar-bell, .topbar-logout, .theme-toggle, .sidebar-toggle, .dropdown-item, .kpi-link, .bell-row, .saved-filter-link, a.alarm-id):focus-visible {
   outline: 2px solid var(--primary, #0ea5e9);
   outline-offset: 2px;
   border-radius: var(--radius-sm, 4px);
@@ -3572,7 +3601,178 @@ body,
 }
 
 /* ============================================================
-   LIGHT THEME — FLOW WIDGET OVERRIDES
+   20. FILTER BAR — card header + body + filter item grid
+   ============================================================ */
+
+/* --- Header strip --- */
+.filter-bar-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 14px;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface-2);
+  border-radius: calc(var(--card-radius, 8px) - 1px) calc(var(--card-radius, 8px) - 1px) 0 0;
+  flex-wrap: wrap;
+}
+.filter-bar-title {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--text-2);
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  white-space: nowrap;
+}
+.filter-bar-badge {
+  font-size: 0.68rem;
+}
+.filter-bar-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+/* Compact secondary buttons in the header */
+.filter-bar-actions .btn-sm {
+  font-size: 0.78rem;
+  padding: 3px 10px;
+  line-height: 1.5;
+}
+/* Thin vertical rule separating action groups */
+.filter-bar-sep {
+  display: inline-block;
+  width: 1px;
+  height: 22px;
+  background: var(--border);
+  flex-shrink: 0;
+  align-self: center;
+  margin: 0 2px;
+}
+/* Date widget sitting inside the header */
+.filter-bar-date {
+  display: flex;
+  align-items: center;
+}
+
+.filter-bar-date .drw-preset {
+  font-size: 0.68rem;
+  padding: 4px 6px;
+}
+.filter-bar-date .drw-inputs .form-control {
+  width: 108px;
+  font-size: 0.78rem;
+}
+
+/* --- Body / controls grid --- */
+.filter-bar-body {
+  padding: 14px 16px;
+}
+.filter-bar-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 14px;
+  align-items: flex-end;
+}
+
+/* --- Individual filter item --- */
+.filter-item {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 120px;
+  flex: 1 1 120px;
+}
+.filter-item--search {
+  flex: 2 1 180px;
+}
+.filter-item--wide {
+  flex: 1 1 160px;
+}
+.filter-item--date {
+  flex: 0 0 auto;
+}
+.filter-label {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--text-3);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  white-space: nowrap;
+  margin-bottom: 0;
+}
+
+/* ============================================================
+   20b. DATE RANGE WIDGET — preset shortcuts + custom date inputs (see section 20 for the filter bar wrapper)
+   ============================================================ */
+
+.date-range-widget {
+  display: inline-flex;
+  flex-direction: column;
+  gap: 5px;
+}
+.drw-presets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px;
+}
+.drw-preset {
+  font-size: 0.7rem;
+  line-height: 1.5;
+  padding: 4px 8px;
+  border-radius: 3px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text-2);
+  cursor: pointer;
+  white-space: nowrap;
+  transition:
+    background 0.12s,
+    color 0.12s,
+    border-color 0.12s;
+}
+.drw-preset:hover {
+  background: var(--primary-50);
+  color: var(--primary-700);
+  border-color: var(--primary-300);
+}
+.drw-preset.active {
+  background: var(--primary);
+  color: #fff;
+  border-color: var(--primary-700);
+}
+.drw-inputs {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+.drw-inputs .form-control {
+  width: 132px;
+  min-width: 0;
+}
+.drw-sep {
+  flex-shrink: 0;
+  color: var(--text-muted);
+  font-size: 0.85rem;
+}
+
+/* Inline mode — presets and inputs on the same row */
+.date-range-widget.is-inline {
+  flex-direction: row;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+.date-range-widget.is-inline .drw-presets {
+  flex-shrink: 0;
+}
+.date-range-widget.is-inline .drw-inputs .form-control {
+  width: 116px;
+}
+
+/* ============================================================
+   20b. LIGHT THEME — Flow widget canvas overrides
    ============================================================ */
 
 [data-theme="light"] .flow-widget {
@@ -3590,7 +3790,7 @@ body,
 [data-theme="light"] .flow-widget .fw-btn {
   background: #ffffff;
 }
-[data-theme="light"] .flow-widget .flow-mermaid-wrap {
+[data-theme="light"] .flow-widget .flow-vis-wrap {
   background:
     radial-gradient(ellipse 60% 50% at 0% 0%, rgba(14, 165, 233, 0.08), transparent 60%),
     radial-gradient(ellipse 50% 50% at 100% 100%, rgba(139, 92, 246, 0.07), transparent 60%),
@@ -3599,63 +3799,12 @@ body,
     linear-gradient(90deg, rgba(15, 23, 42, 0.04) 1px, transparent 1px) 0 0 / 110px 110px,
     linear-gradient(180deg, #ffffff 0%, #f1f5f9 100%);
 }
-[data-theme="light"] .flow-widget .flow-mermaid-wrap::after {
+[data-theme="light"] .flow-widget .flow-vis-wrap::after {
   box-shadow: inset 0 0 60px rgba(15, 23, 42, 0.06);
-}
-[data-theme="light"] .flow-widget .flow-mermaid-wrap g.node rect,
-[data-theme="light"] .flow-widget .flow-mermaid-wrap g.node polygon {
-  fill: #ffffff !important;
-  stroke: #cbd5e1 !important;
-}
-[data-theme="light"] .flow-widget .flow-mermaid-wrap g.node *,
-[data-theme="light"] .flow-widget .flow-mermaid-wrap g.node text,
-[data-theme="light"] .flow-widget .flow-mermaid-wrap g.node tspan,
-[data-theme="light"] .flow-widget .flow-mermaid-wrap g.node .label,
-[data-theme="light"] .flow-widget .flow-mermaid-wrap g.node .nodeLabel,
-[data-theme="light"] .flow-widget .flow-mermaid-wrap g.node foreignObject,
-[data-theme="light"] .flow-widget .flow-mermaid-wrap g.node foreignObject div,
-[data-theme="light"] .flow-widget .flow-mermaid-wrap g.node foreignObject span,
-[data-theme="light"] .flow-widget .flow-mermaid-wrap g.node foreignObject p {
-  color: #0f172a !important;
-}
-[data-theme="light"] .flow-widget .flow-mermaid-wrap g.node text,
-[data-theme="light"] .flow-widget .flow-mermaid-wrap g.node tspan {
-  fill: #0f172a !important;
-}
-[data-theme="light"] .flow-widget .flow-mermaid-wrap g.node.initialState rect,
-[data-theme="light"] .flow-widget .flow-mermaid-wrap g.node.initialState polygon {
-  fill: rgba(16, 185, 129, 0.15) !important;
-  stroke: #059669 !important;
-  filter: drop-shadow(0 0 10px rgba(16, 185, 129, 0.45));
-}
-[data-theme="light"] .flow-widget .flow-mermaid-wrap g.node.finalState rect,
-[data-theme="light"] .flow-widget .flow-mermaid-wrap g.node.finalState polygon {
-  fill: rgba(100, 116, 139, 0.18) !important;
-  stroke: #475569 !important;
-}
-[data-theme="light"] .flow-widget .flow-mermaid-wrap g.node.processState rect {
-  fill: rgba(139, 92, 246, 0.12) !important;
-  stroke: #7c3aed !important;
-  filter: drop-shadow(0 0 8px rgba(139, 92, 246, 0.35));
-}
-[data-theme="light"] .flow-widget .flow-mermaid-wrap g.node.passed rect,
-[data-theme="light"] .flow-widget .flow-mermaid-wrap g.node.passed polygon {
-  fill: rgba(16, 185, 129, 0.15) !important;
-  stroke: #059669 !important;
-}
-[data-theme="light"] .flow-widget .flow-mermaid-wrap g.node.current rect,
-[data-theme="light"] .flow-widget .flow-mermaid-wrap g.node.current polygon {
-  fill: rgba(14, 165, 233, 0.18) !important;
-  stroke: #0284c7 !important;
-}
-[data-theme="light"] .flow-widget .flow-mermaid-wrap g.node.pending rect,
-[data-theme="light"] .flow-widget .flow-mermaid-wrap g.node.pending polygon {
-  fill: rgba(148, 163, 184, 0.18) !important;
-  stroke: #94a3b8 !important;
 }
 
 /* ============================================================
-   DARK THEME
+   21. DARK THEME — [data-theme="dark"] overrides
    ============================================================ */
 
 [data-theme="dark"] {
@@ -3782,11 +3931,28 @@ body,
 [data-theme="dark"] .form-label {
   color: #c6ccd8;
 }
+[data-theme="dark"] .form-text {
+  color: #8f98ad;
+}
 [data-theme="dark"] .select2-container--default .select2-selection--single .select2-selection__rendered {
   color: var(--text);
 }
 
 /* --- Buttons ---------------------------------------------- */
+[data-theme="light"] .btn-light {
+  background: var(--surface-2);
+  color: var(--text-2);
+  border-color: var(--border-2);
+  box-shadow:
+    0 1px 3px rgba(15, 23, 42, 0.08),
+    0 1px 1px rgba(15, 23, 42, 0.04);
+}
+[data-theme="light"] .btn-light:hover {
+  background: #e2e8f0;
+  color: var(--text);
+  border-color: #94a3b8;
+  box-shadow: 0 2px 6px rgba(15, 23, 42, 0.12);
+}
 [data-theme="dark"] .btn-light {
   background: var(--surface-2);
   color: var(--text);
@@ -4365,84 +4531,60 @@ body,
 [data-theme="dark"] .btn-close {
   filter: invert(1) grayscale(100%) brightness(200%);
 }
+.modal-backdrop.show {
+  opacity: 0;
+  position: relative;
+}
 
-/* Activity Log meta overlay — plain fixed positioning, not a Bootstrap
-   modal, so it always renders the backdrop and click-outside reliably
-   dismisses it regardless of parent stacking context. */
-.activity-meta-overlay {
-  position: fixed;
-  top: 0;
-  right: 0;
-  bottom: 0;
-  left: 0;
-  width: 100vw;
-  height: 100vh;
-  background: rgba(0, 0, 0, 0.55);
-  z-index: 1080; /* above sidebar (1040) and topbar */
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 16px;
+/* ============================================================
+   STATE TRANSITIONS — badges and designer panel
+   ============================================================ */
+.transition-badge-forward {
+  background: rgba(14, 165, 233, 0.15);
+  color: #0369a1;
+  border: 1px solid rgba(14, 165, 233, 0.35);
+  font-weight: 600;
+  font-size: 11px;
+  padding: 3px 8px;
+  border-radius: 999px;
 }
-.activity-meta-overlay[hidden] {
-  display: none !important;
+.transition-badge-backward {
+  background: rgba(239, 68, 68, 0.12);
+  color: #b91c1c;
+  border: 1px solid rgba(239, 68, 68, 0.35);
+  font-weight: 600;
+  font-size: 11px;
+  padding: 3px 8px;
+  border-radius: 999px;
 }
-.activity-meta-dialog {
-  background: #ffffff;
-  color: #0f172a;
-  border-radius: 8px;
-  width: 100%;
-  max-width: 800px;
-  max-height: 90vh;
-  display: flex;
-  flex-direction: column;
-  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.35);
-  overflow: hidden;
+.transition-badge-rework {
+  background: rgba(245, 158, 11, 0.12);
+  color: #92400e;
+  border: 1px solid rgba(245, 158, 11, 0.35);
+  font-weight: 600;
+  font-size: 11px;
+  padding: 3px 8px;
+  border-radius: 999px;
 }
-.activity-meta-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 14px 18px;
-  border-bottom: 1px solid #e2e8f0;
+[data-theme="dark"] .transition-badge-forward {
+  color: #7dd3fc;
+  background: rgba(14, 165, 233, 0.15);
+  border-color: rgba(14, 165, 233, 0.3);
 }
-.activity-meta-x {
-  background: transparent;
-  border: 0;
-  font-size: 18px;
-  line-height: 1;
-  color: inherit;
-  cursor: pointer;
-  padding: 4px 8px;
-  border-radius: 4px;
+[data-theme="dark"] .transition-badge-backward {
+  color: #fca5a5;
+  background: rgba(239, 68, 68, 0.15);
+  border-color: rgba(239, 68, 68, 0.3);
 }
-.activity-meta-x:hover {
-  background: rgba(0, 0, 0, 0.06);
+[data-theme="dark"] .transition-badge-rework {
+  color: #fcd34d;
+  background: rgba(245, 158, 11, 0.15);
+  border-color: rgba(245, 158, 11, 0.3);
 }
-.activity-meta-body {
-  padding: 16px 18px;
-  overflow: auto;
-}
-.activity-meta-body pre {
-  margin: 0;
-  white-space: pre-wrap;
-  word-break: break-all;
-  font-size: 13px;
-}
-.activity-meta-footer {
-  padding: 12px 18px;
-  border-top: 1px solid #e2e8f0;
-  display: flex;
-  justify-content: flex-end;
-}
-[data-theme="dark"] .activity-meta-dialog {
-  background: var(--surface);
-  color: var(--text);
-}
-[data-theme="dark"] .activity-meta-header,
-[data-theme="dark"] .activity-meta-footer {
-  border-color: var(--border);
-}
-[data-theme="dark"] .activity-meta-x:hover {
-  background: rgba(255, 255, 255, 0.08);
+
+.btn-xs {
+  padding: 2px 6px;
+  font-size: 11px;
+  line-height: 1.4;
+  border-radius: var(--radius-sm);
 }

@@ -1,343 +1,953 @@
 # pView Alert System
 
-pView Alert System is a premium, data-dense web application designed specifically for Network Operations Center (NOC) teams to manage alerts, trigger escalation flows, and handle ticket lifecycles. Built on **CodeIgniter 4** (PHP 8) and styled with sky-blue accents and a dark-mode-first premium layout, it features a robust, extensible workflow engine with live, zoomable Mermaid diagrams, sliding lockout security, precise rate-limiting, and deep SLA/TAT tracking.
+A self-hosted NOC (Network Operations Centre) alert and ticket management system built on CodeIgniter 4. It turns incoming alerts into trackable tickets, routes them through configurable multi-stage workflows, automatically escalates overdue tickets through four escalation levels, and dispatches email notifications at each lifecycle event.
 
 ---
 
-## 🛠️ Key Technologies & Architecture
+## Table of Contents
 
-* **Backend Framework:** CodeIgniter 4.5.0 (PHP ^8.1 pin, supports PHP 8.0+)
-* **Database Engine:** MySQL 8.0 / MariaDB 10.5+ with structured constraints and cascade soft-deletes
-* **Frontend Core:** Bootstrap 5, Vanilla CSS (CSS Custom Variables for seamless theme transitions), jQuery 3.7
-* **Interactive UI Enhancements:**
-  * **Mermaid.js:** Renders zoomable, pannable, and fullscreen-capable workflow node graphs dynamically
-  * **jQuery UI 1.13:** Enables smooth drag-and-drop state reordering for workflow designers
-  * **DataTables:** Highly-optimized server-side paginated tables to scale with 100k+ tickets effortlessly
-  * **Chart.js:** Visualizes real-time and historical KPI trend charts
-  * **Select2:** Powerfully manages searchable dropdowns and operator pools
-  * **SweetAlert2 & Toastr:** Delivers premium feedback dialogs and toast alerts
-* **Mailer Engine:** PHPMailer 6.9 for reliable SMTP/Sendmail notification queuing
+1. [Overview](#overview)
+2. [Key Features](#key-features)
+3. [Technology Stack](#technology-stack)
+4. [Architecture](#architecture)
+5. [Folder Structure](#folder-structure)
+6. [Requirements](#requirements)
+7. [Installation](#installation)
+8. [Database Setup](#database-setup)
+9. [Configuration](#configuration)
+10. [Running the Application](#running-the-application)
+11. [Cron Job Setup](#cron-job-setup)
+12. [User Roles & Permissions](#user-roles--permissions)
+13. [Modules](#modules)
+14. [Workflow Engine](#workflow-engine)
+15. [Ticket Lifecycle](#ticket-lifecycle)
+16. [Notifications & Email Queue](#notifications--email-queue)
+17. [REST API](#rest-api)
+18. [Activity Logs](#activity-logs)
+19. [Settings Reference](#settings-reference)
+20. [File Uploads](#file-uploads)
+21. [Backup](#backup)
+22. [Deployment](#deployment)
+23. [Default Credentials](#default-credentials)
+24. [Database Tables Reference](#database-tables-reference)
 
 ---
 
-## 📁 Project Structure
+## Overview
 
-```text
+pView Alert System solves the problem of alert fatigue in operations teams. When a monitoring system fires an alert, pView captures it as a structured ticket, assigns it to the right operator based on workflow rules, tracks how long it sits at each stage, and automatically escalates it if the team does not act within the configured time window.
+
+The system is designed for use by NOC teams who need:
+
+- A central place to receive and track alerts from multiple projects
+- Clear ownership rules through workflow-defined user pools
+- Automatic escalation when SLAs are missed
+- A full audit trail of every action taken on every ticket
+- An API for integration with external monitoring tools
+
+---
+
+## Key Features
+
+- **Configurable workflow engine** — build multi-stage ticket flows with forward and backward transitions
+- **Four-level escalation** — tickets auto-escalate from L1 → L2 → L3 → L4 when TAT thresholds are exceeded
+- **Escalation matrix overrides** — per-state, per-level TAT and notify-user lists that override flow defaults
+- **REST API** — external monitoring systems raise and update tickets via `X-API-KEY` authentication
+- **Role-based access control** — granular per-module permissions (view / add / edit / delete) per role
+- **Custom roles** — create additional roles beyond the three built-ins with configurable admin scope
+- **Async email notifications** — email events are queued to `notification_logs` and flushed by the cron job
+- **@mention in comments** — tag operators by `@user_id` in ticket comments to trigger direct notifications
+- **Per-user notification preferences** — operators opt in or out per project and per severity
+- **Saved ticket filters** — operators save and recall named filter combinations
+- **Bulk ticket actions** — resolve or close multiple tickets in one operation
+- **Live dashboard** — real-time KPI cards, trend charts, and bell-badge polling
+- **Activity audit log** — every user action is recorded with module, action, entity, IP, and timestamp
+- **Maintenance mode** — take the system offline for all non-admin users with a one-click toggle
+- **Dark/light theme** — persistent per-user preference stored in session and database
+- **CSV export** — export ticket lists and activity logs with current filters applied
+- **File attachments** — up to five files per ticket with magic-byte MIME validation
+- **Idle session timeout** — automatic logout after configurable inactivity period
+
+---
+
+## Technology Stack
+
+### Backend
+
+| Component | Technology |
+|---|---|
+| Framework | CodeIgniter 4.5+ |
+| Language | PHP 8.1+ |
+| Database | MySQL 8.0+ / MariaDB 10.4+ |
+| Email | PHPMailer 6.9+ |
+| Authentication | Session-based with bcrypt passwords |
+| Session storage | File-based (configurable) |
+
+### Frontend
+
+| Library | Purpose |
+|---|---|
+| Bootstrap 5 | UI framework, layout, components |
+| Bootstrap Icons | Icon set |
+| jQuery 3.7.1 | DOM manipulation and AJAX |
+| jQuery UI 1.13.2 | Drag-and-drop state reordering |
+| DataTables | Server-side paginated and searchable tables |
+| Select2 | Searchable and multi-select dropdowns |
+| Chart.js | Dashboard trend line and severity doughnut charts |
+| vis-network | Interactive workflow diagram rendering |
+| SweetAlert2 | Confirm dialogs and idle-logout countdown |
+| Toastr | Toast notifications |
+
+All vendor libraries are bundled locally — the application runs without internet access once deployed.
+
+---
+
+## Architecture
+
+```
+Browser ──HTTPS──▶ Apache / Nginx
+                        │
+                        ▼
+               public/index.php   ◀── CodeIgniter 4 front controller
+                        │
+                   Routes.php
+                        │
+          ┌─────────────┴──────────────┐
+          ▼                            ▼
+  Controllers/user.php         Controllers/app.php
+  (auth, users, roles)         (all other modules)
+          │                            │
+          ├── Models/user_model.php    ├── Models/app_model.php
+          │                            │
+          └── Views/                   └── Views/
+                                            │
+                                       Helpers/
+                                       ├── alert_helper.php     (settings cache, email builders, auth guards)
+                                       ├── flow_helper.php      (vis-network data builders)
+                                       └── security_helper.php  (rate-limiting, file security)
+
+Background process (runs every minute via cron):
+  tat_monitor.php ──▶ reads tickets
+                  ──▶ writes ticket_actions, notification_logs, cron_runs
+                  ──▶ flushes notification_logs via PHPMailer → SMTP
+```
+
+All application state lives in MySQL. Sessions are stored on the filesystem under `writable/session/`. Email delivery is queued to the `notification_logs` table and flushed by the cron job, so web requests never block on SMTP.
+
+---
+
+## Folder Structure
+
+```
 pview_alerts/
-│
-├── app/                                 # Core Application logic
-│   ├── Config/                          # Route, Database, Mail and app configs
+├── app/
+│   ├── Config/               # Framework configuration (App, Email, Session, Routes, …)
 │   ├── Controllers/
-│   │   ├── BaseController.php           # Core controller loading session & models
-│   │   ├── app.php                      # NOC dashboards, CRUD modules, AJAX & REST APIs
-│   │   └── user.php                     # Authentication, profiles, security & settings
-│   │
+│   │   ├── app.php           # Main application controller (60+ public methods)
+│   │   ├── user.php          # Auth, user management, roles (27 methods)
+│   │   └── BaseController.php
+│   ├── Database/
+│   │   └── Migrations/       # CI4 migrations (indexes, lifecycle columns, cron_runs)
 │   ├── Helpers/
-│   │   ├── alert_helper.php             # Email builders, @mentions, and general helpers
-│   │   ├── flow_helper.php              # Dynamically compiles Mermaid diagram markup
-│   │   └── security_helper.php          # Lockouts, rate-limiting, and upload sniffers
-│   │
+│   │   ├── alert_helper.php  # App settings, email templates, auth guards, AJAX helpers
+│   │   ├── flow_helper.php   # vis-network node/edge data builders
+│   │   └── security_helper.php  # Login rate-limiting, upload validation
 │   ├── Models/
-│   │   ├── app_model.php                # Core operational queries (tickets, flows, matrix)
-│   │   └── user_model.php               # User CRUD, custom roles, and auth states
-│   │
-│   └── Views/                           # Secure PHP templates and page structures
-│
-├── docs/                                # Technical specifications & manuals
-│   ├── README.md                        # Application overview & instructions (this file)
-│   ├── PROJECT_PLAN.md                  # Milestone details & phase breakdowns
-│   ├── test_plan.md                     # QA scenario matrix and test cases
-│   └── user_documentation.md            # Operator & NOC team lead user guide
-│
-├── public/                              # Web server root
-│   ├── assets/                          # Static assets (fonts, CSS, JS)
-│   │   ├── fonts/                       # Local Inter and JetBrains Mono fonts (No CDNs)
-│   │   └── vendor/                      # Offline-vendored frontend libraries
-│   ├── index.php                        # CI4 Front Controller bootstrap
-│   └── .htaccess                        # URL rewriting and file access restrictions
-│
-├── scripts/                             # Server CLI operational utilities
-│   ├── alert_system_schema.sql          # Clean schema dump (17 tables)
-│   ├── setup_defaults.php               # System seeding script (wipes and builds baseline)
-│   └── migrate_*.sql                    # Cumulative schema migrations
-│
-├── writable/                            # Cache, logging, and uploaded files (server-writable)
-├── composer.json                        # Dependencies, autoload maps & platform locks
-├── tat_monitor.php                      # Background cron worker: handles SLA breaches
-└── spark                                # CodeIgniter CLI tool
+│   │   ├── app_model.php     # Projects, flows, states, tickets, alerts, escalation, API keys
+│   │   └── user_model.php    # Users, roles, permissions, authentication
+│   └── Views/
+│       ├── templates/        # Shared header, footer, sidebar, auth wrappers
+│       ├── filters/          # Date range picker and filter bar components
+│       ├── me/               # Dashboard and notification preference pages
+│       └── *.php             # Page templates (dashboard, tickets, flows, users, …)
+├── public/
+│   ├── index.php             # Application entry point
+│   ├── .htaccess             # URL rewriting to public/
+│   └── assets/
+│       ├── css/app.css       # Custom stylesheet (dark/light theme, all components)
+│       ├── js/app.js         # Core frontend logic
+│       ├── js/datatable.js   # DataTable initialization, filters, analytics
+│       └── vendor/           # Bundled third-party libraries
+├── scripts/
+│   ├── schema.sql            # Full database schema for fresh installation
+│   ├── setup_defaults.php    # Seeds roles, modules, permissions, and settings
+│   ├── seed_demo_data.php    # Seeds realistic demo data for evaluation
+│   └── backup.sh             # Daily database and upload backup script
+├── writable/
+│   ├── cache/                # Settings file cache (app_settings.cache, 5-min TTL)
+│   ├── logs/                 # Application error logs
+│   ├── session/              # User session files
+│   └── uploads/              # Ticket file attachments (organised by alarm_id)
+├── .env                      # Local environment configuration (not committed to git)
+├── .env.example              # Environment variable template
+├── composer.json             # PHP dependency definitions
+├── spark                     # CodeIgniter CLI tool
+└── tat_monitor.php           # TAT escalation and notification cron job
 ```
 
 ---
 
-## 🗄️ Database Structure
+## Requirements
 
-The system relies on **17 highly optimized tables** with indexed foreign keys. You can find the database schema inside the [alert_system_schema.sql](file:///c:/xampp8/htdocs/pview_alerts/scripts/alert_system_schema.sql) file.
+- **PHP** 8.1 or later with extensions: `pdo_mysql`, `mbstring`, `intl`, `json`, `openssl`, `fileinfo`
+- **MySQL** 8.0+ or **MariaDB** 10.4+
+- **Composer** 2.x
+- **Apache** with `mod_rewrite` enabled, or **Nginx** with equivalent rewrite rules
+- A working **SMTP relay** for email notifications
+- **Cron** (Linux) or **Task Scheduler** (Windows) to run `tat_monitor.php` every minute
 
-```mermaid
-erDiagram
-    users ||--o{ tickets : "assignee"
-    users ||--o{ tickets : "raised_by"
-    roles ||--o{ users : "role"
-    projects ||--o{ flows : "contains"
-    flows ||--o{ states : "defines"
-    states ||--o{ tickets : "current_state"
-    tickets ||--o{ ticket_actions : "logs"
+---
+
+## Installation
+
+### 1. Clone or copy the project
+
+```bash
+git clone <repository-url> /var/www/pview_alerts
+cd /var/www/pview_alerts
 ```
 
-### Table Matrix
+### 2. Install PHP dependencies
 
-| Table Name | Description | Key Fields / Constraints |
-| :--- | :--- | :--- |
-| **`users`** | Operator registry. Supports soft deletes to maintain historical ticket relations. | `user_id` (Unique String), `role`, `theme`, `password_changed_at`, `deleted_at` |
-| **`roles`** | Custom role dictionary containing privilege settings. | `role_key` (PK), `is_admin_scope` |
-| **`module_permissions`**| Access Control Matrix detailing module grants (View, Add, Edit, Delete). | `role`, `module_key` (Unique Composite Index) |
-| **`projects`** | Top-level business groups (soft-deletes cascade down). | `id` (PK), `status`, `deleted_at` |
-| **`flows`** | Workflows belonging to projects (e.g. NOC Alert Flow, Dev Escalation). | `id` (PK), `project_id`, `deleted_at` |
-| **`states`** | Nodes/stages inside a flow. Defines multi-tier SLA settings. | `id` (PK), `flow_id`, `parent_state_id` (Tree branching), `l1_user_ids`...`l4_user_ids` (JSON) |
-| **`tickets`** | Dynamic ticket store. Unique formats prevent identifier collisions. | `id` (PK), `alarm_id` (Unique formatted `ALM-YYYYMMDD-XXXXX`), `status`, `current_level` |
-| **`ticket_actions`** | Immutable ticket audit trail, comment logs, and uploads ledger. | `ticket_id`, `action_type`, `performed_by`, `attachment_path` |
-| **`alert_definitions`** | Monitored threshold templates used to trigger alerts automatically. | `project_id`, `flow_id`, `alert_type`, `notify_user_ids` (JSON) |
-| **`escalation_matrix`** | Custom routing rule overrides (SLA override) per flow, state, and tier. | `flow_id`, `state_id`, `level`, `escalate_after` (minutes), `notify_user_ids` (JSON) |
-| **`api_keys`** | External systems' authentication tokens. Tied securely to single projects. | `api_key` (Unique Hash), `project_id`, `is_active`, `last_used` |
-| **`api_request_log`** | Raw log used to enforce granular rate limiting. | `api_key_id`, `requested_at` (Indexed composite) |
-| **`activity_logs`** | Global admin/operator audit log. Captures system state changes. | `user_id`, `module`, `action`, `ip_address`, `meta` |
-| **`login_attempts`** | Tracks failed and successful log-ins to prevent brute-force attacks. | `ip`, `login_identifier`, `attempted_at` (Cleaned automatically after 7 days) |
-| **`saved_filters`** | Personal, reloadable search configurations for tickets list. | `user_id`, `scope`, `query_params` |
-| **`user_notification_settings`**| Individual severity subscription matrix per project and alarm type. | `user_id`, `project_id`, `severity` (Unique Composite) |
-| **`alarm_id_sequence`** | Monotonic daily sequences ensuring lock-free transaction-safe IDs. | `day_key` (Unique `YYYYMMDD`), `last_seq` |
-
----
-
-## ⚙️ Security Infrastructure
-
-The application implements enterprise-tier defensive guards at the application layer:
-
-1. **Sliding Brute-Force Lockout:**
-   A sliding window lockout blocks credentials stuffing. If a user accumulates **3 failed attempts within 10 minutes** (customizable in system settings), they are locked out. Lockouts expire naturally based on the oldest attempt, and verification delays occur before password checks to mitigate timing attacks.
-2. **Strict API Rate Limiting:**
-   Granular limits are checked on each incoming request (`api_rate_per_minute` and `api_rate_per_hour`). Old rate-limiting records are pruned inside a minute cron sweep rather than inline, protecting the telemetry pipeline from database lock contention.
-3. **Rigorous File-Upload Hardening:**
-   * **Magic Byte Sniffing:** Verifies actual content using PHP's `fileinfo` (magic bytes) to reject executable payloads disguised with friendly extensions (e.g., a `.php` file renamed to `.pdf`).
-   * **Double Extension Block:** Splitting original filenames by dot segments allows `upload_filename_is_safe()` to verify all intermediate extensions, preventing bypasses like `payload.php.jpg`.
-   * **Absolute Denylist:** Even if an administrator misconfigures the allowed extensions list, a hardcoded core denylist rejects executable/configuration files unconditionally.
-4. **Hierarchical RBAC Enforcement:**
-   `assignable_role_keys()` checks that an operator can never edit, create, delete, or demote a user whose role is higher than their own, eliminating privilege escalation via direct POST tampering.
-
----
-
-## 🔄 Workflow Engine & Ticket Lifecycle
-
-pView Alert System supports both flat (linear) and tree (branched) state machine topologies.
-
-```text
-              [ Raised (Initial State) ]
-                           │
-                  (L1 SLA: T1 Minutes)
-                           │
-                L1 Operator Acknowledges
-               ┌───────────┴───────────┐
-      Linear Progress         Branched Decision
-               │                       │
-      [ Investigation ]       ┌────────┴────────┐
-               │              ▼                 ▼
-               │      [ DB Diagnostic ]  [ Network Diagnostic ]
-               │              │                 │
-               └──────────────┼─────────────────┘
-                              ▼
-                      [ Resolved / Closed ]
+```bash
+composer install --no-dev --optimize-autoloader
 ```
 
-### Ticket SLA Tiers & Escalation Matrix
-Every workflow state defines **4 sequential levels of SLA** (L1 to L4):
-* Each tier specifies an operator notification pool and a Turn-Around-Time (TAT) in minutes.
-* **The Escalation Sweep (`tat_monitor.php`):** Runs every minute in the background. It finds tickets that have been in their current state longer than the allowed TAT.
-  * **L1 to L3 Breaches:** The system auto-escalates the ticket to the next tier, logs the audit activity, and email-notifies the operators mapped to the new tier.
-  * **L4 Breach:** The ticket is flagged as `escalated` dynamically, raising dashboard priority and notifying administrators to intervene.
-  * **Escalation Rules Overrides:** Admins can insert overrides into the `escalation_matrix` table to reroute paths or modify times for specific (flow, state, level) combinations without rebuilding the main workflow.
+### 3. Set directory permissions
 
-### Proactive Warnings
-When a ticket consumes **80% of its TAT window**, the engine queues an `SLA Warning` notification to the current level's pool, allowing intervention before an escalation occurs.
+```bash
+chmod -R 775 writable/
+chown -R www-data:www-data writable/
+```
 
----
+### 4. Create the environment file
 
-## 🔔 Mentions & Notifications Pipeline
+```bash
+cp .env.example .env
+```
 
-* **Queued Delivery:** To avoid halting the browser/API during slow SMTP handshake threads, all ticket updates write a record to `notification_logs` with a status of `pending`.
-* **Draining:** The cron worker (`tat_monitor.php`) drains the queue in optimized batches of size `notification_batch_size` every minute.
-* **@Mentions Autocomplete:** Inside ticket timelines, operators can use `@user_id` to mention colleagues.
-  * `parse_mentions()` extracts mentioned strings, confirms they match active users, and issues direct email notifications.
-  * `highlight_mentions()` escapes the input string and highlights chips safely to prevent XSS.
+Edit `.env` with your values (see [Configuration](#configuration) below).
 
----
+### 5. Configure the web server
 
-## 💻 Profile & User Customization
+**Apache** — point the document root to `public/` and ensure `mod_rewrite` is enabled:
 
-* **Theme Manager:** Implements standard **Light** and **Dark** theme palettes toggled with a single click. High-performance styling is executed via CSS variables, and an inline script in `<head>` reads `localStorage` to avoid flash-of-unstyled-content (FOUC).
-* **Dashboard Widgets Config:** Operators can customize which KPI cards (`open`, `critical`, `major`, `resolved`) to view, set default trend graph intervals (7, 15, 30 days), and pick their default project view from their personal profiles.
-* **Selective Subscriptions:** Users can select exactly which projects and severities they wish to receive notifications for, opting out of noisy telemetry channels easily.
+```apache
+<VirtualHost *:80>
+    ServerName pview.example.com
+    DocumentRoot /var/www/pview_alerts/public
 
----
+    <Directory /var/www/pview_alerts/public>
+        Options -Indexes +FollowSymLinks
+        AllowOverride All
+        Require all granted
+    </Directory>
+</VirtualHost>
+```
 
-## 🚀 Installation & Setup
+**Nginx** — proxy to PHP-FPM and rewrite all requests through `index.php`:
 
-### Prerequisites
+```nginx
+server {
+    listen 80;
+    server_name pview.example.com;
+    root /var/www/pview_alerts/public;
+    index index.php;
 
-1. **Web Server:** Apache 2.4+ (with `mod_rewrite` enabled) or Nginx
-2. **Database:** MySQL 8.0+ or MariaDB 10.5+
-3. **Runtime:** PHP 8.1.0+ (requires `php-curl`, `php-mysql`, `php-intl`, `php-mbstring`, `php-fileinfo` extensions)
-4. **Package Manager:** Composer
-
-### Local Setup (XAMPP / Development environment)
-
-1. **Clone & Install Dependencies:**
-   Clone the repository to your root web directory (e.g. `C:\xampp8\htdocs\pview_alerts\`) and install dependencies:
-   ```bash
-   composer install
-   ```
-
-2. **Configure Environment:**
-   Copy the default template `env` to `.env`:
-   ```bash
-   cp env .env
-   ```
-   Open `.env` and set your local path and database details:
-   ```env
-   CI_ENVIRONMENT = development
-   app.baseURL    = 'http://localhost/pview_alerts/'
-
-   database.default.hostname = 127.0.0.1
-   database.default.database = pview_alerts
-   database.default.username = root
-   database.default.password =
-   database.default.DBDriver = MySQLi
-   ```
-
-3. **Initialize Database:**
-   Create the database and import the structured baseline schema:
-   ```bash
-   mysql -u root -p -e "CREATE DATABASE IF NOT EXISTS pview_alerts CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci;"
-   mysql -u root -p pview_alerts < scripts/alert_system_schema.sql
-   ```
-
-4. **Seed System Defaults:**
-   Execute the baseline setup script from the project root. This will wipe any operational tables and seed the core `super_admin` role, modules, default settings, and create the default admin account:
-   ```bash
-   php scripts/setup_defaults.php
-   ```
-   * **Default Admin Credentials:** User ID: **`admin`** | Password: **`Demo@1234`**
-
-5. **Configure Apache VirtualHost:**
-   Ensure `mod_rewrite` is enabled. The application contains a root-level `.htaccess` that safely redirects requests internally to the `public/` folder, allowing URLs to look clean without showing `/public/` in the browser bar.
-
----
-
-## 🔧 Deployment Process (Production)
-
-Follow this structured checklist to deploy the application to a production Linux/UNIX host:
-
-1. **Server Requirements:**
-   * Linux server (Ubuntu 22.04 LTS / RHEL 9 recommended)
-   * Apache 2.4 with `mod_rewrite` enabled
-   * PHP 8.1+ with OPcache, Mbstring, Intl, Curl, Fileinfo and MySQLi extensions
-   * Let's Encrypt SSL configuration
-
-2. **Clone & Configure Production Settings:**
-   * Clone the repo to `/var/www/pview_alerts`.
-   * Run production Composer install:
-     ```bash
-     composer install --no-dev --optimize-autoloader
-     ```
-   * Setup production `.env`:
-     ```env
-     CI_ENVIRONMENT = production
-     app.baseURL    = 'https://yourdomain.com/'
-     # Set secure production DB credentials and strong random passwords
-     ```
-
-3. **Apache Vhost Setup:**
-   Document root should point to `/var/www/pview_alerts`. The root-level `.htaccess` will manage secure redirections into the `public/` directory seamlessly.
-
-4. **Background Task Scheduling (Cron):**
-   Setup the system cron scheduler to trigger the escalation engine and email dispatcher **every minute**:
-   ```bash
-   * * * * * php /var/www/pview_alerts/tat_monitor.php >> /var/log/pview/tat.log 2>&1
-   ```
-
-5. **Production Backups:**
-   Integrate [backup.sh](file:///c:/xampp8/htdocs/pview_alerts/docs/backup.sh) to run daily at off-peak hours (e.g., 2:30 AM). Make sure to configure the output target folder securely:
-   ```bash
-   30 2 * * * /var/www/pview_alerts/docs/backup.sh >> /var/log/pview-backup.log 2>&1
-   ```
-
----
-
-## 🔌 Integration REST API
-
-External monitoring tools (e.g., Prometheus, Zabbix, Dynatrace) can automatically ingest alerts into pView. Authenticaton is handled via an `X-API-KEY` HTTP header.
-
-### 1. Ingest/Raise Alert
-* **Endpoint:** `POST /api/raise`
-* **Headers:**
-  ```http
-  X-API-KEY: your_masked_api_key_hash
-  Content-Type: application/json
-  ```
-* **Payload:**
-  ```json
-  {
-    "project_id": 1,
-    "flow_id": 2,
-    "title": "Database connection pool exhausted",
-    "description": "DB connection count exceeded 95% threshold on DB-NODE-01.",
-    "alert_type": "critical",
-    "priority": "urgent"
-  }
-  ```
-* **Response (Success):**
-  ```json
-  {
-    "status": "success",
-    "message": "Ticket created successfully.",
-    "data": {
-      "alarm_id": "ALM-20260529-00001",
-      "ticket_id": 14
+    location / {
+        try_files $uri $uri/ /index.php?$query_string;
     }
-  }
-  ```
 
-### 2. Update Ticket
-* **Endpoint:** `POST /api/alert/ALM-20260529-00001/update`
-* **Headers:** `X-API-KEY: your_key`
-* **Payload:**
-  ```json
-  {
-    "action": "resolved",
-    "comment": "Connection pool cleared by restarting service thread."
-  }
-  ```
-* **Response (Success):**
-  ```json
-  {
-    "status": "success",
-    "message": "Ticket updated successfully."
-  }
-  ```
-
-### Rate Limiting Headers
-Every API response returns standard rate-limiting metadata headers:
-```http
-X-RateLimit-Limit-Min: 60
-X-RateLimit-Limit-Hour: 1000
-X-RateLimit-Remaining-Min: 58
-X-RateLimit-Remaining-Hour: 994
+    location ~ \.php$ {
+        fastcgi_pass unix:/run/php/php8.2-fpm.sock;
+        fastcgi_param SCRIPT_FILENAME $realpath_root$fastcgi_script_name;
+        include fastcgi_params;
+    }
+}
 ```
-When limits are breached, the API returns `HTTP 429 Too Many Requests` with a descriptive JSON error.
 
 ---
 
-## 🧑‍💻 Contributing & Handover Notes
+## Database Setup
 
-* **Flat Controllers:** All standard page routing and operational actions are located in [app.php](file:///c:/xampp8/htdocs/pview_alerts/app/Controllers/app.php). Auth guards and user CRUD are located in [user.php](file:///c:/xampp8/htdocs/pview_alerts/app/Controllers/user.php).
-* **Single Models:** `App_model` encapsulates all workflow and ticket state queries; keep new DB operations within this model to maintain structural clean layouts.
-* **Offline-Ready UI:** No scripts, fonts, or styling relies on CDNs. If deploying inside closed intranet systems, the web client will load perfectly without external internet access.
-* **Writable Folders:** Ensure `/writable` is owned by the Apache user (`www-data` or `apache`) and has `chmod 775` permissions applied recursively on Linux.
+### Step 1: Create the database and user
+
+```sql
+CREATE DATABASE pview_alerts CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+CREATE USER 'pview'@'localhost' IDENTIFIED BY 'strong_password_here';
+GRANT ALL PRIVILEGES ON pview_alerts.* TO 'pview'@'localhost';
+FLUSH PRIVILEGES;
+```
+
+### Step 2: Import the schema
+
+```bash
+mysql -u pview -p pview_alerts < scripts/schema.sql
+```
+
+This creates all 21 tables with their indexes and constraints.
+
+### Step 3: Seed baseline configuration
+
+```bash
+php scripts/setup_defaults.php
+```
+
+This populates:
+- Three built-in roles: `super_admin`, `admin`, `user`
+- All system modules with sensible default permissions per role
+- Forty-plus application settings with production-ready defaults
+- A default `admin` user account (see [Default Credentials](#default-credentials))
+
+### Step 4 (optional): Load demo data
+
+```bash
+php scripts/seed_demo_data.php
+```
+
+Creates six demo users, three projects with flows and escalation rules, and a variety of tickets across different statuses. Useful for evaluating the system before going live.
+
+### Step 5: Run migrations
+
+When upgrading from an earlier version, apply any pending schema changes:
+
+```bash
+php spark migrate
+```
+
+---
+
+## Configuration
+
+### Environment file (`.env`)
+
+Copy `.env.example` to `.env` and set the values for your environment.
+
+**Application:**
+
+```ini
+CI_ENVIRONMENT = production
+# Use "development" to enable detailed error pages and the Debug Toolbar.
+
+app.baseURL = 'https://pview.example.com/'
+# Must include the trailing slash.
+```
+
+**Database:**
+
+```ini
+database.default.hostname = localhost
+database.default.database = pview_alerts
+database.default.username = pview
+database.default.password = your_db_password
+database.default.DBDriver = MySQLi
+database.default.port     = 3306
+```
+
+**Email (SMTP):**
+
+```ini
+email.fromEmail   = alerts@example.com
+email.fromName    = 'pView Alerts'
+email.protocol    = smtp
+email.SMTPHost    = smtp.example.com
+email.SMTPUser    = alerts@example.com
+email.SMTPPass    = your_smtp_password
+email.SMTPPort    = 587
+email.SMTPCrypto  = tls
+```
+
+Use `email.protocol = mail` to use PHP's built-in mail function, though SMTP is recommended for production.
+
+### In-app settings (`/settings`)
+
+Most operational parameters are configured through the Settings page and stored in the `app_settings` table. Changes take effect immediately without a server restart. See [Settings Reference](#settings-reference) for the full list.
+
+---
+
+## Running the Application
+
+### Development
+
+```bash
+php spark serve
+# Available at http://localhost:8080
+```
+
+### Production
+
+Deploy behind Apache or Nginx as described in [Installation](#installation). The web server document root must point to `public/` — the application root must not be web-accessible.
+
+---
+
+## Cron Job Setup
+
+The TAT monitor must run **every minute** to enforce escalation SLAs and flush the email queue.
+
+### Linux
+
+```bash
+crontab -e
+```
+
+Add:
+
+```
+* * * * * /usr/bin/php /var/www/pview_alerts/tat_monitor.php >> /var/log/pview_tat.log 2>&1
+```
+
+### Windows (Task Scheduler)
+
+Create a Basic Task that repeats every minute:
+
+- **Program:** `C:\php\php.exe`
+- **Arguments:** `C:\xampp8\htdocs\pview_alerts\tat_monitor.php`
+
+### What the cron job does
+
+Each run performs these steps in order:
+
+1. **Acquires an exclusive file lock** (`writable/cache/tat_monitor.lock`) to prevent duplicate runs if SMTP is slow
+2. **Loads all open, non-final tickets** from the database
+3. **For each ticket**, resolves the applicable TAT from the escalation matrix (if configured) or the state's default; checks whether the threshold has elapsed since `state_entered_at`
+4. **If TAT is breached at L1–L3:** bumps `current_level` by one and notifies the new level's user pool via the email queue
+5. **If TAT is breached at L4:** sets `status = escalated` and notifies L4 as the terminal escalation
+6. **Flushes the email queue** — sends all `pending` rows from `notification_logs` via PHPMailer
+7. **Prunes log tables** — removes stale rows from `login_attempts` and `api_request_log` based on retention settings
+8. **Records its execution** in `cron_runs` — visible in the Cron Panel at `/cron_panel`
+
+The script is locked to CLI execution. HTTP requests to `tat_monitor.php` receive a 404.
+
+---
+
+## User Roles & Permissions
+
+### Built-in roles
+
+| Role key | Admin scope | Description |
+|---|---|---|
+| `super_admin` | Yes | Full unrestricted access; can manage Settings, Roles, and Module Control Panel |
+| `admin` | Yes | Sees all tickets across all projects; module access configured via permission grid |
+| `user` | No | Sees only tickets they raised, are assigned to, or are in a state's user pool |
+
+**Admin scope** determines ticket visibility. An admin-scope role sees every ticket in the system. A non-admin-scope role sees only tickets it is directly involved with.
+
+### Custom roles
+
+Create additional roles at `/roles`. Each role gets a unique key (e.g., `vendor_lead`), a display label, and an optional admin-scope flag. After creation, configure its permissions at `/module_control_panel`.
+
+### Module permissions
+
+Every module supports four permission bits: **view**, **add**, **edit**, **delete**. These bits are enforced server-side on every request — the same check that hides a button in the UI also rejects direct HTTP requests.
+
+### Security guards
+
+The following are enforced server-side regardless of UI state:
+
+- A user can only assign roles within their own assignable list — privilege escalation via direct POST is blocked
+- `super_admin` cannot demote or deactivate their own account
+- The last active `super_admin` cannot be deleted or demoted
+- Editing a user whose role outranks the editor is refused at the controller level
+
+---
+
+## Modules
+
+### Dashboard
+
+Provides a live overview of the current alert situation:
+
+- **KPI cards** — open, in-progress, escalated, and resolved ticket counts; users can hide individual cards
+- **Severity breakdown** — doughnut chart of active tickets by alert type (info / major / critical)
+- **Ticket trend chart** — tickets raised per day over a configurable range (7, 15, or 30 days)
+- **Recent tickets** — the five most urgent open tickets sorted by escalation status
+- **TAT breached count** — number of tickets currently in `escalated` status
+
+Users personalise their dashboard at `/me/dashboard` to set a default project, configure which KPI cards to display, and choose the default trend range.
+
+### Projects
+
+Top-level namespaces that group flows, alert definitions, API keys, and tickets. Soft-deleting a project cascades to soft-delete its flows and deactivate its alert definitions and API keys.
+
+### Flows (Workflow Designer)
+
+A flow is a state machine that defines how tickets move through your process. Each flow belongs to one project and has an ordered set of states.
+
+- **States** represent the stages a ticket can be in (e.g., Triage → Investigation → Resolution)
+- **Transitions** are the allowed paths between states — forward transitions advance the ticket; backward transitions are send-back/rework paths that always require a reason comment
+- **Per-state user pools** — each state defines up to four escalation-level user pools (L1–L4), each with its own TAT threshold in minutes
+- **Interactive diagram** — the workflow is rendered as an interactive directed graph using vis-network; clicking a node highlights the corresponding state row in the editor
+- **Drag-to-reorder** — states are reordered by dragging; the new `sort_order` is saved to the database immediately
+
+### Alert Definitions
+
+Alert definitions connect an alert type to a specific project flow. When an external system raises a ticket via the API, it specifies a project and flow; the alert definition provides the routing context and a default notification list.
+
+### Escalation Matrix
+
+Provides per-state, per-level overrides for TAT thresholds and notification lists. When the cron job evaluates a ticket, it checks the escalation matrix first; if a matching row exists, it takes precedence over the state's built-in L1–L4 settings.
+
+This enables fine-grained control — for example, the "Critical Review" state at L2 can escalate in 30 minutes while the default flow-wide L2 threshold is 120 minutes.
+
+### Tickets
+
+Tickets are the core operational unit. Each ticket receives a unique alarm ID in the format `ALM-YYYYMMDD-NNNNN`.
+
+**Creating a ticket manually:** Users with `tickets:add` permission create tickets at `/tickets/create` by selecting a project, flow, severity, and priority. An initial assignee from the initial state's L1 pool may be selected at creation.
+
+**Ticket list views:**
+- `/tickets` — tickets the logged-in user is directly involved with (raised, assigned, or in their state pool)
+- `/tickets/all` — all tickets across all projects (requires `tickets_all:view` permission)
+
+**Actions on a ticket:**
+
+| Action | Description |
+|---|---|
+| Comment | Add a text note; supports `@mention` for direct notifications |
+| Edit title / description | Inline edit with real-time save |
+| Change priority | Inline dropdown; saved via AJAX |
+| Assign | Select an operator from the current state's user pool |
+| Move state | Forward or backward transition with optional reason comment |
+| Resolve | Marks as resolved; auto-sets `resolved_at` and `actual_end_date` |
+| Close | Terminal action; no further changes allowed |
+| Reopen | Reverts a resolved ticket back to open/in-progress |
+| Attach file | Upload up to five files with MIME and extension validation |
+| Download attachment | Served through the application with path traversal protection |
+
+**Ticket statuses:**
+
+| Status | Meaning |
+|---|---|
+| `open` | Raised but not yet assigned to an operator |
+| `in_progress` | Assigned; operator is actively working it |
+| `escalated` | TAT breached at L4; requires admin/management intervention |
+| `resolved` | Marked resolved; can be reopened if needed |
+| `closed` | Fully closed; no further changes are accepted |
+
+Once `resolved` or `closed`, all mutation endpoints reject further changes.
+
+**Duplicate detection:** When a ticket is created, the system checks for other open tickets with the same alert type in the same project within the configured window (default 24 hours). A warning is displayed if duplicates are found — the ticket is still created but the operator is alerted.
+
+### API Keys
+
+API keys authorise external monitoring systems to create and query tickets without a user session. Each key is bound to a single project and can only operate on that project's data. Keys can be toggled active/inactive without deletion.
+
+### Module Control Panel
+
+The permission management interface at `/module_control_panel`. Displays a grid of every module against every role. Admins toggle the view/add/edit/delete bits per cell. Custom modules can also be registered here to control access to non-standard sections.
+
+### Settings
+
+The system configuration page at `/settings` (super_admin only). Exposes all `app_settings` rows through a form. All changes take effect immediately on save. A **Bump asset version** button increments the `asset_version` value, forcing browsers to reload `app.css` and `app.js` on the next page visit.
+
+### Activity Logs
+
+A searchable, filterable, append-only audit trail of every significant user action. See [Activity Logs](#activity-logs) for the full description.
+
+### Cron Panel
+
+Displays the execution history of `tat_monitor.php` from the `cron_runs` table. Visible at `/cron_panel`. Retains the last 99 runs per script, showing start time, duration, tickets checked, notifications sent, and status.
+
+---
+
+## Workflow Engine
+
+### Flow structure
+
+A flow is a directed graph with exactly one initial state and one final state. When a ticket is created, it starts at the initial state. Operators advance it by choosing a valid next state.
+
+**Forward transitions** move the ticket toward the final state. They can be configured to require a comment.
+
+**Backward transitions** are rework paths — sending a ticket back to an earlier stage because more work is needed. They always require a reason comment. When a backward transition occurs, it is recorded in the state transition table so the diagram reflects that rework happened.
+
+### User pools and escalation
+
+Each state has four user pools (L1–L4), each with an independent TAT threshold. L1 is the first responder pool. If no one in L1 acts within the L1 TAT, the cron job bumps the ticket to L2, updates `current_level`, and notifies L2 users. This repeats through L3. At L4, the ticket status becomes `escalated`.
+
+The escalation matrix provides per-state overrides for any (flow, state, level) combination, enabling different escalation timings and contact lists without changing the flow structure.
+
+### Transition validation
+
+Every state move is validated server-side:
+
+- Forward targets must be in the state's valid next-state list
+- Backward targets must be in the configured backward transition list
+- Only the assigned operator or an admin-scope user may move a ticket's state
+- Moving to a state where the current assignee is not in L1 automatically clears the assignee and sets status back to `open`
+- Cycle prevention: forward transitions that would create a loop in the graph are rejected
+
+---
+
+## Ticket Lifecycle
+
+```
+  External API or UI
+         │
+         ▼
+    ticket created
+    status: open
+    current_level: 1
+         │
+         ▼
+    operator assigned ◀──────────────────────────────────┐
+    status: in_progress                                    │
+         │                                                 │
+         ├── L1 TAT elapsed? ──▶ bump to L2, notify L2    │
+         ├── L2 TAT elapsed? ──▶ bump to L3, notify L3    │
+         ├── L3 TAT elapsed? ──▶ bump to L4, notify L4    │
+         ├── L4 TAT elapsed? ──▶ status = escalated        │
+         │                                                 │
+         ▼                                                 │
+    state transitions (forward / backward) ◀──────────────┘
+         │
+         ├──▶ resolved (can be reopened by assignee or admin-scope user)
+         │
+         └──▶ closed (terminal — no further changes accepted)
+```
+
+---
+
+## Notifications & Email Queue
+
+### Queue-based delivery
+
+Email is never sent synchronously during a web request. Instead, an email row is written to `notification_logs` with `status = pending`. The cron job processes this queue at the end of each tick, calling the SMTP server out-of-band. This keeps web request latency low even when the SMTP server is slow.
+
+The queue is processed in batches up to `notification_batch_size` (default 50). Transient failures are retried up to `notification_max_attempts` (default 5) times using a counter embedded in `error_message`. After the retry limit is exceeded, the row is marked `failed`.
+
+### Events that trigger notifications
+
+| Event | Recipients |
+|---|---|
+| Ticket created | L1 pool of the initial state (or the specified assignee) |
+| Ticket assigned | The newly assigned operator |
+| State moved | L1 pool of the new state |
+| Level escalated (L1→L2, L2→L3, L3→L4) | The user pool of the new level |
+| Terminal escalation (L4 breached) | L4 pool |
+| Ticket resolved | Configured recipients |
+| `@mention` in comment | Each mentioned user individually |
+| TAT warning (80% of TAT window elapsed) | Current level's user pool |
+
+### Per-user preferences
+
+Users configure their notification preferences at `/me/notifications`. The matrix lets them opt out per project and per severity. Operators who have not visited this page receive all notifications by default.
+
+### Notification filtering
+
+Before any email row is queued, `user_notify_allowed()` checks the user's preferences. The lookup order is:
+
+1. Exact match: `(user_id, project_id, severity)`
+2. Catch-all: `(user_id, project_id=0, severity)`
+3. Default: allow (no row = all notifications enabled)
+
+---
+
+## REST API
+
+External monitoring systems authenticate by sending an `X-API-KEY` header. Keys are managed at `/api_keys` and are scoped to a single project — requests that reference a different project receive HTTP 403.
+
+### Rate limiting
+
+Requests are rate-limited per API key. Default limits are 60 requests per minute and 1,000 per hour (configurable in Settings). Exceeded limits return HTTP 429 with a `Retry-After` header.
+
+### Endpoints
+
+#### Raise a ticket
+
+```http
+POST /api/raise
+X-API-KEY: your_api_key_here
+Content-Type: application/json
+
+{
+    "project_id":     1,
+    "flow_id":        2,
+    "title":          "High CPU on web-01",
+    "description":    "CPU sustained above 90% for 5 minutes",
+    "alert_type":     "critical",
+    "priority":       "high",
+    "source_system":  "Zabbix"
+}
+```
+
+`alert_type`: `info` | `major` | `critical`  
+`priority`: `low` | `medium` | `high` | `urgent`
+
+**Response (HTTP 201):**
+
+```json
+{
+    "success":        true,
+    "alarm_id":       "ALM-20260605-00042",
+    "ticket_id":      42,
+    "current_state":  "Triage",
+    "notified_users": ["ops@example.com"],
+    "message":        "Alert raised successfully"
+}
+```
+
+#### Get a ticket
+
+```http
+GET /api/alert/ALM-20260605-00042
+X-API-KEY: your_api_key_here
+```
+
+Returns full ticket details including status, current state, current level, TAT remaining, and the complete action timeline.
+
+#### Update a ticket
+
+```http
+POST /api/alert/ALM-20260605-00042/update
+X-API-KEY: your_api_key_here
+Content-Type: application/json
+
+{
+    "action":               "resolved",
+    "comment":              "Root cause identified. Batch job completed normally.",
+    "performed_by_system":  "Zabbix"
+}
+```
+
+`action`: `resolved` | `closed` | `comment`
+
+#### List tickets
+
+```http
+GET /api/alerts?status=open&alert_type=critical&limit=50&offset=0
+X-API-KEY: your_api_key_here
+```
+
+Returns tickets scoped to the API key's project. Supports `status` and `alert_type` filters with `limit` / `offset` pagination.
+
+#### List flows
+
+```http
+GET /api/flows
+X-API-KEY: your_api_key_here
+```
+
+Returns all active flows and their states for the API key's project. Useful when building integrations that need to select the correct flow ID when raising a ticket.
+
+---
+
+## Activity Logs
+
+Every significant user action is captured automatically. Log entries are append-only — they cannot be edited or deleted through the UI. Each entry records:
+
+- Timestamp, user ID, display name, role
+- Module, action type, entity type and ID
+- Human-readable summary
+- Field-level diff for update operations (old value → new value)
+- IP address and source classification (Web / Mobile / API)
+- Associated session login and logout timestamps
+
+### Searching and exporting
+
+The log supports filtering by user, module, action, role, status, project, and date range. Results can be exported to CSV with the current filters applied.
+
+### Analytics tab
+
+The Analytics tab within Activity Logs provides:
+
+- Login and failed-login counts for today and a selected period
+- Top active users table with last-seen time
+- Average session duration per user
+- Module-usage horizontal bar chart
+- Failed events breakdown table
+- Per-user drilldown modal showing the full event history for any user
+
+---
+
+## Settings Reference
+
+All settings are managed through `/settings` and stored in the `app_settings` table.
+
+### General
+
+| Key | Default | Description |
+|---|---|---|
+| `app_name` | pView Alert System | Name shown in emails and page titles |
+| `maintenance_mode` | 0 | Redirect non-admin users to the maintenance page |
+
+### Authentication
+
+| Key | Default | Description |
+|---|---|---|
+| `password_min_length` | 8 | Minimum password length |
+| `password_require_letter` | 1 | At least one letter required |
+| `password_require_digit` | 1 | At least one digit required |
+| `password_rotate_days` | 90 | Forced rotation after N days (0 = disabled) |
+| `login_max_attempts` | 3 | Failed attempts before lockout |
+| `login_lockout_minutes` | 10 | Lockout duration in minutes |
+| `session_timeout_minutes` | 30 | Idle timeout in minutes (0 = disabled) |
+
+### Email / SMTP
+
+| Key | Description |
+|---|---|
+| `email_protocol` | `smtp`, `sendmail`, or `mail` |
+| `email_smtp_host` | SMTP server hostname |
+| `email_smtp_port` | SMTP port (typically 587 for TLS) |
+| `email_smtp_user` | SMTP username |
+| `email_smtp_pass` | SMTP password (masked in audit logs) |
+| `email_smtp_crypto` | `tls` or `ssl` |
+| `email_from_email` | Sender email address |
+| `email_from_name` | Sender display name |
+
+### TAT defaults
+
+| Key | Default | Description |
+|---|---|---|
+| `default_tat_l1_minutes` | 60 | Default L1 TAT when state has no override |
+| `default_tat_l2_minutes` | 120 | Default L2 TAT |
+| `default_tat_l3_minutes` | 240 | Default L3 TAT |
+| `default_tat_l4_minutes` | 480 | Default L4 TAT |
+
+### Notifications
+
+| Key | Default | Description |
+|---|---|---|
+| `notification_batch_size` | 50 | Emails processed per cron run |
+| `notification_max_attempts` | 5 | Retry limit before marking `failed` |
+| `live_poll_seconds` | 15 | Bell-badge AJAX poll interval in seconds (0 = disabled) |
+| `live_audio_enabled` | 1 | Audible beep when new actionable tickets appear |
+| `live_browser_notify` | 1 | Request browser push notification permission |
+
+### Uploads
+
+| Key | Default | Description |
+|---|---|---|
+| `upload_max_mb` | 10 | Maximum attachment size in megabytes |
+| `upload_allowed_ext` | pdf,doc,docx,jpg,jpeg,png,xlsx,xls,csv,txt | Allowed file extensions |
+
+### API
+
+| Key | Default | Description |
+|---|---|---|
+| `api_rate_per_minute` | 60 | Max API requests per key per minute |
+| `api_rate_per_hour` | 1000 | Max API requests per key per hour |
+
+### Dashboard
+
+| Key | Default | Description |
+|---|---|---|
+| `dashboard_trend_ranges` | 7,15,30 | Selectable trend ranges in days |
+| `duplicate_detection_window_hours` | 24 | Window for duplicate ticket detection |
+
+### Display
+
+| Key | Default | Description |
+|---|---|---|
+| `datatable_page_length` | 25 | Default rows per page in all tables |
+| `asset_version` | 1 | Appended to JS/CSS URLs as a cache-buster |
+| `analytics_refresh_seconds` | 30 | Auto-refresh interval on the Analytics tab |
+| `log_retention_days` | 30 | Retention period for login attempt rows |
+
+---
+
+## File Uploads
+
+Ticket attachments are stored under `writable/uploads/tickets/{alarm_id}/`. Up to five files may be attached per ticket.
+
+### Validation pipeline
+
+Each upload is checked in this order:
+
+1. **Extension denylist** — executable and script extensions are always rejected regardless of admin settings (`.php`, `.phar`, `.sh`, `.exe`, `.bat`, `.js`, `.html`, `.asp`, and many others)
+2. **Extension allowlist** — only extensions in `upload_allowed_ext` are accepted
+3. **MIME type check** — the header MIME type must be in the allowed MIME list
+4. **Magic byte check** — `finfo` reads the actual file bytes to confirm the MIME matches the extension, catching renamed files such as a PHP script with a `.pdf` extension
+5. **File size** — rejected if over `upload_max_mb`
+
+### Storage protection
+
+Each upload directory gets an auto-generated `.htaccess` that disables PHP execution, CGI, and directory listing. Downloads are served through the application controller — the absolute path is verified to sit inside `writable/uploads/` before the file is sent, preventing path traversal.
+
+---
+
+## Backup
+
+The `scripts/backup.sh` script creates dated backups of the MySQL database and the file upload directory.
+
+### Setup
+
+```bash
+chmod +x scripts/backup.sh
+# Edit the variables at the top of the script to set your database credentials and backup path.
+```
+
+### Schedule (Linux)
+
+```bash
+# Daily backup at 2 AM
+0 2 * * * /bin/bash /var/www/pview_alerts/scripts/backup.sh >> /var/log/pview_backup.log 2>&1
+```
+
+The script reads the database password from `.env` to avoid storing it in the script itself. It retains the last 14 days of backups by default.
+
+---
+
+## Deployment
+
+### Production checklist
+
+1. Set `CI_ENVIRONMENT = production` in `.env` — disables error display and the debug toolbar
+2. Set `app.baseURL` to the correct production URL with a trailing slash
+3. Point the web server document root to `public/` — not the project root
+4. Verify `writable/` is writable by the web server user and not accessible from the web
+5. Import the schema and run `setup_defaults.php` before first use
+6. Configure SMTP settings and send a test email from the Settings page
+7. Set up the cron job to run `tat_monitor.php` every minute
+8. Set up the daily backup script
+9. Change the default admin password immediately after first login
+10. After deploying updated CSS or JS, bump `asset_version` in Settings to force browser cache refresh
+
+### CI/CD workflows
+
+Two GitHub Actions workflows are included:
+
+- `.github/workflows/ci.yml` — runs on every push to validate PHP syntax and project structure
+- `.github/workflows/release.yml` — creates tagged GitHub releases on version bumps
+
+---
+
+## Default Credentials
+
+After running `setup_defaults.php`, the following account is created:
+
+| Field | Value |
+|---|---|
+| User ID | `admin` |
+| Password | `Demo@1234` |
+| Role | `super_admin` |
+
+**Change this password immediately after first login.** The password rotation policy will prompt for a change if the account age exceeds the configured rotation period.
+
+---
+
+## Database Tables Reference
+
+| Table | Purpose |
+|---|---|
+| `users` | Operator accounts with roles, bcrypt passwords, and preferences |
+| `roles` | Role definitions (built-in and custom); includes `is_admin_scope` flag |
+| `module_permissions` | Per-role, per-module CRUD permission bits |
+| `projects` | Top-level project namespaces |
+| `flows` | Workflow state machine definitions; stores TAT level count |
+| `states` | Individual states with per-level TAT and user pool JSON arrays |
+| `state_transitions` | Allowed transitions (forward / backward / rework) |
+| `tickets` | Active and historical tickets with full lifecycle fields |
+| `ticket_actions` | Complete action history per ticket (comments, state changes, attachments) |
+| `alert_definitions` | Alert type to flow mappings with default notification lists |
+| `escalation_matrix` | Per-state, per-level TAT and notification overrides |
+| `api_keys` | External system authentication keys (project-scoped) |
+| `api_request_log` | API rate-limiting audit trail (pruned daily by cron) |
+| `notification_logs` | Outbound email queue with status tracking (pending / sent / failed) |
+| `user_notification_settings` | Per-user opt-out preferences per project and severity |
+| `saved_filters` | Named ticket filter presets per user |
+| `activity_logs` | System-wide append-only audit trail |
+| `login_attempts` | Failed and successful login tracking for rate-limiting |
+| `alarm_id_sequence` | Atomic daily sequence counter for `ALM-YYYYMMDD-NNNNN` generation |
+| `app_settings` | Key-value store for all application configuration |
+| `cron_runs` | Execution history of `tat_monitor.php` (last 99 runs retained) |

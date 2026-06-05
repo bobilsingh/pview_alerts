@@ -62,7 +62,9 @@ function notif_pref_checked($existing, $project_id, $severity)
                 <div class="form-check form-switch d-inline-block">
                   <input type="checkbox" class="form-check-input"
                     name="pref_0_<?= esc($sevKey); ?>"
-                    value="1" <?php if ($checked) { echo 'checked'; } ?>>
+                    value="1" <?php if ($checked) {
+                                echo 'checked';
+                              } ?>>
                 </div>
               </td>
             <?php } ?>
@@ -79,7 +81,9 @@ function notif_pref_checked($existing, $project_id, $severity)
                   <div class="form-check form-switch d-inline-block">
                     <input type="checkbox" class="form-check-input"
                       name="pref_<?= (int) $p['id']; ?>_<?= esc($sevKey); ?>"
-                      value="1" <?php if ($checked) { echo 'checked'; } ?>>
+                      value="1" <?php if ($checked) {
+                                  echo 'checked';
+                                } ?>>
                   </div>
                 </td>
               <?php } ?>
@@ -89,7 +93,6 @@ function notif_pref_checked($existing, $project_id, $severity)
       </table>
     </div>
   </div>
-
   <button type="submit" class="btn btn-primary">
     <i class="bi bi-check-lg"></i> Save Preferences
   </button>

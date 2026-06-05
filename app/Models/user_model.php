@@ -11,8 +11,6 @@ class User_model
         $this->db = \Config\Database::connect();
     }
 
-    // --- Read ---
-
     public function getAll()
     {
         return $this->db->table('users')
@@ -40,7 +38,6 @@ class User_model
 
     public function getByIds($ids)
     {
-        // Tolerant of both numeric PKs and user_id strings (migration window).
         if (empty($ids)) {
             return [];
         }
@@ -73,6 +70,26 @@ class User_model
             ->get()->getResultArray();
     }
 
+    public function getPoolUsers($callerUserId)
+    {
+        $caller = (string) $callerUserId;
+        return $this->db->query(
+            "SELECT DISTINCT u.user_id, u.name
+               FROM users u
+              WHERE u.is_active = 1
+                AND u.deleted_at IS NULL
+                AND (
+                    u.user_id = ?
+                    OR EXISTS (SELECT 1 FROM states s WHERE s.status = 'active' AND JSON_CONTAINS(s.l1_user_ids, JSON_QUOTE(u.user_id)))
+                    OR EXISTS (SELECT 1 FROM states s WHERE s.status = 'active' AND JSON_CONTAINS(s.l2_user_ids, JSON_QUOTE(u.user_id)))
+                    OR EXISTS (SELECT 1 FROM states s WHERE s.status = 'active' AND JSON_CONTAINS(s.l3_user_ids, JSON_QUOTE(u.user_id)))
+                    OR EXISTS (SELECT 1 FROM states s WHERE s.status = 'active' AND JSON_CONTAINS(s.l4_user_ids, JSON_QUOTE(u.user_id)))
+                )
+              ORDER BY u.name ASC",
+            [$caller]
+        )->getResultArray();
+    }
+
     /** True if a user_id is already taken (optionally ignoring one row by PK). */
     public function userIdExists($user_id, $ignoreId = 0)
     {
@@ -83,9 +100,7 @@ class User_model
         return $q->countAllResults() > 0;
     }
 
-    // Count of active super_admin rows excluding the optional ignore PK
-    // (used by the user controller's self-protection guard to refuse the
-    // last super_admin being demoted/deleted).
+    // Returns active super_admin count, excluding the given PK (used to guard against deleting the last one).
     public function countActiveSuperAdmins($ignoreId = 0)
     {
         $q = $this->db->table('users')
@@ -108,8 +123,6 @@ class User_model
         return $q->countAllResults() > 0;
     }
 
-    // --- Write ---
-
     public function save($data)
     {
         if (isset($data['password']) && $data['password'] !== '') {
@@ -121,7 +134,7 @@ class User_model
         $data['created_at'] = date('Y-m-d H:i:s');
         $this->db->table('users')->insert($data);
         $id = $this->db->insertID();
-        error_log("pview alert >> user save: query=[" . $this->db->getLastQuery() . "], new_id=[" . $id . "]");
+        log_message('debug', "pview alert >> user save: query=[" . $this->db->getLastQuery() . "], new_id=[" . $id . "]");
         return $id;
     }
 
@@ -134,10 +147,9 @@ class User_model
             unset($data['password']);
         }
         $ok = $this->db->table('users')->where('id', (int) $id)->update($data);
-        error_log("pview alert >> user update: query=[" . $this->db->getLastQuery() . "], id=[" . $id . "], ok=[" . (int) $ok . "]");
+        log_message('debug', "pview alert >> user update: query=[" . $this->db->getLastQuery() . "], id=[" . $id . "], ok=[" . (int) $ok . "]");
 
-        // WF-02: If the operator is being deactivated, return their active tickets
-        // to the unassigned pool — same logic as softDelete() — so they don't deadlock.
+        // Return active tickets to the unassigned pool when an operator is deactivated.
         if (isset($data['is_active']) && (int) $data['is_active'] === 0) {
             $row = $this->db->table('users')->select('user_id')->where('id', (int) $id)->get()->getRowArray();
             if (!empty($row['user_id'])) {
@@ -145,7 +157,7 @@ class User_model
                     ->where('current_assignee', $row['user_id'])
                     ->whereIn('status', ['open', 'in_progress', 'escalated'])
                     ->update(['current_assignee' => null]);
-                error_log("pview alert >> user deactivate: unassigned active tickets for user_id=[" . $row['user_id'] . "]");
+                log_message('debug', "pview alert >> user deactivate: unassigned active tickets for user_id=[" . $row['user_id'] . "]");
             }
         }
 
@@ -154,32 +166,27 @@ class User_model
 
     public function softDelete($id)
     {
-        // First look up the user_id string so we can unassign their tickets.
         $row = $this->db->table('users')->select('user_id')->where('id', (int) $id)->get()->getRowArray();
 
         $ok = $this->db->table('users')->where('id', (int) $id)->update([
             'deleted_at' => date('Y-m-d H:i:s'),
             'is_active'  => 0,
         ]);
-        error_log("pview alert >> user softDelete: query=[" . $this->db->getLastQuery() . "], id=[" . $id . "]");
+        log_message('debug', "pview alert >> user softDelete: query=[" . $this->db->getLastQuery() . "], id=[" . $id . "]");
 
-        // WF-02: Return all active tickets assigned to this operator to the
-        // unassigned pool. Without this, their tickets become invisible —
-        // they are still "assigned" but the operator can no longer log in.
+        // Return active tickets to the pool so they don't remain stuck on a deleted account.
         if (!empty($row['user_id'])) {
             $this->db->table('tickets')
                 ->where('current_assignee', $row['user_id'])
                 ->whereIn('status', ['open', 'in_progress', 'escalated'])
                 ->update(['current_assignee' => null]);
-            error_log("pview alert >> user softDelete: unassigned active tickets for user_id=[" . $row['user_id'] . "]");
+            log_message('debug', "pview alert >> user softDelete: unassigned active tickets for user_id=[" . $row['user_id'] . "]");
         }
 
         return $ok;
     }
 
-    // --- Login / Session ---
-
-    // $login may be a user_id or email (branches on presence of '@').
+    // Accepts a user_id or email (auto-detected by presence of '@').
     public function checkLogin($login, $password)
     {
         $login = trim((string) $login);
@@ -195,19 +202,19 @@ class User_model
             ->where('deleted_at', null)
             ->get();
 
-        error_log("pview alert >> Login query is [" . $this->db->getLastQuery() . "], num_rows [" . $query->getNumRows() . "]");
+        log_message('debug', "pview alert >> Login query is [" . $this->db->getLastQuery() . "], num_rows [" . $query->getNumRows() . "]");
 
         $row = $query->getRowArray();
 
         if (empty($row)) {
-            error_log("pview alert >> Login failed: no active user found for login=[" . $login . "]");
+            log_message('debug', "pview alert >> Login failed: no active user found for login=[" . $login . "]");
             return false;
         }
         if (!password_verify((string) $password, (string) $row['password'])) {
-            error_log("pview alert >> Login failed: bad password for login=[" . $login . "]");
+            log_message('debug', "pview alert >> Login failed: bad password for login=[" . $login . "]");
             return false;
         }
-        error_log("pview alert >> Login OK: login=[" . $login . "], user_pk=[" . $row['id'] . "], user_id=[" . (isset($row['user_id']) ? $row['user_id'] : '') . "]");
+        log_message('debug', "pview alert >> Login OK: login=[" . $login . "], user_pk=[" . $row['id'] . "], user_id=[" . (isset($row['user_id']) ? $row['user_id'] : '') . "]");
         return $row;
     }
 
@@ -219,15 +226,12 @@ class User_model
         $rotateDays = (int) app_setting('password_rotate_days', 90);
         $must_rotate = password_must_rotate(isset($user['password_changed_at']) ? $user['password_changed_at'] : null, $rotateDays);
 
-        // user_id = human FK string; user_pk = numeric PK; user_uid = alias of user_id for views.
+        // user_id = human FK string (e.g. "bobil.singh"); user_pk = numeric PK.
         $userIdStr = '';
         if (isset($user['user_id'])) {
             $userIdStr = (string) $user['user_id'];
         }
-        // Load dashboard preferences (kpi visibility / default project /
-        // default trend range) from the JSON column so views can read them
-        // without an extra query per page render. Empty / invalid JSON
-        // collapses to an empty array, which the helpers treat as defaults.
+        // Load dashboard_layout JSON into session so views can read it without extra queries.
         $dashboardLayout = [];
         if (isset($user['dashboard_layout']) && $user['dashboard_layout'] !== '') {
             $decoded = json_decode((string) $user['dashboard_layout'], true);
@@ -236,10 +240,12 @@ class User_model
             }
         }
 
+        // Wipe pre-login session state before writing fresh user data.
+        session_unset();
+
         $session->set([
             'user_pk'              => (int) $user['id'],
             'user_id'              => $userIdStr,
-            'user_uid'             => $userIdStr,
             'user_name'            => $user['name'],
             'user_email'           => $user['email'],
             'user_role'            => $user['role'],
@@ -248,9 +254,9 @@ class User_model
             'logged_in'            => true,
             'password_must_rotate' => $must_rotate,
         ]);
-        // Rotate session id post-login to prevent fixation attacks.
+        // Regenerate session ID post-login to prevent session fixation.
         $session->regenerate(true);
-        error_log("pview alert >> Session set for user_pk=[" . $user['id'] . "], user_id=[" . $userIdStr . "], password_must_rotate=[" . (int) $must_rotate . "]");
+        log_message('debug', "pview alert >> Session set for user_pk=[" . $user['id'] . "], user_id=[" . $userIdStr . "], password_must_rotate=[" . (int) $must_rotate . "]");
     }
 
     public function logout()
@@ -261,8 +267,10 @@ class User_model
         if (!$uid) {
             $uid = $session->get('user_id');
         }
+        session_unset();
         $session->destroy();
-        error_log("pview alert >> Logout: user_pk=[" . (int) $uid . "]");
+        app_settings_clear_cache();
+        log_message('debug', "pview alert >> Logout: user_pk=[" . (int) $uid . "]");
     }
 
     public function usersForDT($args)
@@ -280,7 +288,10 @@ class User_model
         if (!empty($args['order_col']) && isset($allowedCols[$args['order_col']])) {
             $orderCol = $allowedCols[$args['order_col']];
         }
-        $orderDir = (!empty($args['order_dir']) && strtolower($args['order_dir']) === 'desc') ? 'DESC' : 'ASC';
+        $orderDir = 'ASC';
+        if (!empty($args['order_dir']) && strtolower($args['order_dir']) === 'desc') {
+            $orderDir = 'DESC';
+        }
 
         $start  = isset($args['start'])  ? (int) $args['start']  : 0;
         $length = isset($args['length']) ? (int) $args['length'] : 25;
@@ -310,11 +321,6 @@ class User_model
         return ['total' => $total, 'filtered' => $filtered, 'rows' => $rows];
     }
 
-    // --- Roles ---
-    // Role definitions live in the `roles` table; the role_key column on
-    // `users` references roles.role_key. Kept here (rather than a separate
-    // model) because role admin is part of user management.
-
     public function getAllRoles()
     {
         return $this->db->table('roles')
@@ -337,8 +343,7 @@ class User_model
             ->countAllResults() > 0;
     }
 
-    // Count active (non-deleted) users currently assigned to this role.
-    // Used by the delete guard so we never strand operators on a deleted role.
+    // Returns active user count for a role; used by the delete guard.
     public function countUsersWithRole($role_key)
     {
         return (int) $this->db->table('users')
@@ -351,30 +356,27 @@ class User_model
     {
         $data['created_at'] = date('Y-m-d H:i:s');
         $this->db->table('roles')->insert($data);
-        error_log("pview alert >> role save: query=[" . $this->db->getLastQuery() . "]");
+        log_message('debug', "pview alert >> role save: query=[" . $this->db->getLastQuery() . "]");
         return $data['role_key'];
     }
 
-    // Label-only update — role_key is the primary key and never changes
-    // (renaming the key would orphan module_permissions rows).
+    // Updates the display label only; role_key is immutable to avoid orphaning permissions rows.
     public function updateRoleLabel($role_key, $label)
     {
         $ok = $this->db->table('roles')
             ->where('role_key', (string) $role_key)
             ->update(['label' => (string) $label]);
-        error_log("pview alert >> role updateLabel: query=[" . $this->db->getLastQuery() . "], ok=[" . (int) $ok . "]");
+        log_message('debug', "pview alert >> role updateLabel: query=[" . $this->db->getLastQuery() . "], ok=[" . (int) $ok . "]");
         return $ok;
     }
 
-    // Set the admin-scope flag (sees all tickets globally vs only own).
-    // Kept separate from updateRoleLabel so the existing label-only path
-    // stays minimal; controllers call both when the form is submitted.
+    // Updates the admin-scope flag (controls global vs own-ticket visibility).
     public function updateRoleAdminScope($role_key, $isAdminScope)
     {
         $ok = $this->db->table('roles')
             ->where('role_key', (string) $role_key)
             ->update(['is_admin_scope' => (int) $isAdminScope === 1 ? 1 : 0]);
-        error_log("pview alert >> role updateAdminScope: query=[" . $this->db->getLastQuery() . "], ok=[" . (int) $ok . "]");
+        log_message('debug', "pview alert >> role updateAdminScope: query=[" . $this->db->getLastQuery() . "], ok=[" . (int) $ok . "]");
         return $ok;
     }
 
@@ -384,20 +386,16 @@ class User_model
         if (empty($row) || (int) $row['is_builtin'] === 1) {
             return false;
         }
-        // Refuse if any active user still has this role.
         if ($this->countUsersWithRole($role_key) > 0) {
             return false;
         }
         $this->db->table('roles')->where('role_key', (string) $role_key)->delete();
-        // Also drop their module_permissions rows — they're now dead data.
         $this->db->table('module_permissions')->where('role', (string) $role_key)->delete();
-        error_log("pview alert >> role delete: role_key=[" . $role_key . "]");
+        log_message('debug', "pview alert >> role delete: role_key=[" . $role_key . "]");
         return true;
     }
 
-    // Seed default module_permissions rows for a brand-new role so the
-    // admin doesn't see an empty grid in the Module Control Panel. All zeros
-    // by default — admin then toggles what the role can do.
+    // Seeds zero-value module_permissions for a new role so the Module Control Panel shows it immediately.
     public function seedDefaultPermissions($role_key)
     {
         $registry = module_registry();

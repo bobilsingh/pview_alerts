@@ -20,9 +20,8 @@ class App extends BaseController
     public function dashboard()
     {
         check_module_access('dashboard', 'view');
-        error_log("pview alert >> dashboard page open by user_id=[" . (string) logged_user_id() . "]");
+        log_message('debug', "pview alert >> dashboard page open by user_id=[" . (string) logged_user_id() . "]");
 
-        // Range options from settings; falls back to [7,15,30].
         $rangesRaw = app_setting_csv('dashboard_trend_ranges', ['7', '15', '30']);
         $trendRangeOptions = [];
         foreach ($rangesRaw as $r) {
@@ -36,16 +35,12 @@ class App extends BaseController
         }
         $trendRangeOptions = array_values(array_unique($trendRangeOptions));
 
-        // Per-user dashboard preferences. Empty / unset = no override; the
-        // dashboard then behaves exactly as it did before this feature.
         $prefDefaultTrendRange = (int) user_dashboard_pref('default_trend_range', 0);
         $prefDefaultProjectId  = (int) user_dashboard_pref('default_project_id', 0);
         $prefKpiVisible        = user_dashboard_pref('kpi_visible', null);
 
         $trendRange = (int) $this->request->getGet('range');
         if (!in_array($trendRange, $trendRangeOptions, true)) {
-            // No explicit ?range= in URL — try the user's saved default
-            // before falling through to the first system option.
             if (in_array($prefDefaultTrendRange, $trendRangeOptions, true)) {
                 $trendRange = $prefDefaultTrendRange;
             } else {
@@ -53,8 +48,6 @@ class App extends BaseController
             }
         }
 
-        // Scope dashboard data to the logged-in user when they are not an admin.
-        // Same rule as verify_ticket_access(): raised_by / assignee / level user lists.
         $role    = logged_user_role();
         $isAdmin = role_has_admin_scope($role);
         $userPk  = logged_user_id();
@@ -74,6 +67,11 @@ class App extends BaseController
             }
         }
 
+        $custKpiVisible = $prefKpiVisible;
+        if ($custKpiVisible === null) {
+            $custKpiVisible = ['open' => 1, 'critical' => 1, 'major' => 1, 'resolved' => 1];
+        }
+
         $data = [
             'title'             => 'Dashboard',
             'projectCount'      => $this->app_model->projectCountActive(),
@@ -88,10 +86,15 @@ class App extends BaseController
             'trendValues'       => $trend['values'],
             'trendRange'        => $trendRange,
             'trendRangeOptions' => $trendRangeOptions,
-            'recentTickets'     => $this->app_model->ticketRecent(10, $userPk, $isAdmin, $prefDefaultProjectId),
+            'recentTickets'     => $this->app_model->ticketRecent(5, $userPk, $isAdmin, $prefDefaultProjectId),
             'tatBreached'       => $this->app_model->ticketCountTatBreached($userPk, $isAdmin, $prefDefaultProjectId),
-            'kpiVisible'        => $prefKpiVisible,
-            'prefProjectName'   => $prefProjectName,
+            'kpiVisible'            => $prefKpiVisible,
+            'prefProjectName'       => $prefProjectName,
+            'custProjects'          => $this->app_model->projectGetActive(),
+            'custDefaultProjectId'  => $prefDefaultProjectId,
+            'custKpiVisible'        => $custKpiVisible,
+            'custDefaultTrendRange' => $prefDefaultTrendRange,
+            'custRangesInt'         => $trendRangeOptions,
         ];
         echo view('templates/header', $data);
         echo view('templates/sidebar', $data);
@@ -142,8 +145,14 @@ class App extends BaseController
             'status'      => 'active',
             'created_by'  => logged_user_id(),
         ]);
-        activity_log('projects', 'create', 'project', (string) $newId,
-            'Created project "' . $name . '"', ['name' => $name]);
+        activity_log(
+            'projects',
+            'create',
+            'project',
+            (string) $newId,
+            'Created project "' . $name . '"',
+            ['name' => $name]
+        );
         $this->session->setFlashdata('success', 'Project "' . $name . '" created.');
         return redirect()->to(site_url('projects'));
     }
@@ -185,8 +194,14 @@ class App extends BaseController
         ];
         $this->app_model->projectUpdate($id, $after);
         $diff = activity_diff($before, $after, ['name', 'description', 'status']);
-        activity_log('projects', 'update', 'project', (string) $id,
-            'Updated project "' . $name . '"', $diff);
+        activity_log(
+            'projects',
+            'update',
+            'project',
+            (string) $id,
+            'Updated project "' . $name . '"',
+            $diff
+        );
         $this->session->setFlashdata('success', 'Project "' . $name . '" updated.');
         return redirect()->to(site_url('projects'));
     }
@@ -197,8 +212,14 @@ class App extends BaseController
         $before = $this->app_model->projectGetById($id);
         $this->app_model->projectSoftDelete($id);
         $name = isset($before['name']) ? (string) $before['name'] : '';
-        activity_log('projects', 'delete', 'project', (string) $id,
-            'Removed project "' . $name . '"', ['name' => $name]);
+        activity_log(
+            'projects',
+            'delete',
+            'project',
+            (string) $id,
+            'Removed project "' . $name . '"',
+            ['name' => $name]
+        );
         $this->session->setFlashdata('success', 'Project removed.');
         return redirect()->to(site_url('projects'));
     }
@@ -247,14 +268,28 @@ class App extends BaseController
             $this->session->setFlashdata('error', 'A flow with that name already exists in this project.');
             return redirect()->to(site_url('flows/add'));
         }
+        $tatLevelCount = (int) $this->request->getPost('tat_level_count');
+        if ($tatLevelCount < 1) {
+            $tatLevelCount = 4;
+        }
+        if ($tatLevelCount > 4) {
+            $tatLevelCount = 4;
+        }
         $newId = $this->app_model->flowSave([
-            'name'       => $name,
-            'project_id' => $project_id,
-            'status'     => 'active',
-            'created_by' => logged_user_id(),
+            'name'            => $name,
+            'project_id'      => $project_id,
+            'status'          => 'active',
+            'created_by'      => logged_user_id(),
+            'tat_level_count' => $tatLevelCount,
         ]);
-        activity_log('flows', 'create', 'flow', (string) $newId,
-            'Created flow "' . $name . '"', ['name' => $name, 'project_id' => $project_id]);
+        activity_log(
+            'flows',
+            'create',
+            'flow',
+            (string) $newId,
+            'Created flow "' . $name . '"',
+            ['name' => $name, 'project_id' => $project_id]
+        );
         $this->session->setFlashdata('success', 'Flow "' . $name . '" created.');
         return redirect()->to(site_url('flows'));
     }
@@ -294,16 +329,30 @@ class App extends BaseController
         $status = $this->request->getPost('status');
         $status = or_default($status, 'active');
 
+        $tatLevelCount = (int) $this->request->getPost('tat_level_count');
+        if ($tatLevelCount < 1) {
+            $tatLevelCount = 4;
+        }
+        if ($tatLevelCount > 4) {
+            $tatLevelCount = 4;
+        }
         $before = $this->app_model->flowGetById($id);
         $after  = [
-            'name'       => $name,
-            'project_id' => $project_id,
-            'status'     => $status,
+            'name'            => $name,
+            'project_id'      => $project_id,
+            'status'          => $status,
+            'tat_level_count' => $tatLevelCount,
         ];
         $this->app_model->flowUpdate($id, $after);
         $diff = activity_diff($before, $after, ['name', 'project_id', 'status']);
-        activity_log('flows', 'update', 'flow', (string) $id,
-            'Updated flow "' . $name . '"', $diff);
+        activity_log(
+            'flows',
+            'update',
+            'flow',
+            (string) $id,
+            'Updated flow "' . $name . '"',
+            $diff
+        );
         $this->session->setFlashdata('success', 'Flow updated.');
         return redirect()->to(site_url('flows'));
     }
@@ -314,13 +363,17 @@ class App extends BaseController
         $before = $this->app_model->flowGetById($id);
         $this->app_model->flowSoftDelete($id);
         $name = isset($before['name']) ? (string) $before['name'] : '';
-        activity_log('flows', 'delete', 'flow', (string) $id,
-            'Removed flow "' . $name . '"', ['name' => $name]);
+        activity_log(
+            'flows',
+            'delete',
+            'flow',
+            (string) $id,
+            'Removed flow "' . $name . '"',
+            ['name' => $name]
+        );
         $this->session->setFlashdata('success', 'Flow removed.');
         return redirect()->to(site_url('flows'));
     }
-
-    // ----- States (live inside a flow) -----
 
     public function flow_states($flow_id)
     {
@@ -329,12 +382,43 @@ class App extends BaseController
         if (empty($flow)) {
             return redirect()->to(site_url('flows'));
         }
+        $states = $this->app_model->stateGetAll($flow_id);
+
+        $editStateId = (int) $this->request->getGet('edit_state');
+        $editState   = null;
+        if ($editStateId > 0) {
+            $editState = $this->app_model->stateGetById($editStateId);
+            if (!empty($editState) && (int) $editState['flow_id'] !== (int) $flow_id) {
+                $editState = null;
+            }
+        }
+
+        $allTransitions = $this->app_model->stateGetAllTransitions((int) $flow_id);
+        $stateNameMap   = array_column($states, 'name', 'id');
+        $bwdLabels      = [];
+        $editBwdIds     = [];
+        foreach ($allTransitions as $t) {
+            if (($t['transition_type'] ?? '') !== 'backward') {
+                continue;
+            }
+            $fromId               = (int) $t['from_state_id'];
+            $toName               = $stateNameMap[(int) $t['to_state_id']] ?? ('#' . $t['to_state_id']);
+            $bwdLabels[$fromId][] = $toName;
+            if ($editStateId > 0 && $fromId === $editStateId) {
+                $editBwdIds[] = (int) $t['to_state_id'];
+            }
+        }
+
         $data = [
-            'title'  => 'Flow States: ' . $flow['name'],
-            'view'   => 'states',
-            'flow'   => $flow,
-            'states' => $this->app_model->stateGetAll($flow_id),
-            'users'  => $this->user_model->getActive(),
+            'title'      => 'Flow States: ' . $flow['name'],
+            'view'       => 'states',
+            'flow'       => $flow,
+            'states'     => $states,
+            'users'      => $this->user_model->getActive(),
+            'editState'  => $editState,
+            'transitions' => $allTransitions,
+            'bwdLabels'  => $bwdLabels,
+            'editBwdIds' => $editBwdIds,
         ];
         echo view('templates/header', $data);
         echo view('templates/sidebar', $data);
@@ -357,16 +441,11 @@ class App extends BaseController
         $parent      = (int) $this->request->getPost('parent_state_id');
         $parentValue = null;
         if ($parent > 0) {
-            // Parent must exist and belong to the same flow (cross-flow
-            // parents break the tree-render).
             $parentRow = $this->app_model->stateGetById($parent);
             if (empty($parentRow) || (int) $parentRow['flow_id'] !== $flow_id) {
                 $this->session->setFlashdata('error', 'Parent state must belong to the same flow.');
                 return redirect()->to(site_url('flows/states/' . $flow_id));
             }
-            // Self-parent and cycle guard. On an update, the new parent
-            // cannot be the state itself, and cannot live anywhere in the
-            // state's own subtree (otherwise it would form a loop).
             if ($id > 0) {
                 if ($parent === $id) {
                     $this->session->setFlashdata('error', 'A state cannot be its own parent.');
@@ -374,27 +453,21 @@ class App extends BaseController
                 }
                 $descendants = $this->app_model->stateGetDescendantIds($flow_id, $id);
                 if (in_array($parent, $descendants, true)) {
-                    $this->session->setFlashdata('error', 'Cannot set parent — that would create a cycle.');
+                    $this->session->setFlashdata('error', 'Cannot set parent — that would create a cycle in the workflow tree.');
                     return redirect()->to(site_url('flows/states/' . $flow_id));
                 }
             }
             $parentValue = $parent;
         }
 
-        $tat = function ($postKey, $default) {
-            $v = (int) $this->request->getPost($postKey);
-            if ($v < 1) {
-                return (int) $default;
-            }
-            return $v;
-        };
-
         $isInitial = bool_int($this->request->getPost('is_initial'));
         $isFinal   = bool_int($this->request->getPost('is_final'));
-        // A state can't be both the entry point and the terminal point.
         if ($isInitial === 1 && $isFinal === 1) {
             $this->session->setFlashdata('error', 'A state cannot be both initial and final.');
             return redirect()->to(site_url('flows/states/' . $flow_id));
+        }
+        if ($isInitial === 1 || $isFinal === 1) {
+            $parentValue = null;
         }
 
         $l1Users = (array) $this->request->getPost('l1_user_ids');
@@ -404,6 +477,23 @@ class App extends BaseController
             return redirect()->to(site_url('flows/states/' . $flow_id));
         }
 
+        $l1Tat = (int) $this->request->getPost('l1_tat_minutes');
+        if ($l1Tat < 1) {
+            $l1Tat = app_setting_int('default_tat_l1_minutes', 60);
+        }
+        $l2Tat = (int) $this->request->getPost('l2_tat_minutes');
+        if ($l2Tat < 1) {
+            $l2Tat = app_setting_int('default_tat_l2_minutes', 120);
+        }
+        $l3Tat = (int) $this->request->getPost('l3_tat_minutes');
+        if ($l3Tat < 1) {
+            $l3Tat = app_setting_int('default_tat_l3_minutes', 240);
+        }
+        $l4Tat = (int) $this->request->getPost('l4_tat_minutes');
+        if ($l4Tat < 1) {
+            $l4Tat = app_setting_int('default_tat_l4_minutes', 480);
+        }
+
         $data = [
             'flow_id'         => $flow_id,
             'name'            => $name,
@@ -411,13 +501,13 @@ class App extends BaseController
             'is_initial'      => $isInitial,
             'is_final'        => $isFinal,
             'l1_user_ids'     => (array) $this->request->getPost('l1_user_ids'),
-            'l1_tat_minutes'  => $tat('l1_tat_minutes', app_setting_int('default_tat_l1_minutes', 60)),
+            'l1_tat_minutes'  => $l1Tat,
             'l2_user_ids'     => (array) $this->request->getPost('l2_user_ids'),
-            'l2_tat_minutes'  => $tat('l2_tat_minutes', app_setting_int('default_tat_l2_minutes', 120)),
+            'l2_tat_minutes'  => $l2Tat,
             'l3_user_ids'     => (array) $this->request->getPost('l3_user_ids'),
-            'l3_tat_minutes'  => $tat('l3_tat_minutes', app_setting_int('default_tat_l3_minutes', 240)),
+            'l3_tat_minutes'  => $l3Tat,
             'l4_user_ids'     => (array) $this->request->getPost('l4_user_ids'),
-            'l4_tat_minutes'  => $tat('l4_tat_minutes', app_setting_int('default_tat_l4_minutes', 480)),
+            'l4_tat_minutes'  => $l4Tat,
             'status'          => 'active',
             'created_by'      => logged_user_id(),
         ];
@@ -426,16 +516,46 @@ class App extends BaseController
         }
         $savedId = $this->app_model->stateSave($data);
 
-        // Enforce one initial state per flow — clear is_initial on every
-        // sibling so the designer / ticket-create flow has a single entry.
         if ($isInitial === 1) {
             $this->app_model->stateClearOtherInitial($flow_id, (int) $savedId);
         }
+        if ($isFinal === 1) {
+            $this->app_model->stateClearOtherFinal($flow_id, (int) $savedId);
+        }
+
+        $rawBwdIds = (array) $this->request->getPost('backward_state_ids');
+        $bwdIds = [];
+        foreach ($rawBwdIds as $v) {
+            $v = (int) $v;
+            if ($v > 0) {
+                $bwdIds[] = $v;
+            }
+        }
+        $bwdIds = array_values($bwdIds);
+        $this->app_model->stateDeleteFromTransitions((int) $savedId);
+        foreach ($bwdIds as $bwdId) {
+            if ($bwdId === (int) $savedId) {
+                continue;
+            }
+            $this->app_model->stateTransitionSave([
+                'flow_id'          => $flow_id,
+                'from_state_id'    => (int) $savedId,
+                'to_state_id'      => $bwdId,
+                'transition_type'  => 'backward',
+                'requires_comment' => 1,
+                'created_by'       => (string) logged_user_id(),
+            ]);
+        }
 
         $isCreate = ($id <= 0);
-        activity_log('flows', $isCreate ? 'create_state' : 'update_state', 'state', (string) $savedId,
+        activity_log(
+            'flows',
+            $isCreate ? 'create_state' : 'update_state',
+            'state',
+            (string) $savedId,
             ($isCreate ? 'Added' : 'Updated') . ' state "' . $name . '" in flow #' . $flow_id,
-            ['flow_id' => $flow_id, 'name' => $name, 'is_initial' => $isInitial, 'is_final' => $isFinal]);
+            ['flow_id' => $flow_id, 'name' => $name, 'is_initial' => $isInitial, 'is_final' => $isFinal]
+        );
 
         $this->session->setFlashdata('success', 'State saved.');
         return redirect()->to(site_url('flows/states/' . $flow_id));
@@ -452,9 +572,14 @@ class App extends BaseController
         $result = $this->app_model->stateDelete($id);
         if (!empty($result['ok'])) {
             $stateName = isset($state['name']) ? (string) $state['name'] : '';
-            activity_log('flows', 'delete_state', 'state', (string) $id,
+            activity_log(
+                'flows',
+                'delete_state',
+                'state',
+                (string) $id,
                 'Removed state "' . $stateName . '" from flow #' . $flow_id,
-                ['flow_id' => $flow_id, 'name' => $stateName]);
+                ['flow_id' => $flow_id, 'name' => $stateName]
+            );
             $this->session->setFlashdata('success', 'State removed.');
         } else {
             $msg = 'State could not be removed.';
@@ -469,7 +594,12 @@ class App extends BaseController
     public function state_reorder()
     {
         check_module_access('flows', 'edit');
-        $payload = $this->request->getJSON(true);
+        try {
+            $payload = $this->request->getJSON(true) ?: [];
+        } catch (\Exception $e) {
+            log_message('warning', 'state_reorder: request body parse failed — {msg}', ['msg' => $e->getMessage()]);
+            $payload = [];
+        }
         if (empty($payload)) {
             $payload = $this->request->getPost();
         }
@@ -481,10 +611,80 @@ class App extends BaseController
         if (!$this->app_model->stateReorder($flow_id, $order)) {
             return json_fail('Reorder rejected: state ids do not belong to this flow');
         }
-        activity_log('flows', 'reorder_states', 'flow', (string) $flow_id,
+        activity_log(
+            'flows',
+            'reorder_states',
+            'flow',
+            (string) $flow_id,
             'Reordered states in flow #' . $flow_id,
-            ['flow_id' => $flow_id, 'order' => $order]);
+            ['flow_id' => $flow_id, 'order' => $order]
+        );
         return json_ok([], 'Order saved');
+    }
+
+    /** GET /flows/transitions/(:num) — list all transitions for a flow (JSON). */
+    public function state_transitions($flow_id)
+    {
+        check_module_access('flows', 'view');
+        $rows = $this->app_model->stateGetAllTransitions((int) $flow_id);
+        return json_ok($rows);
+    }
+
+    /** POST /flows/transitions/save — create or update a state transition. */
+    public function state_transition_save()
+    {
+        check_module_access('flows', 'edit');
+        $flow_id       = (int) $this->request->getPost('flow_id');
+        $from_state_id = (int) $this->request->getPost('from_state_id');
+        $to_state_id   = (int) $this->request->getPost('to_state_id');
+        $type          = trim((string) $this->request->getPost('transition_type'));
+        $requires_comment = (int) $this->request->getPost('requires_comment');
+        $id            = (int) $this->request->getPost('id');
+
+        if ($flow_id <= 0 || $from_state_id <= 0 || $to_state_id <= 0) {
+            return json_fail('flow_id, from_state_id and to_state_id are required.');
+        }
+        if (!in_array($type, ['forward', 'backward'], true)) {
+            return json_fail('Invalid transition_type.');
+        }
+        if ($from_state_id === $to_state_id) {
+            return json_fail('A state cannot transition to itself.');
+        }
+        if ($type === 'forward') {
+            $descendants = $this->app_model->stateGetDescendantIds($flow_id, $to_state_id);
+            if (in_array($from_state_id, $descendants, true)) {
+                return json_fail('This forward transition would create a cycle.');
+            }
+        }
+        $newId = $this->app_model->stateTransitionSave([
+            'id'              => $id ?: null,
+            'flow_id'         => $flow_id,
+            'from_state_id'   => $from_state_id,
+            'to_state_id'     => $to_state_id,
+            'transition_type' => $type,
+            'requires_comment' => $requires_comment,
+            'created_by'      => (string) logged_user_id(),
+        ]);
+        activity_log(
+            'flows',
+            'transition_save',
+            'flow',
+            (string) $flow_id,
+            ($id ? 'Updated' : 'Added') . ' ' . $type . ' transition in flow #' . $flow_id
+        );
+        return json_ok(['id' => $newId], 'Transition saved');
+    }
+
+    /** POST /flows/transitions/delete/(:num) — delete a transition by id. */
+    public function state_transition_delete($id)
+    {
+        check_module_access('flows', 'edit');
+        $ok = $this->app_model->stateTransitionDelete((int) $id);
+        if (!$ok) {
+            return json_fail('Transition not found.');
+        }
+        activity_log('flows', 'transition_delete', null, null, 'Deleted transition #' . $id);
+        return json_ok([], 'Transition deleted');
     }
 
     public function alerts()
@@ -550,9 +750,14 @@ class App extends BaseController
             'is_active'       => 1,
             'created_by'      => logged_user_id(),
         ]);
-        activity_log('alerts', 'create', 'alert', (string) $newId,
+        activity_log(
+            'alerts',
+            'create',
+            'alert',
+            (string) $newId,
             'Created alert "' . $alertName . '" (' . $alertType . ')',
-            ['name' => $alertName, 'project_id' => $projectId, 'flow_id' => $flowId, 'alert_type' => $alertType]);
+            ['name' => $alertName, 'project_id' => $projectId, 'flow_id' => $flowId, 'alert_type' => $alertType]
+        );
         $this->session->setFlashdata('success', 'Alert definition saved.');
         return redirect()->to(site_url('alerts'));
     }
@@ -608,8 +813,14 @@ class App extends BaseController
         ];
         $this->app_model->alertUpdate($id, $after);
         $diff = activity_diff($before, $after, ['project_id', 'name', 'description', 'alert_type', 'threshold_value', 'threshold_unit', 'flow_id', 'is_active']);
-        activity_log('alerts', 'update', 'alert', (string) $id,
-            'Updated alert "' . $alertName . '"', $diff);
+        activity_log(
+            'alerts',
+            'update',
+            'alert',
+            (string) $id,
+            'Updated alert "' . $alertName . '"',
+            $diff
+        );
         $this->session->setFlashdata('success', 'Alert definition updated.');
         return redirect()->to(site_url('alerts'));
     }
@@ -620,8 +831,14 @@ class App extends BaseController
         $before = $this->app_model->alertGetById($id);
         $this->app_model->alertDeactivate($id);
         $alertName = isset($before['name']) ? (string) $before['name'] : '';
-        activity_log('alerts', 'delete', 'alert', (string) $id,
-            'Deactivated alert "' . $alertName . '"', ['name' => $alertName]);
+        activity_log(
+            'alerts',
+            'delete',
+            'alert',
+            (string) $id,
+            'Deactivated alert "' . $alertName . '"',
+            ['name' => $alertName]
+        );
         $this->session->setFlashdata('success', 'Alert deactivated.');
         return redirect()->to(site_url('alerts'));
     }
@@ -667,9 +884,14 @@ class App extends BaseController
             'notify_user_ids' => (array) $this->request->getPost('notify_user_ids'),
             'alert_type'      => $alertType,
         ]);
-        activity_log('escalation', 'create', 'escalation', null,
+        activity_log(
+            'escalation',
+            'create',
+            'escalation',
+            null,
             'Added escalation L' . $level . ' @ ' . $minutes . 'm for flow #' . $flow_id . ' state #' . $state_id,
-            ['flow_id' => $flow_id, 'state_id' => $state_id, 'level' => $level, 'escalate_after' => $minutes, 'alert_type' => $alertType]);
+            ['flow_id' => $flow_id, 'state_id' => $state_id, 'level' => $level, 'escalate_after' => $minutes, 'alert_type' => $alertType]
+        );
         $this->session->setFlashdata('success', 'Escalation rule added.');
         return redirect()->to(site_url('escalation'));
     }
@@ -678,8 +900,13 @@ class App extends BaseController
     {
         check_module_access('escalation', 'delete');
         $this->app_model->escalationDelete($id);
-        activity_log('escalation', 'delete', 'escalation', (string) $id,
-            'Removed escalation rule #' . $id);
+        activity_log(
+            'escalation',
+            'delete',
+            'escalation',
+            (string) $id,
+            'Removed escalation rule #' . $id
+        );
         $this->session->setFlashdata('success', 'Escalation rule removed.');
         return redirect()->to(site_url('escalation'));
     }
@@ -710,11 +937,14 @@ class App extends BaseController
             return redirect()->to(site_url('api_keys'));
         }
         $key = $this->app_model->apiKeyGenerate($project_id, $name);
-        // Never write the raw key to activity_logs — it's only shown once
-        // to the admin and storing it here would defeat the warning above.
-        activity_log('api_keys', 'generate', 'api_key', null,
+        activity_log(
+            'api_keys',
+            'generate',
+            'api_key',
+            null,
             'Generated API key "' . $name . '" for project #' . $project_id,
-            ['name' => $name, 'project_id' => $project_id]);
+            ['name' => $name, 'project_id' => $project_id]
+        );
         $this->session->setFlashdata('newKey', $key);
         $this->session->setFlashdata('success', 'API key generated. Copy it now — you won\'t see it again.');
         return redirect()->to(site_url('api_keys'));
@@ -724,21 +954,27 @@ class App extends BaseController
     {
         check_module_access('api_keys', 'edit');
         $this->app_model->apiKeyToggle($id);
-        activity_log('api_keys', 'toggle', 'api_key', (string) $id,
-            'Toggled API key #' . $id);
+        activity_log(
+            'api_keys',
+            'toggle',
+            'api_key',
+            (string) $id,
+            'Toggled API key #' . $id
+        );
         return redirect()->to(site_url('api_keys'));
     }
 
     public function tickets_my()
     {
         check_module_access('tickets', 'view');
-        error_log("pview alert >> tickets MY page open by user_id=[" . (string) logged_user_id() . "]");
-        // Read filter params so dropdowns don't reset on page reload.
+        log_message('debug', "pview alert >> tickets MY page open by user_id=[" . (string) logged_user_id() . "]");
         $filters = [
             'status'     => (string) $this->request->getGet('status'),
             'search'     => (string) $this->request->getGet('q'),
             'alert_type' => (string) $this->request->getGet('alert_type'),
             'priority'   => (string) $this->request->getGet('priority'),
+            'f_from'     => trim((string) $this->request->getGet('f_from')),
+            'f_to'       => trim((string) $this->request->getGet('f_to')),
         ];
         $data = [
             'title'         => 'My Tickets',
@@ -758,7 +994,7 @@ class App extends BaseController
     public function tickets_all()
     {
         check_module_access('tickets_all', 'view');
-        error_log("pview alert >> tickets ALL page open by user_id=[" . (string) logged_user_id() . "]");
+        log_message('debug', "pview alert >> tickets ALL page open by user_id=[" . (string) logged_user_id() . "]");
         $filters = [
             'project_id' => (int) $this->request->getGet('project_id'),
             'flow_id'    => (int) $this->request->getGet('flow_id'),
@@ -766,6 +1002,8 @@ class App extends BaseController
             'alert_type' => (string) $this->request->getGet('alert_type'),
             'priority'   => (string) $this->request->getGet('priority'),
             'search'     => (string) $this->request->getGet('q'),
+            'f_from'     => trim((string) $this->request->getGet('f_from')),
+            'f_to'       => trim((string) $this->request->getGet('f_to')),
         ];
         $data = [
             'title'         => 'All Tickets',
@@ -807,8 +1045,6 @@ class App extends BaseController
             return redirect()->to(site_url('tickets/create'));
         }
 
-        // Flow must exist, be active, and belong to the chosen project.
-        // Mirrors the same check that api_raise already enforces.
         $project = $this->app_model->projectGetById($project_id);
         if (empty($project) || $project['status'] !== 'active') {
             $this->session->setFlashdata('error', 'Selected project is not active.');
@@ -839,60 +1075,186 @@ class App extends BaseController
             $priority = 'medium';
         }
 
+        $assigneeUserId = trim((string) $this->request->getPost('assignee_user_id'));
+        if ($assigneeUserId !== '') {
+            $pool = $this->app_model->stateLevelUsers($initial, 1);
+            if (!in_array($assigneeUserId, $pool, true)) {
+                $this->session->setFlashdata('error', 'Selected assignee is not in the L1 pool for this flow.');
+                return redirect()->to(site_url('tickets/create'));
+            }
+        }
+
+        $actualStart = trim((string) $this->request->getPost('actual_start_date'));
+        $actualEnd   = trim((string) $this->request->getPost('actual_end_date'));
+        $actualStart = preg_match('/^\d{4}-\d{2}-\d{2}$/', $actualStart) ? $actualStart : null;
+        $actualEnd   = preg_match('/^\d{4}-\d{2}-\d{2}$/', $actualEnd)   ? $actualEnd   : null;
+        if ($actualStart !== null && $actualEnd !== null && $actualEnd < $actualStart) {
+            $this->session->setFlashdata('error', 'End Date cannot be earlier than Start Date.');
+            return redirect()->to(site_url('tickets/create'));
+        }
+
         $alarmId   = generate_alarm_id();
         $ticket_id = $this->app_model->ticketSave([
-            'alarm_id'         => $alarmId,
-            'project_id'       => $project_id,
-            'flow_id'          => $flow_id,
-            'title'            => $title,
-            'description'      => (string) $this->request->getPost('description'),
-            'alert_type'       => $alertType,
-            'priority'         => $priority,
-            'current_state_id' => (int) $initial['id'],
-            'current_level'    => 1,
-            'status'           => 'open',
-            'source'           => 'ui',
-            'raised_by'        => logged_user_id(),
+            'alarm_id'          => $alarmId,
+            'project_id'        => $project_id,
+            'flow_id'           => $flow_id,
+            'title'             => $title,
+            'description'       => (string) $this->request->getPost('description'),
+            'alert_type'        => $alertType,
+            'priority'          => $priority,
+            'actual_start_date' => $actualStart,
+            'actual_end_date'   => $actualEnd,
+            'current_state_id'  => (int) $initial['id'],
+            'current_level'     => 1,
+            'current_assignee'  => $assigneeUserId !== '' ? $assigneeUserId : null,
+            'status'            => $assigneeUserId !== '' ? 'in_progress' : 'open',
+            'source'            => 'ui',
+            'raised_by'         => logged_user_id(),
         ]);
+
+        $createComment = 'Ticket raised by ' . logged_user_name();
+        if ($assigneeUserId !== '') {
+            $createComment .= ', assigned to ' . $assigneeUserId;
+        }
         $this->app_model->ticketLogAction($ticket_id, 'created', [
-            'comment'     => 'Ticket raised by ' . logged_user_name(),
+            'comment'     => $createComment,
             'to_state_id' => (int) $initial['id'],
             'to_level'    => 1,
         ]);
 
-        // L1 notification (best-effort, enqueued).
-        try {
-            $level_users = $this->app_model->stateLevelUsers($initial, 1);
-            if (!empty($level_users)) {
-                notify_ticket_event('created', [
-                    'id'           => $ticket_id,
-                    'alarm_id'     => $alarmId,
-                    'title'        => $title,
-                    'description'  => (string) $this->request->getPost('description'),
-                    'alert_type'   => $alertType,
-                    'priority'     => $priority,
-                    'project_name' => $project['name'],
-                    'flow_name'    => $flow['name'],
-                    'state_name'   => $initial['name'],
-                    'current_level' => 1,
-                ], ['actor_name' => logged_user_name()], $level_users);
+        $file = $this->request->getFile('attachment');
+        if (!empty($file) && $file->isValid() && $file->getSize() > 0) {
+            $attachErr = $this->processTicketAttachment($ticket_id, $alarmId, $file);
+            if ($attachErr !== null) {
+                $this->session->setFlashdata('warning', 'Ticket created but attachment failed: ' . $attachErr);
             }
-        } catch (\Throwable $e) {
-            error_log("pview alert >> ticket save notify_ticket_event FAILED: error=[" . $e->getMessage() . "]");
         }
 
-        activity_log('tickets', 'create', 'ticket', $alarmId,
+        $notifyUsers = $assigneeUserId !== '' ? [$assigneeUserId] : $this->app_model->stateLevelUsers($initial, 1);
+        try {
+            if (!empty($notifyUsers)) {
+                notify_ticket_event('created', [
+                    'id'            => $ticket_id,
+                    'alarm_id'      => $alarmId,
+                    'title'         => $title,
+                    'description'   => (string) $this->request->getPost('description'),
+                    'alert_type'    => $alertType,
+                    'priority'      => $priority,
+                    'project_name'  => $project['name'],
+                    'flow_name'     => $flow['name'],
+                    'state_name'    => $initial['name'],
+                    'current_level' => 1,
+                ], ['actor_name' => logged_user_name()], $notifyUsers);
+            }
+        } catch (\Throwable $e) {
+            log_message('error', "pview alert >> ticket save notify_ticket_event FAILED: error=[" . $e->getMessage() . "]");
+        }
+
+        activity_log(
+            'tickets',
+            'create',
+            'ticket',
+            $alarmId,
             'Raised ticket "' . $title . '" (' . $alertType . '/' . $priority . ')',
-            ['project_id' => $project_id, 'flow_id' => $flow_id, 'alert_type' => $alertType, 'priority' => $priority]);
+            ['project_id' => $project_id, 'flow_id' => $flow_id, 'alert_type' => $alertType, 'priority' => $priority]
+        );
+
+        // Warn if a recent open ticket with the same type+project already exists.
+        $dupWindowHours = app_setting_int('duplicate_detection_window_hours', 24);
+        if ($dupWindowHours > 0) {
+            $windowStart = date('Y-m-d H:i:s', time() - $dupWindowHours * 3600);
+            $dups = $this->db->table('tickets')
+                ->select('alarm_id')
+                ->where('project_id', $project_id)
+                ->where('alert_type', $alertType)
+                ->whereNotIn('status', ['resolved', 'closed'])
+                ->where('created_at >=', $windowStart)
+                ->where('id !=', $ticket_id)
+                ->get()->getResultArray();
+            if (!empty($dups)) {
+                $dupIds = implode(', ', array_column($dups, 'alarm_id'));
+                $this->session->setFlashdata('warning', 'Possible duplicate: ' . count($dups) . ' open ticket(s) with the same type already exist in this project in the last ' . $dupWindowHours . 'h — ' . $dupIds);
+            }
+        }
 
         $this->session->setFlashdata('success', 'Ticket raised: ' . $alarmId);
         return redirect()->to(site_url('tickets/detail/' . $alarmId));
     }
 
-    // Tickets in these statuses are "frozen" — no further state moves,
-    // comments, attachments, edits or assignments are allowed. Centralised
-    // so every endpoint enforces the same rule (UI disables the buttons,
-    // server enforces it for direct POSTs / bulk).
+    /** Validates and stores an uploaded attachment. Returns null on success, error string on failure. */
+    private function processTicketAttachment($ticket_id, $alarmId, $file)
+    {
+        $originalName = (string) $file->getName();
+        $nameErr = upload_filename_is_safe($originalName);
+        if ($nameErr !== '') {
+            return $nameErr;
+        }
+
+        $allowedExt = app_setting_csv('upload_allowed_ext', ['pdf', 'doc', 'docx', 'jpg', 'jpeg', 'png', 'xlsx', 'xls', 'csv', 'txt']);
+        $ext = strtolower($file->getExtension());
+        if ($ext === '') {
+            $ext = strtolower(pathinfo($originalName, PATHINFO_EXTENSION));
+        }
+        if (!in_array($ext, $allowedExt, true) || in_array($ext, upload_blocked_extensions(), true)) {
+            return 'File type "' . $ext . '" is not allowed.';
+        }
+
+        $allowedMime = [
+            'application/pdf',
+            'application/msword',
+            'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+            'image/jpeg',
+            'image/png',
+            'application/vnd.ms-excel',
+            'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            'text/csv',
+            'text/plain',
+            'application/octet-stream',
+        ];
+        $mime = (string) $file->getMimeType();
+        if (!in_array($mime, $allowedMime, true)) {
+            return 'File mime type not allowed.';
+        }
+
+        $maxMb = app_setting_int('upload_max_mb', 10);
+        if ($maxMb < 1) {
+            $maxMb = 10;
+        }
+        if ($file->getSize() > $maxMb * 1024 * 1024) {
+            return 'Max ' . $maxMb . ' MB per file.';
+        }
+
+        $tmpPath = (string) $file->getTempName();
+        $sniffed = upload_sniff_mime($tmpPath);
+        if ($sniffed !== '' && !upload_mime_matches_ext($ext, $sniffed)) {
+            return 'File content does not match its extension.';
+        }
+
+        $dir = WRITEPATH . 'uploads/tickets/' . $alarmId . '/';
+        if (!is_dir($dir) && !mkdir($dir, 0775, true)) {
+            return 'Could not create upload directory.';
+        }
+        $htaccess = $dir . '.htaccess';
+        if (!is_file($htaccess)) {
+            @file_put_contents(
+                $htaccess,
+                "# Auto-generated — do not edit.\n"
+                    . "<IfModule mod_php8.c>\n  php_flag engine off\n</IfModule>\n"
+                    . "RemoveHandler .php .phtml .phar\nOptions -ExecCGI -Indexes\n"
+            );
+        }
+
+        $newName = $file->getRandomName();
+        $file->move($dir, $newName);
+        $rel = 'uploads/tickets/' . $alarmId . '/' . $newName;
+        $this->app_model->ticketLogAction($ticket_id, 'attachment', [
+            'attachment_path' => $rel,
+            'comment'         => basename($originalName),
+        ]);
+        return null;
+    }
+
+    // Returns true for resolved/closed tickets — all mutations are blocked on these.
     private function ticketIsTerminal($ticket)
     {
         $status = '';
@@ -902,7 +1264,7 @@ class App extends BaseController
         return $status === 'resolved' || $status === 'closed';
     }
 
-    // Validate alarm_id, load ticket, check access. Returns ticket array or redirect/JSON error.
+    // Validates alarm_id, loads the ticket, and checks access. Returns the ticket row or a response object.
     private function ticketLoad($alarm_id, $isAjax)
     {
         $clean = safe_alarm_id($alarm_id);
@@ -936,28 +1298,73 @@ class App extends BaseController
             return $r;
         }
         $ticket = $r;
-        activity_log('tickets', 'view', 'ticket', (string) $ticket['alarm_id'],
-            'Viewed ticket ' . $ticket['alarm_id']);
+        activity_log(
+            'tickets',
+            'view',
+            'ticket',
+            (string) $ticket['alarm_id'],
+            'Viewed ticket ' . $ticket['alarm_id']
+        );
 
         $allStates = $this->app_model->stateGetAll($ticket['flow_id']);
         $state     = $this->app_model->stateGetById($ticket['current_state_id']);
         $tatMin    = tat_minutes_for_level($state, $ticket['current_level']);
 
-        $levelUserIds = $this->app_model->stateLevelUsers($state, $ticket['current_level']);
-        $assignable   = $this->user_model->getByIds($levelUserIds);
+        $allPoolIds = [];
+        for ($lvl = 1; $lvl <= 4; $lvl++) {
+            $allPoolIds = array_merge($allPoolIds, $this->app_model->stateLevelUsers($state, $lvl));
+        }
+        $assignable = $this->user_model->getByIds(array_values(array_unique($allPoolIds)));
+
+        $attachCount = $this->app_model->ticketAttachmentCount($ticket['id']);
+
+        $currentSortOrder = (int) ($state['sort_order'] ?? 0);
+        $isInitialState   = !empty($state['is_initial']);
+        $bwdTransitions   = $this->app_model->stateGetTransitions(
+            (int) $ticket['flow_id'],
+            (int) $ticket['current_state_id'],
+            'backward'
+        );
+        $previousStates = [];
+        if (!empty($bwdTransitions)) {
+            $validBwdIds = array_map('intval', array_column($bwdTransitions, 'to_state_id'));
+            foreach ($allStates as $s) {
+                if (in_array((int) $s['id'], $validBwdIds, true)) {
+                    $previousStates[] = $s;
+                }
+            }
+            usort($previousStates, function ($a, $b) {
+                return (int) $b['sort_order'] - (int) $a['sort_order'];
+            });
+            $previousStates = array_values($previousStates);
+        } elseif (!$isInitialState && $currentSortOrder > 0) {
+            foreach ($allStates as $s) {
+                if ((int) $s['sort_order'] > 0 && (int) $s['sort_order'] < $currentSortOrder) {
+                    $previousStates[] = $s;
+                }
+            }
+            usort($previousStates, function ($a, $b) {
+                return (int) $b['sort_order'] - (int) $a['sort_order'];
+            });
+            $previousStates = array_values($previousStates);
+        }
 
         $data = [
-            'title'           => 'Ticket Detail',
-            'view'            => 'detail',
-            'ticket'          => $ticket,
-            'allStates'       => $allStates,
-            'state'           => $state,
-            'tatMinutes'      => $tatMin,
-            'tatExpiresAt'    => tat_expires_at($ticket, $state),
-            'timeline'        => $this->app_model->ticketTimeline($ticket['id']),
+            'title'          => 'Ticket Detail',
+            'view'           => 'detail',
+            'ticket'         => $ticket,
+            'allStates'      => $allStates,
+            'state'          => $state,
+            'tatMinutes'     => $tatMin,
+            'tatExpiresAt'   => tat_expires_at($ticket, $state),
+            'timeline'       => $this->app_model->ticketTimeline($ticket['id']),
             'assignableUsers' => $assignable,
-            'notifications'   => $this->app_model->ticketRecentNotifications($ticket['id'], 5),
-            'nextStates'      => $this->app_model->stateGetChildren((int) $ticket['flow_id'], (int) $ticket['current_state_id']),
+            'notifications'  => $this->app_model->ticketRecentNotifications($ticket['id'], 5),
+            'nextStates'     => $this->app_model->stateGetChildren((int) $ticket['flow_id'], (int) $ticket['current_state_id']),
+            'previousStates' => $previousStates,
+            'allTransitions' => $this->app_model->stateGetAllTransitions((int) $ticket['flow_id']),
+            'attachCount'    => $attachCount,
+            'attachMax'      => 5,
         ];
         echo view('templates/header', $data);
         echo view('templates/sidebar', $data);
@@ -975,8 +1382,6 @@ class App extends BaseController
         $ticket = $r;
         $type   = (string) $this->request->getPost('type');
 
-        // Block edits on closed/resolved tickets — UI also disables the
-        // controls, this is the server-side guard against direct POSTs.
         if ($this->ticketIsTerminal($ticket)) {
             return json_fail('Ticket is ' . $ticket['status'] . '; further edits are blocked.');
         }
@@ -991,28 +1396,29 @@ class App extends BaseController
             }
             $this->app_model->ticketLogAction($ticket['id'], 'commented', ['comment' => $comment]);
 
-            // Notify any @-mentioned users. parse_mentions() excludes the
-            // commenter, dedupes, and only returns active users. Mentioned
-            // users get pinged regardless of whether they're in the state's
-            // level pool — that's the whole point of an @mention.
             try {
                 $mentioned = parse_mentions($comment, (string) logged_user_id());
                 if (!empty($mentioned)) {
                     $body = '<p><strong>' . esc(logged_user_name()) . '</strong> mentioned you in ticket '
-                          . '<strong>' . esc($ticket['alarm_id']) . '</strong>:</p>'
-                          . '<blockquote style="margin:8px 0;padding:8px 12px;border-left:3px solid #0792cd;background:#f1f5f9;color:#0f172a;">'
-                          . nl2br(esc($comment))
-                          . '</blockquote>'
-                          . '<p><a href="' . esc(site_url('tickets/detail/' . $ticket['alarm_id'])) . '">View ticket</a></p>';
+                        . '<strong>' . esc($ticket['alarm_id']) . '</strong>:</p>'
+                        . '<blockquote style="margin:8px 0;padding:8px 12px;border-left:3px solid #0792cd;background:#f1f5f9;color:#0f172a;">'
+                        . nl2br(esc($comment))
+                        . '</blockquote>'
+                        . '<p><a href="' . esc(site_url('tickets/detail/' . $ticket['alarm_id'])) . '">View ticket</a></p>';
                     notify_users($mentioned, (int) $ticket['id'], '[MENTION] ' . $ticket['alarm_id'] . ' — ' . logged_user_name() . ' mentioned you', $body);
-                    error_log("pview alert >> @mention notify: ticket=[" . $ticket['alarm_id'] . "], mentioned=[" . implode(',', $mentioned) . "], by=[" . logged_user_id() . "]");
+                    log_message('debug', "pview alert >> @mention notify: ticket=[" . $ticket['alarm_id'] . "], mentioned=[" . implode(',', $mentioned) . "], by=[" . logged_user_id() . "]");
                 }
             } catch (\Throwable $e) {
-                error_log("pview alert >> @mention parse/notify FAILED: " . $e->getMessage());
+                log_message('error', "pview alert >> @mention parse/notify FAILED: " . $e->getMessage());
             }
 
-            activity_log('tickets', 'comment', 'ticket', (string) $ticket['alarm_id'],
-                'Commented on ' . $ticket['alarm_id']);
+            activity_log(
+                'tickets',
+                'comment',
+                'ticket',
+                (string) $ticket['alarm_id'],
+                'Commented on ' . $ticket['alarm_id']
+            );
             return json_ok([], 'Comment added');
         }
 
@@ -1026,9 +1432,14 @@ class App extends BaseController
             }
             $this->app_model->ticketUpdate($ticket['id'], ['title' => $newTitle]);
             $this->app_model->ticketLogAction($ticket['id'], 'title_changed', ['comment' => 'Title updated to: ' . $newTitle]);
-            activity_log('tickets', 'update', 'ticket', (string) $ticket['alarm_id'],
+            activity_log(
+                'tickets',
+                'update',
+                'ticket',
+                (string) $ticket['alarm_id'],
                 'Title changed on ' . $ticket['alarm_id'],
-                ['field' => 'title', 'old' => $ticket['title'], 'new' => $newTitle]);
+                ['field' => 'title', 'old' => $ticket['title'], 'new' => $newTitle]
+            );
             return json_ok([], 'Title updated');
         }
 
@@ -1039,9 +1450,14 @@ class App extends BaseController
             }
             $this->app_model->ticketUpdate($ticket['id'], ['description' => $desc]);
             $this->app_model->ticketLogAction($ticket['id'], 'description_changed', ['comment' => 'Description updated']);
-            activity_log('tickets', 'update', 'ticket', (string) $ticket['alarm_id'],
+            activity_log(
+                'tickets',
+                'update',
+                'ticket',
+                (string) $ticket['alarm_id'],
                 'Description changed on ' . $ticket['alarm_id'],
-                ['field' => 'description']);
+                ['field' => 'description']
+            );
             return json_ok([], 'Description updated');
         }
 
@@ -1052,15 +1468,21 @@ class App extends BaseController
             }
             $this->app_model->ticketUpdate($ticket['id'], ['priority' => $prio]);
             $this->app_model->ticketLogAction($ticket['id'], 'priority_changed', ['comment' => 'Priority changed to ' . $prio]);
-            activity_log('tickets', 'update', 'ticket', (string) $ticket['alarm_id'],
+            activity_log(
+                'tickets',
+                'update',
+                'ticket',
+                (string) $ticket['alarm_id'],
                 'Priority changed on ' . $ticket['alarm_id'] . ' to ' . $prio,
-                ['field' => 'priority', 'old' => $ticket['priority'], 'new' => $prio]);
+                ['field' => 'priority', 'old' => $ticket['priority'], 'new' => $prio]
+            );
             return json_ok([], 'Priority updated');
         }
         return json_fail('Unknown action');
     }
 
-    /** POST /tickets/move_state/(:any) — advance ticket to the next flow state. */
+    /** POST /tickets/move_state/(:any) — move ticket to an allowed forward or
+     *  backward state. Backward transitions always require a reason comment. */
     public function ticket_move_state($alarm_id)
     {
         check_module_access('tickets', 'edit');
@@ -1070,57 +1492,132 @@ class App extends BaseController
         }
         $ticket = $r;
 
+        if (!role_has_admin_scope(logged_user_role()) && (string) $ticket['current_assignee'] !== (string) logged_user_id()) {
+            return json_fail('Only the assigned operator or an admin can move the ticket state.');
+        }
+
         if ($this->ticketIsTerminal($ticket)) {
             return json_fail('Ticket is ' . $ticket['status'] . '; cannot move state.');
         }
-        // If the ticket is sitting in a final state, the workflow has ended.
-        // The operator should resolve / close, not move further.
-        if (!empty($ticket['state_is_final']) && (int) $ticket['state_is_final'] === 1) {
-            return json_fail('Current state is final — resolve or close the ticket instead.');
+
+        $targetId      = (int) $this->request->getPost('target_state_id');
+        $transType     = trim((string) $this->request->getPost('transition_type'));
+        $reason        = trim((string) $this->request->getPost('reason'));
+
+        if ($targetId <= 0) {
+            return json_fail('Please select a target state.');
+        }
+        if (!in_array($transType, ['forward', 'backward'], true)) {
+            $transType = 'forward';
         }
 
-        $children = $this->app_model->stateGetChildren((int) $ticket['flow_id'], (int) $ticket['current_state_id']);
-        $next = null;
+        $next = $this->app_model->stateGetById($targetId);
+        if (empty($next) || (int) $next['flow_id'] !== (int) $ticket['flow_id']) {
+            return json_fail('Target state not found in this flow.');
+        }
 
-        if (!empty($children)) {
-            if (count($children) === 1) {
-                $next = $children[0];
-            } else {
-                $targetId = (int) $this->request->getPost('target_state_id');
-                if ($targetId <= 0) {
-                    return json_fail('Please select a target state');
-                }
-                foreach ($children as $child) {
-                    if ((int) $child['id'] === $targetId) {
-                        $next = $child;
-                        break;
+        $currentState = $this->app_model->stateGetById($ticket['current_state_id']);
+
+        if ($transType === 'forward') {
+            if (!empty($ticket['state_is_final']) && (int) $ticket['state_is_final'] === 1) {
+                return json_fail('Current state is the closing state — resolve or close the ticket instead.');
+            }
+            $validNext = $this->app_model->stateGetChildren(
+                (int) $ticket['flow_id'],
+                (int) $ticket['current_state_id']
+            );
+            $validIds = array_column($validNext, 'id');
+            if (!in_array($targetId, array_map('intval', $validIds), true)) {
+                return json_fail('This is not a valid next state from the current position.');
+            }
+            // Enforce requires_comment on explicit forward transitions even if the UI didn't prompt.
+            $fwdTransitions = $this->app_model->stateGetTransitions(
+                (int) $ticket['flow_id'],
+                (int) $ticket['current_state_id'],
+                'forward'
+            );
+            foreach ($fwdTransitions as $ft) {
+                if ((int) $ft['to_state_id'] === $targetId && !empty($ft['requires_comment'])) {
+                    if ($reason === '') {
+                        return json_fail('A comment is required for this transition.');
                     }
-                }
-                if (empty($next)) {
-                    return json_fail('Invalid target state selected');
+                    break;
                 }
             }
         } else {
-            // stateGetNext() now refuses to fall through in branched flows.
-            // For tree-shaped flows, a leaf is a dead end — the operator
-            // must resolve/close from here.
-            $next = $this->app_model->stateGetNext($ticket['flow_id'], $ticket['current_state_id']);
-        }
-
-        if (empty($next)) {
-            return json_fail('No next state — resolve or close the ticket instead.');
+            if ($reason === '') {
+                return json_fail('A reason is required when sending a ticket backward.');
+            }
+            $bwdTransitions = $this->app_model->stateGetTransitions(
+                (int) $ticket['flow_id'],
+                (int) $ticket['current_state_id'],
+                'backward'
+            );
+            if (!empty($bwdTransitions)) {
+                $validBwdIds = array_map('intval', array_column($bwdTransitions, 'to_state_id'));
+                if (!in_array($targetId, $validBwdIds, true)) {
+                    return json_fail('This state is not a configured backward target from the current state.');
+                }
+            } elseif ((int) $next['sort_order'] >= (int) $currentState['sort_order']) {
+                return json_fail('Backward movement must target an earlier state in the workflow.');
+            }
         }
 
         $this->app_model->ticketMoveToState($ticket['id'], (int) $next['id']);
+
+        // Record backward transition in the diagram if it doesn't exist yet.
+        if ($transType === 'backward') {
+            $existingBwd = $this->app_model->stateGetTransitions(
+                (int) $ticket['flow_id'],
+                (int) $ticket['current_state_id'],
+                'backward'
+            );
+            $existingToIds = array_map('intval', array_column($existingBwd, 'to_state_id'));
+            if (!in_array((int) $next['id'], $existingToIds, true)) {
+                $this->app_model->stateTransitionSave([
+                    'flow_id'          => (int) $ticket['flow_id'],
+                    'from_state_id'    => (int) $ticket['current_state_id'],
+                    'to_state_id'      => (int) $next['id'],
+                    'transition_type'  => 'backward',
+                    'requires_comment' => 1,
+                    'created_by'       => (string) logged_user_id(),
+                ]);
+            }
+        }
+
+        $currentAssignee = (string) ($ticket['current_assignee'] ?? '');
+        if ($currentAssignee !== '') {
+            $newPool = $this->app_model->stateLevelUsers($next, 1);
+            if (!in_array($currentAssignee, $newPool, true)) {
+                $this->app_model->ticketUpdate($ticket['id'], [
+                    'current_assignee' => null,
+                    'status'           => 'open',
+                ]);
+                $this->app_model->ticketLogAction($ticket['id'], 'unassigned', [
+                    'comment' => 'Assignee cleared — not in ' . $next['name'] . ' L1 pool',
+                ]);
+            }
+        }
+
+        $logComment = ucfirst($transType) . ' transition to ' . $next['name'];
+        if ($reason !== '') {
+            $logComment .= ': ' . $reason;
+        }
         $this->app_model->ticketLogAction($ticket['id'], 'state_changed', [
-            'from_state_id' => (int) $ticket['current_state_id'],
-            'to_state_id'   => (int) $next['id'],
-            'comment'       => 'Moved to ' . $next['name'],
+            'from_state_id'   => (int) $ticket['current_state_id'],
+            'to_state_id'     => (int) $next['id'],
+            'transition_type' => $transType,
+            'comment'         => $logComment,
         ]);
-        error_log("pview alert >> ticket move_state: alarm_id=[" . $alarm_id . "], to_state=[" . $next['name'] . "], by=[" . logged_user_id() . "]");
-        activity_log('tickets', 'move_state', 'ticket', (string) $ticket['alarm_id'],
+        log_message('debug', "pview alert >> ticket move_state: alarm_id=[" . $alarm_id . "], to_state=[" . $next['name'] . "], by=[" . logged_user_id() . "]");
+        activity_log(
+            'tickets',
+            'move_state',
+            'ticket',
+            (string) $ticket['alarm_id'],
             'Moved ' . $ticket['alarm_id'] . ' to "' . $next['name'] . '"',
-            ['from_state_id' => (int) $ticket['current_state_id'], 'to_state_id' => (int) $next['id']]);
+            ['from_state_id' => (int) $ticket['current_state_id'], 'to_state_id' => (int) $next['id']]
+        );
 
         try {
             $level_users = $this->app_model->stateLevelUsers($next, 1);
@@ -1137,7 +1634,7 @@ class App extends BaseController
                 ], $level_users);
             }
         } catch (\Throwable $e) {
-            error_log("pview alert >> ticket move_state notify FAILED: error=[" . $e->getMessage() . "]");
+            log_message('error', "pview alert >> ticket move_state notify FAILED: error=[" . $e->getMessage() . "]");
         }
 
         return json_ok([], 'Moved to next state');
@@ -1157,7 +1654,6 @@ class App extends BaseController
             return json_fail('Ticket is ' . $ticket['status'] . '; cannot reassign.');
         }
 
-        // Post-2026-05-21 migration: the form sends a user_id string.
         $userIdStr = trim((string) $this->request->getPost('user_id'));
         if ($userIdStr === '') {
             return json_fail('Pick a user');
@@ -1167,28 +1663,47 @@ class App extends BaseController
             return json_fail('Invalid or inactive user');
         }
 
-        // Assignee must be in the current state's current-level pool. The UI
-        // dropdown already restricts to this set; the server-side check
-        // catches direct POSTs.
-        $state = $this->app_model->stateGetById((int) $ticket['current_state_id']);
-        $pool  = $this->app_model->stateLevelUsers($state, (int) $ticket['current_level']);
-        if (!in_array($userIdStr, $pool, true)) {
-            return json_fail('User is not in the current level pool for this state.');
+        $state   = $this->app_model->stateGetById((int) $ticket['current_state_id']);
+        $allPool = [];
+        for ($lvl = 1; $lvl <= 4; $lvl++) {
+            $allPool = array_merge($allPool, $this->app_model->stateLevelUsers($state, $lvl));
+        }
+        if (!in_array($userIdStr, $allPool, true)) {
+            return json_fail('User is not in any pool for this state.');
         }
 
-        $this->app_model->ticketUpdate($ticket['id'], [
+        $assignData = [
             'current_assignee' => $userIdStr,
             'status'           => 'in_progress',
-            'current_level'    => 1,                 // SLA-01: reset escalation tier to L1
-            'state_entered_at' => date('Y-m-d H:i:s'), // SLA-01: give the new assignee a fresh SLA window
-        ]);
+            'state_entered_at' => date('Y-m-d H:i:s'),
+        ];
+        if ((string) $ticket['status'] !== 'escalated') {
+            $assignData['current_level'] = 1;
+        }
+        if (empty($ticket['current_assignee']) && empty($ticket['actual_start_date'])) {
+            $assignData['actual_start_date'] = date('Y-m-d');
+        }
+        $this->app_model->ticketUpdate($ticket['id'], $assignData);
         $this->app_model->ticketLogAction($ticket['id'], 'assigned', [
             'comment' => 'Assigned to ' . $user['name'],
         ]);
-        error_log("pview alert >> ticket assign: alarm_id=[" . $alarm_id . "], assigned_to=[" . $userIdStr . "], by=[" . logged_user_id() . "]");
-        activity_log('tickets', 'assign', 'ticket', (string) $ticket['alarm_id'],
+        log_message('debug', "pview alert >> ticket assign: alarm_id=[" . $alarm_id . "], assigned_to=[" . $userIdStr . "], by=[" . logged_user_id() . "]");
+        activity_log(
+            'tickets',
+            'assign',
+            'ticket',
+            (string) $ticket['alarm_id'],
             'Assigned ' . $ticket['alarm_id'] . ' to ' . $user['name'],
-            ['assignee_user_id' => $userIdStr]);
+            ['assignee_user_id' => $userIdStr]
+        );
+        try {
+            notify_ticket_event('assigned', $ticket, [
+                'actor_name'    => logged_user_name(),
+                'assignee_name' => (string) $user['name'],
+            ], [$userIdStr]);
+        } catch (\Throwable $e) {
+            log_message('error', "pview alert >> ticket assign notify FAILED: error=[" . $e->getMessage() . "]");
+        }
         return json_ok([], 'Assigned');
     }
 
@@ -1201,18 +1716,67 @@ class App extends BaseController
             return $r;
         }
         $ticket = $r;
+        if (!role_has_admin_scope(logged_user_role()) && (string) $ticket['current_assignee'] !== (string) logged_user_id()) {
+            return json_fail('Only the assigned operator or an admin can resolve this ticket.');
+        }
         if ($this->ticketIsTerminal($ticket)) {
             return json_fail('Ticket is already ' . $ticket['status'] . '.');
         }
-        $this->app_model->ticketUpdate($ticket['id'], [
+        $resolveData = [
             'status'      => 'resolved',
             'resolved_at' => date('Y-m-d H:i:s'),
-        ]);
+        ];
+        if (empty($ticket['actual_end_date'])) {
+            $resolveData['actual_end_date'] = date('Y-m-d');
+        }
+        $this->app_model->ticketUpdate($ticket['id'], $resolveData);
         $this->app_model->ticketLogAction($ticket['id'], 'resolved');
-        error_log("pview alert >> ticket resolve: alarm_id=[" . $alarm_id . "], by=[" . logged_user_id() . "]");
-        activity_log('tickets', 'resolve', 'ticket', (string) $ticket['alarm_id'],
-            'Resolved ' . $ticket['alarm_id']);
+        log_message('debug', "pview alert >> ticket resolve: alarm_id=[" . $alarm_id . "], by=[" . logged_user_id() . "]");
+        activity_log(
+            'tickets',
+            'resolve',
+            'ticket',
+            (string) $ticket['alarm_id'],
+            'Resolved ' . $ticket['alarm_id']
+        );
         return json_ok([], 'Resolved');
+    }
+
+    /** POST /tickets/reopen/(:any) — reopen a resolved ticket back to its last active state. */
+    public function ticket_reopen($alarm_id)
+    {
+        check_module_access('tickets', 'edit');
+        $r = $this->ticketLoad($alarm_id, true);
+        if (!is_array($r)) {
+            return $r;
+        }
+        $ticket = $r;
+        if ((string) ($ticket['status'] ?? '') !== 'resolved') {
+            return json_fail('Only resolved tickets can be reopened.');
+        }
+        if (!role_has_admin_scope(logged_user_role()) && (string) $ticket['current_assignee'] !== (string) logged_user_id()) {
+            return json_fail('Only the assigned operator or an admin can reopen this ticket.');
+        }
+        $newStatus = 'open';
+        if (!empty($ticket['current_assignee'])) {
+            $newStatus = 'in_progress';
+        }
+        $this->app_model->ticketUpdate($ticket['id'], [
+            'status'      => $newStatus,
+            'resolved_at' => null,
+        ]);
+        $this->app_model->ticketLogAction($ticket['id'], 'reopened', [
+            'comment' => 'Ticket reopened by ' . logged_user_name(),
+        ]);
+        log_message('debug', "pview alert >> ticket reopen: alarm_id=[" . $alarm_id . "], by=[" . logged_user_id() . "]");
+        activity_log(
+            'tickets',
+            'reopen',
+            'ticket',
+            (string) $ticket['alarm_id'],
+            'Reopened ' . $ticket['alarm_id']
+        );
+        return json_ok([], 'Ticket reopened');
     }
 
     /** POST /tickets/close/(:any) — mark ticket closed. */
@@ -1224,17 +1788,29 @@ class App extends BaseController
             return $r;
         }
         $ticket = $r;
+        if (!role_has_admin_scope(logged_user_role()) && (string) $ticket['current_assignee'] !== (string) logged_user_id()) {
+            return json_fail('Only the assigned operator or an admin can close this ticket.');
+        }
         if (isset($ticket['status']) && $ticket['status'] === 'closed') {
             return json_fail('Ticket is already closed.');
         }
-        $this->app_model->ticketUpdate($ticket['id'], [
+        $closeData = [
             'status'    => 'closed',
             'closed_at' => date('Y-m-d H:i:s'),
-        ]);
+        ];
+        if (empty($ticket['actual_end_date'])) {
+            $closeData['actual_end_date'] = date('Y-m-d');
+        }
+        $this->app_model->ticketUpdate($ticket['id'], $closeData);
         $this->app_model->ticketLogAction($ticket['id'], 'closed');
-        error_log("pview alert >> ticket close: alarm_id=[" . $alarm_id . "], by=[" . logged_user_id() . "]");
-        activity_log('tickets', 'close', 'ticket', (string) $ticket['alarm_id'],
-            'Closed ' . $ticket['alarm_id']);
+        log_message('debug', "pview alert >> ticket close: alarm_id=[" . $alarm_id . "], by=[" . logged_user_id() . "]");
+        activity_log(
+            'tickets',
+            'close',
+            'ticket',
+            (string) $ticket['alarm_id'],
+            'Closed ' . $ticket['alarm_id']
+        );
         return json_ok([], 'Closed');
     }
 
@@ -1251,11 +1827,7 @@ class App extends BaseController
             return json_fail('Ticket is ' . $ticket['status'] . '; attachments are blocked.');
         }
 
-        // Limit total attachments per ticket (DoS mitigation).
-        $currentCount = $this->db->table('ticket_actions')
-            ->where('ticket_id', (int) $ticket['id'])
-            ->where('action_type', 'attachment')
-            ->countAllResults();
+        $currentCount = $this->app_model->ticketAttachmentCount($ticket['id']);
         if ($currentCount >= 5) {
             return json_fail('Maximum attachment limit (5 files) reached for this ticket.');
         }
@@ -1269,7 +1841,7 @@ class App extends BaseController
         $originalName = (string) $file->getName();
         $nameErr      = upload_filename_is_safe($originalName);
         if ($nameErr !== '') {
-            error_log('pview alert >> attach rejected (unsafe name): ticket=[' . $ticket['alarm_id'] . '], name=[' . $originalName . '], reason=[' . $nameErr . ']');
+            log_message('warning', 'pview alert >> attach rejected (unsafe name): ticket=[' . $ticket['alarm_id'] . '], name=[' . $originalName . '], reason=[' . $nameErr . ']');
             return json_fail($nameErr);
         }
 
@@ -1285,7 +1857,7 @@ class App extends BaseController
         // Defence in depth: even if an admin accidentally adds `php` to
         // the allow-list, the hard denylist still rejects it.
         if (in_array($ext, upload_blocked_extensions(), true)) {
-            error_log('pview alert >> attach blocked (denylist): ticket=[' . $ticket['alarm_id'] . '], ext=[' . $ext . ']');
+            log_message('warning', 'pview alert >> attach blocked (denylist): ticket=[' . $ticket['alarm_id'] . '], ext=[' . $ext . ']');
             return json_fail('Files of type "' . $ext . '" are not allowed.');
         }
 
@@ -1320,7 +1892,7 @@ class App extends BaseController
         $tmpPath = (string) $file->getTempName();
         $sniffed = upload_sniff_mime($tmpPath);
         if ($sniffed !== '' && !upload_mime_matches_ext($ext, $sniffed)) {
-            error_log('pview alert >> attach blocked (mime mismatch): ticket=[' . $ticket['alarm_id'] . '], ext=[' . $ext . '], sniffed=[' . $sniffed . ']');
+            log_message('warning', 'pview alert >> attach blocked (mime mismatch): ticket=[' . $ticket['alarm_id'] . '], ext=[' . $ext . '], sniffed=[' . $sniffed . ']');
             return json_fail('File content does not match its extension.');
         }
 
@@ -1352,9 +1924,14 @@ class App extends BaseController
             'attachment_path' => $rel,
             'comment'         => basename($originalName), // display name; basename() strips any path components
         ]);
-        activity_log('tickets', 'attach', 'ticket', (string) $ticket['alarm_id'],
+        activity_log(
+            'tickets',
+            'attach',
+            'ticket',
+            (string) $ticket['alarm_id'],
             'Attached "' . basename($originalName) . '" to ' . $ticket['alarm_id'],
-            ['original_name' => basename($originalName), 'size_bytes' => (int) $file->getSize(), 'mime' => $mime]);
+            ['original_name' => basename($originalName), 'size_bytes' => (int) $file->getSize(), 'mime' => $mime]
+        );
         return json_ok(['path' => $rel], 'File attached');
     }
 
@@ -1367,22 +1944,16 @@ class App extends BaseController
         }
         $ticket = $r;
 
-        $row = $this->db->table('ticket_actions')
-            ->where('id', (int) $action_id)
-            ->where('ticket_id', (int) $ticket['id'])
-            ->where('action_type', 'attachment')
-            ->get()->getRowArray();
+        $row = $this->app_model->ticketGetAttachment((int) $ticket['id'], (int) $action_id);
 
         if (empty($row) || empty($row['attachment_path'])) {
             return redirect()->to(site_url('tickets/detail/' . $ticket['alarm_id']))
                 ->with('error', 'Attachment not found.');
         }
 
-        // Resolve to absolute and confirm it sits inside writable/uploads/
-        // (trailing separator prevents /uploads2/ matching /uploads/).
         $relative = ltrim((string) $row['attachment_path'], "/\\");
         if ($relative === '' || strpbrk($relative, "\0\r\n") !== false) {
-            error_log('pview alert >> download blocked (bad path): action_id=[' . $action_id . ']');
+            log_message('warning', 'pview alert >> download blocked (bad path): action_id=[' . $action_id . ']');
             return redirect()->to(site_url('tickets/detail/' . $ticket['alarm_id']))
                 ->with('error', 'Attachment file missing.');
         }
@@ -1394,12 +1965,11 @@ class App extends BaseController
         }
         $baseSep = rtrim($base, DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR;
         if (strpos($abs, $baseSep) !== 0 || !is_file($abs)) {
-            error_log('pview alert >> download blocked (traversal): action_id=[' . $action_id . '], abs=[' . $abs . '], base=[' . $base . ']');
+            log_message('warning', 'pview alert >> download blocked (traversal): action_id=[' . $action_id . '], abs=[' . $abs . '], base=[' . $base . ']');
             return redirect()->to(site_url('tickets/detail/' . $ticket['alarm_id']))
                 ->with('error', 'Attachment file missing.');
         }
 
-        // Sanitize display name before sending in Content-Disposition.
         $name = basename($abs);
         if (!empty($row['comment'])) {
             $candidate = basename((string) $row['comment']);
@@ -1408,18 +1978,40 @@ class App extends BaseController
                 $name = $candidate;
             }
         }
-        activity_log('tickets', 'download', 'ticket', (string) $ticket['alarm_id'],
+        activity_log(
+            'tickets',
+            'download',
+            'ticket',
+            (string) $ticket['alarm_id'],
             'Downloaded attachment "' . $name . '" from ' . $ticket['alarm_id'],
-            ['action_id' => (int) $action_id]);
+            ['action_id' => (int) $action_id]
+        );
         return $this->response->download($abs, null)->setFileName($name);
     }
 
     /** GET /tickets/flows_by_project/(:num) — returns active flows of a project. */
     public function ticket_flows_by_project($project_id)
     {
-        check_isvalidated();
+        check_module_access('tickets', 'view');
         $rows = $this->app_model->flowGetByProject((int) $project_id);
         return json_ok($rows);
+    }
+
+    /** GET /tickets/assignable_users/(:num) — L1 pool users for a flow's initial state. */
+    public function ticket_assignable_users($flow_id)
+    {
+        check_module_access('tickets', 'add');
+        $initial = $this->app_model->stateGetInitial((int) $flow_id);
+        if (empty($initial)) {
+            return json_ok([]);
+        }
+        $pool  = $this->app_model->stateLevelUsers($initial, 1);
+        $users = empty($pool) ? [] : $this->user_model->getByIds($pool);
+        $out   = [];
+        foreach ($users as $u) {
+            $out[] = ['id' => (string) $u['user_id'], 'name' => (string) $u['name']];
+        }
+        return json_ok($out);
     }
 
     /** GET /escalation/states_by_flow/(:num) — states JSON for escalation form. */
@@ -1453,10 +2045,6 @@ class App extends BaseController
             $search = (string) $searchArr['value'];
         }
 
-        // Column index 0 is the bulk-select checkbox (not sortable), so the
-        // data columns shift +1. Every visible column maps to a real sort key;
-        // the previous map collapsed 4 columns onto 'created_at' and produced
-        // surprising sort behaviour when clicking those headers.
         $colNames = [
             0 => 'created_at',   // checkbox — not sortable in the UI
             1 => 'alarm_id',
@@ -1486,6 +2074,8 @@ class App extends BaseController
             'status'     => (string) $this->request->getGet('status'),
             'alert_type' => (string) $this->request->getGet('alert_type'),
             'priority'   => (string) $this->request->getGet('priority'),
+            'f_from'     => trim((string) $this->request->getGet('f_from')),
+            'f_to'       => trim((string) $this->request->getGet('f_to')),
         ];
         if ($mode === 'my') {
             $filters['user_id'] = (string) logged_user_id();
@@ -1517,8 +2107,6 @@ class App extends BaseController
         $data = [];
         foreach ($page['rows'] as $t) {
             $level   = isset($t['current_level']) ? (int) $t['current_level'] : 1;
-            // tat_expires_at() returns '' for resolved/closed tickets and final
-            // states so the JS countdown stops on its own.
             $expires = tat_expires_at($t);
             $assignee = '-';
             if (!empty($t['assignee_name'])) {
@@ -1533,7 +2121,17 @@ class App extends BaseController
                     $created = (string) $t['created_at'];
                 }
             }
-            $checkbox = '<input type="checkbox" class="form-check-input bulk-select" data-bulk-id="' . (int) $t['id'] . '" aria-label="Select ticket">';
+            $checkbox = '<input type="checkbox" class="form-check-input bulk-select" data-bulk-id="' . esc($t['alarm_id']) . '" aria-label="Select ticket">';
+            $actions = '';
+            $canReopen = false;
+            if (role_has_admin_scope(logged_user_role())) {
+                $canReopen = true;
+            } elseif ((string) ($t['current_assignee'] ?? '') === (string) logged_user_id()) {
+                $canReopen = true;
+            }
+            if (isset($t['status']) && $t['status'] === 'resolved' && $canReopen) {
+                $actions = '<button class="btn btn-sm btn-outline-warning list-reopen-btn" data-url="' . site_url('tickets/reopen/' . esc($t['alarm_id'])) . '" aria-label="Reopen ticket"><i class="bi bi-arrow-counterclockwise"></i> Reopen</button>';
+            }
             $data[] = [
                 'select'        => $checkbox,
                 'alarm_id_html' => '<a href="' . site_url('tickets/detail/' . esc($t['alarm_id'])) . '" class="alarm-id">' . esc($t['alarm_id']) . '</a>',
@@ -1545,6 +2143,7 @@ class App extends BaseController
                 'assignee'      => esc($assignee),
                 'tat'           => '<span class="tat-countdown" data-tat-expires="' . esc($expires) . '" data-tat-total-ms="' . (tat_total_minutes($t) * 60000) . '"></span>',
                 'created_at'    => '<span class="created-time">' . esc($created) . '</span>',
+                'actions'       => $actions,
             ];
         }
 
@@ -1578,35 +2177,59 @@ class App extends BaseController
         }
 
         $id = $this->app_model->savedFilterSave($userId, $name, $qs, 'tickets');
-        error_log("pview alert >> saved filter save: user_id=[" . $userId . "], name=[" . $name . "], filter_id=[" . $id . "]");
-        activity_log('tickets', 'saved_filter_save', 'saved_filter', (string) $id,
-            'Saved filter "' . $name . '"', ['filter_name' => $name]);
+        log_message('debug', "pview alert >> saved filter save: user_id=[" . $userId . "], name=[" . $name . "], filter_id=[" . $id . "]");
+        activity_log(
+            'tickets',
+            'saved_filter_save',
+            'saved_filter',
+            (string) $id,
+            'Saved filter "' . $name . '"',
+            ['filter_name' => $name]
+        );
         return json_ok(['id' => $id], 'Filter saved');
     }
 
     /** POST /tickets/saved/delete/(:num) — remove a saved filter preset. */
     public function tickets_saved_delete($id)
     {
-        check_isvalidated();
+        check_module_access('tickets', 'view');
         $userId = (string) logged_user_id();
         if ($userId === '') {
             return json_fail('Not authenticated', 401);
         }
         $this->app_model->savedFilterDelete((int) $id, $userId);
-        error_log("pview alert >> saved filter delete: id=[" . $id . "], user_id=[" . $userId . "]");
-        activity_log('tickets', 'saved_filter_delete', 'saved_filter', (string) $id,
-            'Removed saved filter');
+        log_message('debug', "pview alert >> saved filter delete: id=[" . $id . "], user_id=[" . $userId . "]");
+        activity_log(
+            'tickets',
+            'saved_filter_delete',
+            'saved_filter',
+            (string) $id,
+            'Removed saved filter'
+        );
         return json_ok([], 'Filter removed');
     }
 
     /** POST /tickets/bulk — bulk resolve or close a set of tickets by ID. */
     public function tickets_bulk()
     {
-        // Bulk resolve/close mutates tickets so it must honour the same
-        // module permission as individual resolve/close.
         check_module_access('tickets', 'edit');
-
-        $body = $this->request->getJSON(true);
+        try {
+            $body = $this->request->getJSON(true) ?: [];
+        } catch (\Exception $e) {
+            // Log the bad request so it appears in the activity log and CI4 logs.
+            log_message('warning', 'tickets_bulk: request body parse failed — {msg} — IP: {ip}', [
+                'msg' => $e->getMessage(),
+                'ip'  => $this->request->getIPAddress(),
+            ]);
+            activity_log(
+                'tickets',
+                'bulk_error',
+                null,
+                null,
+                'Bulk action request body could not be parsed: ' . $e->getMessage()
+            );
+            $body = $this->request->getPost();
+        }
         if (empty($body)) {
             $body = $this->request->getPost();
         }
@@ -1621,12 +2244,17 @@ class App extends BaseController
 
         $ids = [];
         if (isset($body['ids']) && is_array($body['ids'])) {
-            $ids = array_values(array_unique(array_map('intval', $body['ids'])));
+            foreach ($body['ids'] as $v) {
+                $s = safe_alarm_id((string) $v);
+                if ($s !== '') {
+                    $ids[] = $s;
+                }
+            }
+            $ids = array_values(array_unique($ids));
         }
         if (empty($ids)) {
             return json_fail('No tickets selected');
         }
-        // Sanity cap so a runaway selection doesn't choke the DB.
         if (count($ids) > 200) {
             return json_fail('Too many tickets selected (max 200 per batch)');
         }
@@ -1636,14 +2264,7 @@ class App extends BaseController
         $failed    = 0;
 
         foreach ($ids as $id) {
-            if ($id <= 0) {
-                $skipped++;
-                continue;
-            }
-            $row = $this->db->table('tickets t')
-                ->select('t.*')
-                ->where('t.id', $id)
-                ->get()->getRowArray();
+            $row = $this->app_model->ticketGetByAlarm($id);
             if (empty($row)) {
                 $skipped++;
                 continue;
@@ -1652,7 +2273,6 @@ class App extends BaseController
                 $skipped++;
                 continue;
             }
-            // Don't re-resolve / re-close — keep the action idempotent.
             if ($action === 'resolve' && in_array($row['status'], ['resolved', 'closed'], true)) {
                 $skipped++;
                 continue;
@@ -1694,10 +2314,15 @@ class App extends BaseController
         if ($failed > 0) {
             $msg .= ', ' . $failed . ' failed';
         }
-        error_log("pview alert >> tickets bulk: action=[" . $action . "], processed=[" . $processed . "], skipped=[" . $skipped . "], failed=[" . $failed . "], by=[" . logged_user_id() . "]");
-        activity_log('tickets', 'bulk', null, null,
+        log_message('debug', "pview alert >> tickets bulk: action=[" . $action . "], processed=[" . $processed . "], skipped=[" . $skipped . "], failed=[" . $failed . "], by=[" . logged_user_id() . "]");
+        activity_log(
+            'tickets',
+            'bulk',
+            null,
+            null,
             'Bulk ' . $action . ': ' . $processed . ' processed, ' . $skipped . ' skipped, ' . $failed . ' failed',
-            ['action' => $action, 'processed' => $processed, 'skipped' => $skipped, 'failed' => $failed, 'ids' => $ids]);
+            ['action' => $action, 'processed' => $processed, 'skipped' => $skipped, 'failed' => $failed, 'ids' => $ids]
+        );
         return json_ok([
             'processed' => $processed,
             'skipped'   => $skipped,
@@ -1722,6 +2347,8 @@ class App extends BaseController
             'alert_type' => (string) $this->request->getGet('alert_type'),
             'priority'   => (string) $this->request->getGet('priority'),
             'search'     => (string) $this->request->getGet('q'),
+            'f_from'     => trim((string) $this->request->getGet('f_from')),
+            'f_to'       => trim((string) $this->request->getGet('f_to')),
         ];
         if ($mode === 'my') {
             $filters['user_id'] = (string) logged_user_id();
@@ -1737,12 +2364,16 @@ class App extends BaseController
         }
 
         $filename = 'tickets-' . date('Ymd-His') . '.csv';
-        activity_log('tickets', 'export', null, null,
+        activity_log(
+            'tickets',
+            'export',
+            null,
+            null,
             'Exported ' . count($rows) . ' tickets (' . $mode . ')',
-            ['mode' => $mode, 'row_count' => count($rows), 'filters' => $filters]);
+            ['mode' => $mode, 'row_count' => count($rows), 'filters' => $filters]
+        );
 
-        // Stream output. service('response') would buffer the whole
-        // CSV in memory; we want to flush row-by-row for large lists.
+        // Stream CSV row-by-row to avoid buffering large exports in memory.
         header('Content-Type: text/csv; charset=utf-8');
         header('Content-Disposition: attachment; filename="' . $filename . '"');
         header('Cache-Control: no-store, no-cache, must-revalidate');
@@ -1826,7 +2457,7 @@ class App extends BaseController
             return null;
         }
         $retry = isset($check['retry_after_seconds']) ? (int) $check['retry_after_seconds'] : 60;
-        error_log('pview alert >> API rate-limited: api_key_id=[' . $this->api_key_row['id'] . '], endpoint=[' . $endpoint . '], retry_after=[' . $retry . ']');
+        log_message('warning', 'pview alert >> API rate-limited: api_key_id=[' . $this->api_key_row['id'] . '], endpoint=[' . $endpoint . '], retry_after=[' . $retry . ']');
         return service('response')
             ->setStatusCode(429)
             ->setHeader('Retry-After', (string) $retry)
@@ -1847,7 +2478,15 @@ class App extends BaseController
         if ($rate !== null) {
             return $rate;
         }
-        $body = $this->request->getJSON(true);
+        try {
+            $body = $this->request->getJSON(true) ?: [];
+        } catch (\Exception $e) {
+            log_message('warning', 'api_raise: request body parse failed — {msg} — IP: {ip}', [
+                'msg' => $e->getMessage(),
+                'ip'  => $this->request->getIPAddress(),
+            ]);
+            $body = [];
+        }
         if (empty($body)) {
             $body = $this->request->getPost();
         }
@@ -1937,8 +2576,18 @@ class App extends BaseController
                 }
             }
         } catch (\Throwable $e) {
-            error_log("pview alert >> API raise notify FAILED: error=[" . $e->getMessage() . "]");
+            log_message('error', "pview alert >> API raise notify FAILED: error=[" . $e->getMessage() . "]");
         }
+
+        activity_log(
+            'api',
+            'raise',
+            'ticket',
+            $alarmId,
+            'API raised ticket ' . $alarmId . ' via project #' . $project_id,
+            ['flow_id' => $flow_id, 'alert_type' => $alertType, 'priority' => $priority],
+            ['user_id' => 'api:' . $this->api_key_row['name'], 'user_name' => (string) $this->api_key_row['name'], 'user_role' => 'api', 'project_id' => $project_id]
+        );
 
         return service('response')->setStatusCode(201)->setJSON([
             'success'        => true,
@@ -1969,13 +2618,22 @@ class App extends BaseController
             return service('response')->setStatusCode(404)->setJSON(['success' => false, 'message' => 'Not found']);
         }
 
-        // Enforce project-wise isolation for API key.
         if ((int) $t['project_id'] !== (int) $this->api_key_row['project_id']) {
             return service('response')->setStatusCode(403)->setJSON([
                 'success' => false,
                 'message' => 'API key is not authorised for this ticket',
             ]);
         }
+
+        activity_log(
+            'api',
+            'show',
+            'ticket',
+            $clean,
+            'API read ticket ' . $clean,
+            [],
+            ['user_id' => 'api:' . $this->api_key_row['name'], 'user_name' => (string) $this->api_key_row['name'], 'user_role' => 'api', 'project_id' => (int) $t['project_id']]
+        );
 
         $entered = strtotime((string) $t['state_entered_at']);
         $tatKey2 = 'l' . (int) $t['current_level'] . '_tat_minutes';
@@ -2011,7 +2669,15 @@ class App extends BaseController
         if (!$clean) {
             return service('response')->setStatusCode(400)->setJSON(['success' => false, 'message' => 'Invalid alarm_id']);
         }
-        $body = $this->request->getJSON(true);
+        try {
+            $body = $this->request->getJSON(true) ?: [];
+        } catch (\Exception $e) {
+            log_message('warning', 'api_update: request body parse failed — {msg} — IP: {ip}', [
+                'msg' => $e->getMessage(),
+                'ip'  => $this->request->getIPAddress(),
+            ]);
+            $body = [];
+        }
         if (empty($body)) {
             $body = $this->request->getPost();
         }
@@ -2020,7 +2686,6 @@ class App extends BaseController
             return service('response')->setStatusCode(404)->setJSON(['success' => false, 'message' => 'Not found']);
         }
 
-        // Enforce project-wise isolation for API key.
         if ((int) $t['project_id'] !== (int) $this->api_key_row['project_id']) {
             return service('response')->setStatusCode(403)->setJSON([
                 'success' => false,
@@ -2044,6 +2709,16 @@ class App extends BaseController
             return service('response')->setStatusCode(400)->setJSON(['success' => false, 'message' => 'Unknown action']);
         }
 
+        activity_log(
+            'api',
+            'update',
+            'ticket',
+            $clean,
+            'API ' . $action . ' on ticket ' . $clean,
+            ['comment' => $comment, 'performed_by_system' => $sys],
+            ['user_id' => 'api:' . $this->api_key_row['name'], 'user_name' => (string) $this->api_key_row['name'], 'user_role' => 'api', 'project_id' => (int) $t['project_id']]
+        );
+
         return service('response')->setJSON([
             'success'    => true,
             'alarm_id'   => $clean,
@@ -2062,7 +2737,6 @@ class App extends BaseController
         if ($rate !== null) {
             return $rate;
         }
-        // Enforce project-wise isolation for API key.
         $filters = [
             'project_id' => (int) $this->api_key_row['project_id'],
             'status'     => (string) $this->request->getGet('status'),
@@ -2082,6 +2756,17 @@ class App extends BaseController
             $offset = 0;
         }
         $rows = array_slice($rows, $offset, $limit);
+
+        activity_log(
+            'api',
+            'index',
+            null,
+            null,
+            'API listed ' . count($rows) . ' alert(s) for project #' . $filters['project_id'],
+            ['status' => $filters['status'], 'alert_type' => $filters['alert_type']],
+            ['user_id' => 'api:' . $this->api_key_row['name'], 'user_name' => (string) $this->api_key_row['name'], 'user_role' => 'api', 'project_id' => $filters['project_id']]
+        );
+
         return service('response')->setJSON([
             'success' => true,
             'count'   => count($rows),
@@ -2099,9 +2784,19 @@ class App extends BaseController
         if ($rate !== null) {
             return $rate;
         }
-        // Enforce project-wise isolation for API key.
         $project_id = (int) $this->api_key_row['project_id'];
         $rows = $this->app_model->flowGetByProject($project_id);
+
+        activity_log(
+            'api',
+            'flows',
+            null,
+            null,
+            'API listed ' . count($rows) . ' flow(s) for project #' . $project_id,
+            [],
+            ['user_id' => 'api:' . $this->api_key_row['name'], 'user_name' => (string) $this->api_key_row['name'], 'user_role' => 'api', 'project_id' => $project_id]
+        );
+
         return service('response')->setJSON(['success' => true, 'data' => $rows]);
     }
 
@@ -2126,7 +2821,6 @@ class App extends BaseController
             $range = $allowed[0];
         }
 
-        // Match the main dashboard scoping rule.
         $role    = logged_user_role();
         $isAdmin = role_has_admin_scope($role);
         $userPk  = logged_user_id();
@@ -2144,8 +2838,6 @@ class App extends BaseController
         if (!session('logged_in') || !session('user_id')) {
             return json_fail('Not authenticated', 401);
         }
-        // After the 2026-05-21 migration, ticketCountActionable
-        // expects the user_id string (FK column type), not the PK.
         $userId  = (string) session('user_id');
         $role    = (string) session('user_role');
         $isAdmin = role_has_admin_scope($role);
@@ -2154,11 +2846,7 @@ class App extends BaseController
         return json_ok($counts);
     }
 
-    /** GET /notifications/recent — bell-icon dropdown data.
-     *  Returns the actionable tickets (one row per ticket, sorted by urgency)
-     *  so the list matches the bell-badge counter exactly. Previously this
-     *  returned notification_logs rows, which produced duplicates when the
-     *  same ticket had been emailed to multiple recipients. */
+    /** GET /notifications/recent — actionable tickets for the bell-icon dropdown. */
     public function notifications_recent()
     {
         if (!session('logged_in') || !session('user_id')) {
@@ -2187,8 +2875,6 @@ class App extends BaseController
                 'alarm_id'      => (string) ($r['alarm_id'] ?? ''),
                 'title'         => (string) ($r['title'] ?? ''),
                 'alert_type'    => (string) ($r['alert_type'] ?? 'info'),
-                // Ticket lifecycle status (open / in_progress / escalated / …)
-                // — distinct from notification_logs.status (sent/failed).
                 'ticket_status' => (string) ($r['status'] ?? ''),
                 'level'         => (int)    ($r['current_level'] ?? 1),
                 'state_name'    => (string) ($r['state_name'] ?? ''),
@@ -2207,15 +2893,7 @@ class App extends BaseController
         $userEmail = (string) session('user_email');
         if ($userEmail !== '') {
             $cutoff = date('Y-m-d H:i:s', strtotime('-7 days'));
-            $rawMentions = $this->db->table('notification_logs nl')
-                ->select('nl.id, nl.subject, nl.created_at, nl.ticket_id, t.alarm_id, t.title, t.alert_type')
-                ->join('tickets t', 't.id = nl.ticket_id', 'left')
-                ->where('nl.recipient_email', $userEmail)
-                ->like('nl.subject', '[MENTION]', 'after')
-                ->where('nl.created_at >=', $cutoff)
-                ->orderBy('nl.created_at', 'desc')
-                ->limit(50)
-                ->get()->getResultArray();
+            $rawMentions = $this->app_model->notificationMentionsForUser($userEmail, $cutoff, 50);
 
             $seenTickets = [];
             foreach ($rawMentions as $m) {
@@ -2258,11 +2936,38 @@ class App extends BaseController
         return json_ok(['items' => $items, 'mentions' => $mentions]);
     }
 
+    // Creates the modules table on first use; safe to call repeatedly.
+    private function ensureModulesTable()
+    {
+        try {
+            $check = $this->db->query("SHOW TABLES LIKE 'modules'")->getResultArray();
+            if (!empty($check)) {
+                return;
+            }
+            $this->db->query("CREATE TABLE IF NOT EXISTS `modules` (
+              `id`          INT UNSIGNED NOT NULL AUTO_INCREMENT,
+              `module_key`  VARCHAR(50)  NOT NULL,
+              `name`        VARCHAR(100) NOT NULL,
+              `description` VARCHAR(255) NOT NULL DEFAULT '',
+              `is_builtin`  TINYINT(1)   NOT NULL DEFAULT 0,
+              `sort_order`  INT          NOT NULL DEFAULT 100,
+              `created_at`  DATETIME     NOT NULL,
+              `created_by`  VARCHAR(100)          DEFAULT NULL,
+              PRIMARY KEY (`id`),
+              UNIQUE KEY `idx_module_key` (`module_key`)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;");
+            log_message('debug', 'pview alert >> modules table created (run setup_defaults.php to seed)');
+        } catch (\Throwable $e) {
+            log_message('error', 'pview alert >> ensureModulesTable failed: ' . $e->getMessage());
+        }
+    }
+
     public function module_control_panel()
     {
-        check_isvalidated();
-        check_issuperadmin();
+        check_module_access('module_control_panel', 'view');
         activity_log('module_control_panel', 'view', null, null, 'Opened Module Control Panel');
+
+        $this->ensureModulesTable();
 
         $tableExists = $this->app_model->modulePermissionsTableExists();
 
@@ -2281,29 +2986,13 @@ class App extends BaseController
                 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;");
 
                 $registry = module_registry();
-                // Iterate every role in the roles table so the first-time
-                // seed covers any custom roles the admin defined before
-                // opening the Module Control Panel. Built-in defaults
-                // come from module_registry(); custom roles fall back to
-                // all-zeros and the admin toggles them on per module.
                 $roleRows = $this->user_model->getAllRoles();
                 $defaults = [];
 
                 foreach ($roleRows as $rRow) {
                     $rKey = (string) $rRow['role_key'];
                     foreach ($registry as $mKey => $mInfo) {
-                        $defs = [0, 0, 0, 0];
-                        if (isset($mInfo['defaults'][$rKey])) {
-                            $defs = $mInfo['defaults'][$rKey];
-                        }
-                        $defaults[] = [
-                            $rKey,
-                            $mKey,
-                            $defs[0],
-                            $defs[1],
-                            $defs[2],
-                            $defs[3]
-                        ];
+                        $defaults[] = [$rKey, $mKey, 0, 0, 0, 0];
                     }
                 }
 
@@ -2319,7 +3008,7 @@ class App extends BaseController
                 }
                 $tableExists = true;
             } catch (\Throwable $e) {
-                error_log("pview alert >> modulePermissions table creation failed: " . $e->getMessage());
+                log_message('error', "pview alert >> modulePermissions table creation failed: " . $e->getMessage());
             }
         }
 
@@ -2328,9 +3017,6 @@ class App extends BaseController
             $rows = $this->app_model->modulePermissionsGetAll();
         }
 
-        // Pull the current role list from the roles table so the panel
-        // tabs (and the save handler below) cover any custom roles the
-        // admin has added under /roles.
         $rolesAll = $this->user_model->getAllRoles();
 
         $data = [
@@ -2348,17 +3034,13 @@ class App extends BaseController
 
     public function module_control_panel_save()
     {
-        check_isvalidated();
-        check_issuperadmin();
+        check_module_access('module_control_panel', 'edit');
 
         $posted = $this->request->getPost('perms');
         if (empty($posted)) {
             $posted = [];
         }
 
-        // Read the role list from the roles table — was hardcoded before.
-        // Now an admin can add a 4th role under /roles and the next save
-        // picks it up automatically.
         $roleRows = $this->user_model->getAllRoles();
         $roles = [];
         foreach ($roleRows as $rr) {
@@ -2370,6 +3052,18 @@ class App extends BaseController
             $modules[] = $mKey;
         }
 
+        $oldPermsRaw = $this->app_model->modulePermissionsGetAll();
+        $oldPerms = [];
+        foreach ($oldPermsRaw as $r) {
+            $oldPerms[$r['role']][$r['module_key']] = [
+                'view'   => (int) $r['can_view'],
+                'add'    => (int) $r['can_add'],
+                'edit'   => (int) $r['can_edit'],
+                'delete' => (int) $r['can_delete'],
+            ];
+        }
+
+        $newPermsAll = [];
         foreach ($roles as $role) {
             $rolePerms = [];
             foreach ($modules as $module) {
@@ -2393,16 +3087,207 @@ class App extends BaseController
                     $rolePerms[$module]['delete'] = 1;
                 }
             }
+            $newPermsAll[$role] = $rolePerms;
             $this->app_model->modulePermissionsSave($role, $rolePerms);
         }
 
-        error_log("pview alert >> module permissions save: by=[" . logged_user_id() . "], roles=[" . implode(',', $roles) . "]");
-        activity_log('module_control_panel', 'update', null, null,
-            'Updated module permissions for ' . count($roles) . ' role(s)',
-            ['roles' => $roles]);
+        $diff = [];
+        foreach ($newPermsAll as $role => $modulesNew) {
+            foreach ($modulesNew as $module => $newP) {
+                $oldP = $oldPerms[$role][$module] ?? ['view' => 0, 'add' => 0, 'edit' => 0, 'delete' => 0];
+                $changed = [];
+                foreach (['view', 'add', 'edit', 'delete'] as $act) {
+                    $o = (int) ($oldP[$act] ?? 0);
+                    $n = (int) ($newP[$act] ?? 0);
+                    if ($o !== $n) {
+                        $changed[$act] = $o . '→' . $n;
+                    }
+                }
+                if (!empty($changed)) {
+                    $diff[$role . '.' . $module] = $changed;
+                }
+            }
+        }
+
+        log_message('debug', "pview alert >> module permissions save: by=[" . logged_user_id() . "], roles=[" . implode(',', $roles) . "], changes=[" . count($diff) . "]");
+        activity_log(
+            'module_control_panel',
+            'update',
+            null,
+            null,
+            'Updated module permissions for ' . count($roles) . ' role(s) (' . count($diff) . ' change(s))',
+            ['roles' => $roles, 'diff' => $diff]
+        );
 
         $this->session->setFlashdata('success', 'Module permissions updated successfully.');
         return redirect()->to(site_url('module_control_panel'));
+    }
+
+    /** POST /module_control_panel/module/add — register a new custom module. */
+    public function module_add()
+    {
+        check_module_access('module_control_panel', 'add');
+
+        $moduleKey   = trim((string) $this->request->getPost('module_key'));
+        $name        = trim((string) $this->request->getPost('name'));
+        $description = trim((string) $this->request->getPost('description'));
+        $sortOrder   = (int) $this->request->getPost('sort_order');
+
+        if ($moduleKey === '' || $name === '') {
+            $this->session->setFlashdata('error', 'Module key and name are required.');
+            return redirect()->to(site_url('module_control_panel'));
+        }
+
+        if (!preg_match('/^[a-z][a-z0-9_]{1,49}$/', $moduleKey)) {
+            $this->session->setFlashdata('error', 'Module key must start with a lowercase letter and contain only lowercase letters, digits, or underscore (2-50 chars).');
+            return redirect()->to(site_url('module_control_panel'));
+        }
+
+        $existing = $this->db->table('modules')
+            ->where('module_key', $moduleKey)
+            ->countAllResults();
+        if ($existing > 0) {
+            $this->session->setFlashdata('error', 'A module with that key already exists.');
+            return redirect()->to(site_url('module_control_panel'));
+        }
+
+        if ($sortOrder < 1) {
+            $sortOrder = 100;
+        }
+
+        $this->db->table('modules')->insert([
+            'module_key'  => $moduleKey,
+            'name'        => $name,
+            'description' => $description,
+            'is_builtin'  => 0,
+            'sort_order'  => $sortOrder,
+            'created_at'  => date('Y-m-d H:i:s'),
+            'created_by'  => (string) logged_user_id(),
+        ]);
+
+        $roles = $this->user_model->getAllRoles();
+        foreach ($roles as $role) {
+            $exists = $this->db->table('module_permissions')
+                ->where('role', (string) $role['role_key'])
+                ->where('module_key', $moduleKey)
+                ->countAllResults();
+            if ($exists === 0) {
+                $this->db->table('module_permissions')->insert([
+                    'role'       => (string) $role['role_key'],
+                    'module_key' => $moduleKey,
+                    'can_view'   => 0,
+                    'can_add'    => 0,
+                    'can_edit'   => 0,
+                    'can_delete' => 0,
+                ]);
+            }
+        }
+
+        log_message('debug', "pview alert >> module_add: key=[" . $moduleKey . "], by=[" . logged_user_id() . "]");
+        activity_log(
+            'module_control_panel',
+            'module_add',
+            'module',
+            $moduleKey,
+            'Added module "' . $name . '" (' . $moduleKey . ')',
+            ['module_key' => $moduleKey, 'name' => $name, 'sort_order' => $sortOrder]
+        );
+
+        $this->session->setFlashdata('success', 'Module "' . $name . '" added. Grant role access in the permission grid above.');
+        return redirect()->to(site_url('module_control_panel'));
+    }
+
+    /** POST /module_control_panel/module/delete/(:any) — remove a custom module. */
+    public function module_delete($module_key)
+    {
+        check_module_access('module_control_panel', 'delete');
+
+        $module_key = (string) $module_key;
+        $row = $this->db->table('modules')
+            ->where('module_key', $module_key)
+            ->get()->getRowArray();
+
+        if (empty($row)) {
+            $this->session->setFlashdata('error', 'Module not found.');
+            return redirect()->to(site_url('module_control_panel'));
+        }
+
+        if ((int) $row['is_builtin'] === 1) {
+            $this->session->setFlashdata('error', 'Built-in modules cannot be deleted.');
+            return redirect()->to(site_url('module_control_panel'));
+        }
+
+        $name = (string) $row['name'];
+
+        $this->db->table('modules')->where('module_key', $module_key)->delete();
+        $this->db->table('module_permissions')->where('module_key', $module_key)->delete();
+
+        log_message('debug', "pview alert >> module_delete: key=[" . $module_key . "], by=[" . logged_user_id() . "]");
+        activity_log(
+            'module_control_panel',
+            'module_delete',
+            'module',
+            $module_key,
+            'Removed module "' . $name . '" (' . $module_key . ')',
+            ['module_key' => $module_key, 'name' => $name]
+        );
+
+        $this->session->setFlashdata('success', 'Module "' . $name . '" removed.');
+        return redirect()->to(site_url('module_control_panel'));
+    }
+
+    /** GET /cron_panel — shows last run history for all cron scripts. */
+    public function cron_panel()
+    {
+        check_module_access('cron_panel', 'view');
+        activity_log('cron_panel', 'view', null, null, 'Opened Cron Management Panel');
+
+        $tableExists = false;
+        try {
+            $this->db->query("SELECT 1 FROM `cron_runs` LIMIT 1");
+            $tableExists = true;
+        } catch (\Throwable $e) {
+            $tableExists = false;
+        }
+
+        $runs = [];
+        $scripts = [];
+        $lastRuns = [];
+
+        if ($tableExists) {
+            $runs = $this->db->table('cron_runs')
+                ->orderBy('started_at', 'desc')
+                ->limit(100)
+                ->get()->getResultArray();
+
+            $scripts = $this->db->table('cron_runs')
+                ->select('script, MAX(started_at) AS last_run')
+                ->groupBy('script')
+                ->get()->getResultArray();
+
+            foreach ($scripts as $s) {
+                $row = $this->db->table('cron_runs')
+                    ->where('script', $s['script'])
+                    ->orderBy('started_at', 'desc')
+                    ->limit(1)
+                    ->get()->getRowArray();
+                if ($row) {
+                    $lastRuns[$s['script']] = $row;
+                }
+            }
+        }
+
+        $data = [
+            'title'       => 'Cron Management',
+            'tableExists' => $tableExists,
+            'runs'        => $runs,
+            'lastRuns'    => $lastRuns,
+        ];
+
+        echo view('templates/header', $data);
+        echo view('templates/sidebar', $data);
+        echo view('cron_panel', $data);
+        echo view('templates/footer');
     }
 
     public function settings()
@@ -2433,16 +3318,13 @@ class App extends BaseController
         check_isvalidated();
         check_issuperadmin();
 
-        // app_settings.updated_by stores the user_id string post-
-        // 2026-05-21 migration. Pull it from the session directly.
         $userId  = (string) session('user_id');
         $changed = 0;
-        $changedKeys = []; // captured for activity_log meta
+        $changedKeys = [];
         $rows    = $this->app_model->settingGetAll();
         foreach ($rows as $row) {
             $key = (string) $row['setting_key'];
-            // Keys that render as number inputs, not checkboxes — never treat as bool
-            // even if their current value happens to be 0 or 1.
+            // These are numeric inputs, not checkboxes — never coerce to bool.
             static $numericKeys = [
                 'password_min_length',
                 'password_rotate_days',
@@ -2457,7 +3339,6 @@ class App extends BaseController
                 'default_tat_l4_minutes',
                 'datatable_page_length',
             ];
-            // Checkboxes in HTML only POST when checked; missing key = unchecked.
             $isBool = in_array((string) $row['setting_value'], ['0', '1'], true)
                 && !in_array($key, $numericKeys, true);
 
@@ -2476,7 +3357,6 @@ class App extends BaseController
             if ((string) $val !== (string) $row['setting_value']) {
                 $this->app_model->settingSet($key, $val, $userId);
                 $changed++;
-                // Mask sensitive values (SMTP password etc) in the audit row.
                 $oldVal = (string) $row['setting_value'];
                 $newVal = (string) $val;
                 if (stripos($key, 'pass') !== false || stripos($key, 'secret') !== false) {
@@ -2488,9 +3368,15 @@ class App extends BaseController
         }
 
         if ($changed > 0) {
-            app_settings_clear_cache(); // flush cache so new value takes effect immediately
-            activity_log('settings', 'update', null, null,
-                'Updated ' . $changed . ' setting(s)', $changedKeys);
+            app_settings_clear_cache();
+            activity_log(
+                'settings',
+                'update',
+                null,
+                null,
+                'Updated ' . $changed . ' setting(s)',
+                $changedKeys
+            );
             $this->session->setFlashdata('success', $changed . ' setting(s) saved.');
         } else {
             $this->session->setFlashdata('success', 'No changes to save.');
@@ -2510,34 +3396,40 @@ class App extends BaseController
             return json_fail('Your account has no email address on file.');
         }
 
-        // Force a fresh read of app_settings so a save that just happened
-        // is reflected in the test.
         app_settings_clear_cache();
 
         $subject = '[pView] SMTP test from ' . app_setting('app_name', 'pView');
         $body    = '<p>This is a test email sent from the pView Alert System Settings page.</p>'
-                 . '<p>Time: ' . esc(date('Y-m-d H:i:s')) . '</p>'
-                 . '<p>If you received it, the saved SMTP settings work.</p>';
+            . '<p>Time: ' . esc(date('Y-m-d H:i:s')) . '</p>'
+            . '<p>If you received it, the saved SMTP settings work.</p>';
 
         $ok = send_email($to, $subject, $body);
         if ($ok) {
-            error_log('pview alert >> settings_send_test_email OK: to=[' . $to . '], by=[' . logged_user_id() . ']');
-            activity_log('settings', 'send_test_email', null, null,
-                'Sent test email to ' . $to, ['to' => $to]);
+            log_message('debug', 'pview alert >> settings_send_test_email OK: to=[' . $to . '], by=[' . logged_user_id() . ']');
+            activity_log(
+                'settings',
+                'send_test_email',
+                null,
+                null,
+                'Sent test email to ' . $to,
+                ['to' => $to]
+            );
             return json_ok([], 'Test email sent to ' . $to . '. Check your inbox in a minute.');
         }
-        error_log('pview alert >> settings_send_test_email FAILED: to=[' . $to . ']');
-        activity_log('settings', 'send_test_email', null, null,
-            'Test email FAILED to ' . $to, ['to' => $to],
-            ['status' => 'fail']);
+        log_message('error', 'pview alert >> settings_send_test_email FAILED: to=[' . $to . ']');
+        activity_log(
+            'settings',
+            'send_test_email',
+            null,
+            null,
+            'Test email FAILED to ' . $to,
+            ['to' => $to],
+            ['status' => 'fail']
+        );
         return json_fail('Send failed. Check writable/logs/log-*.php for the SMTP error.');
     }
 
-    /** POST /settings/bump_asset_version — one-click cache-buster.
-     *  Reads the current asset_version from app_settings, adds 1, writes
-     *  it back, flushes the settings cache so the new ?v= is in effect
-     *  on the very next page render. Used by the Bump button in the
-     *  Assets group on the Settings page. */
+    /** POST /settings/bump_asset_version — increments asset_version to bust browser caches. */
     public function settings_bump_asset_version()
     {
         check_isvalidated();
@@ -2554,9 +3446,14 @@ class App extends BaseController
         $this->app_model->settingSet('asset_version', (string) $next, $userId);
         app_settings_clear_cache();
 
-        activity_log('settings', 'bump_asset_version', null, null,
+        activity_log(
+            'settings',
+            'bump_asset_version',
+            null,
+            null,
             'Bumped asset_version ' . $current . ' → ' . $next,
-            ['from' => $current, 'to' => $next]);
+            ['from' => $current, 'to' => $next]
+        );
 
         return json_ok(['value' => $next], 'Asset version bumped to ' . $next . '. Refresh once to pull the new files.');
     }
@@ -2567,32 +3464,23 @@ class App extends BaseController
         check_module_access('activity_logs', 'view');
         activity_log('activity_logs', 'view', null, null, 'Opened Activity Log viewer');
 
-        // Dropdown options come from the DB so the filter list stays in sync
-        // with whatever modules / actions / users have actually fired so far.
-        $modules = [];
-        $modRows = $this->db->table('activity_logs')
-            ->select('module')->distinct()->orderBy('module', 'asc')
-            ->get()->getResultArray();
-        foreach ($modRows as $r) {
-            if (!empty($r['module'])) {
-                $modules[] = (string) $r['module'];
-            }
-        }
+        $modules  = $this->app_model->activityLogsDistinctValues('module');
+        $actions  = $this->app_model->activityLogsDistinctValues('action');
+        $roles    = $this->app_model->activityLogsDistinctValues('user_role');
+        $statuses = ['success', 'fail'];
+        $projects = $this->app_model->activityLogsProjectsForFilter();
 
-        $actions = [];
-        $actRows = $this->db->table('activity_logs')
-            ->select('action')->distinct()->orderBy('action', 'asc')
-            ->get()->getResultArray();
-        foreach ($actRows as $r) {
-            if (!empty($r['action'])) {
-                $actions[] = (string) $r['action'];
-            }
-        }
+        $canAnalytics = (logged_user_role() === 'super_admin')
+            || has_module_access('activity_logs', 'analytics');
 
         $data = [
-            'title'   => 'Activity Log',
-            'modules' => $modules,
-            'actions' => $actions,
+            'title'        => 'Activity Log',
+            'modules'      => $modules,
+            'actions'      => $actions,
+            'roles'        => $roles,
+            'statuses'     => $statuses,
+            'projects'     => $projects,
+            'canAnalytics' => $canAnalytics,
         ];
         echo view('templates/header', $data);
         echo view('templates/sidebar', $data);
@@ -2605,10 +3493,6 @@ class App extends BaseController
     {
         check_module_access('activity_logs', 'view');
 
-        // Whitelist of orderable columns — DataTables sends an index, we
-        // map it to a known column to keep the SQL safe. Login / Logout
-        // are derived per-row and therefore non-orderable; the JS column
-        // config marks them orderable:false so they never reach here.
         $colMap = [
             0 => 'created_at',
             1 => 'user_name',
@@ -2622,6 +3506,9 @@ class App extends BaseController
         $fUser    = trim((string) $this->request->getGet('f_user'));
         $fModule  = trim((string) $this->request->getGet('f_module'));
         $fAction  = trim((string) $this->request->getGet('f_action'));
+        $fRole    = trim((string) $this->request->getGet('f_role'));
+        $fStatus  = trim((string) $this->request->getGet('f_status'));
+        $fProject = trim((string) $this->request->getGet('f_project'));
         $fFrom    = trim((string) $this->request->getGet('f_from'));
         $fTo      = trim((string) $this->request->getGet('f_to'));
 
@@ -2637,6 +3524,15 @@ class App extends BaseController
         }
         if ($fAction !== '') {
             $builder->where('action', $fAction);
+        }
+        if ($fRole !== '') {
+            $builder->where('user_role', $fRole);
+        }
+        if ($fStatus !== '') {
+            $builder->where('status', $fStatus);
+        }
+        if ($fProject !== '') {
+            $builder->like('meta', $fProject);
         }
         if ($fFrom !== '') {
             $builder->where('created_at >=', $fFrom . ' 00:00:00');
@@ -2658,9 +3554,7 @@ class App extends BaseController
                 ->groupEnd();
         }
 
-        // Total (unfiltered) count for DataTables footer — separate query.
-        $total = (int) $this->db->table('activity_logs')->countAllResults();
-        // Filtered count uses the same builder; clone before pagination.
+        $total    = (int) $this->db->table('activity_logs')->countAllResults();
         $filtered = (int) $builder->countAllResults(false);
 
         $rows = $builder
@@ -2668,10 +3562,7 @@ class App extends BaseController
             ->limit($params['length'], $params['start'])
             ->get()->getResultArray();
 
-        // Build a per-user login/logout map for just the user_ids visible
-        // on the current page. One batch query (instead of two subqueries
-        // per row) keeps the viewer fast even on long tables. The login/
-        // logout indexes on (user_id, created_at) cover this WHERE.
+        // Batch-build the per-user login/logout map for session-window display.
         $userIdsInPage = [];
         foreach ($rows as $r) {
             if (!empty($r['user_id'])) {
@@ -2721,43 +3612,7 @@ class App extends BaseController
                 $statusBadge = ' <span class="badge bg-danger">FAIL</span>';
             }
 
-            // Augment the modal payload with row-level metadata that is no
-            // longer surfaced in the table itself (IP, user-agent, URL, method)
-            // so investigators can still drill in via the info icon.
-            $metaForModal = [];
-            if (!empty($r['meta'])) {
-                $decoded = json_decode((string) $r['meta'], true);
-                if (is_array($decoded)) {
-                    $metaForModal = $decoded;
-                }
-            }
-            if (!empty($r['ip_address'])) {
-                $metaForModal['_ip'] = (string) $r['ip_address'];
-            }
-            if (!empty($r['user_agent'])) {
-                $metaForModal['_user_agent'] = (string) $r['user_agent'];
-            }
-            if (!empty($r['url'])) {
-                $metaForModal['_url'] = (string) $r['url'];
-            }
-            if (!empty($r['method'])) {
-                $metaForModal['_method'] = (string) $r['method'];
-            }
-            $metaTip = '';
-            if (!empty($metaForModal)) {
-                $metaJson = json_encode($metaForModal);
-                if ($metaJson !== false) {
-                    $metaTip = ' <i class="bi bi-info-circle text-muted activity-meta-toggle" '
-                            . 'data-meta="' . esc($metaJson) . '" '
-                            . 'title="Click for details" style="cursor:pointer;"></i>';
-                }
-            }
 
-            // Find the session window this event belongs to: the most
-            // recent login at-or-before created_at, and the earliest
-            // logout at-or-after created_at. Both come from $sessions
-            // (sorted ascending), so we walk linearly. Subtracting login
-            // from logout gives session duration for analytics.
             $loginAt  = null;
             $logoutAt = null;
             $eventTs  = (string) $r['created_at'];
@@ -2776,10 +3631,7 @@ class App extends BaseController
                         break;
                     }
                 }
-                // If the next logout actually predates the matched login,
-                // the event sits between sessions (e.g. legacy data with
-                // no login row) — discard the logout to avoid misleading
-                // pairings.
+                // Discard logout if it predates the matched login (event sits between sessions).
                 if ($loginAt !== null && $logoutAt !== null && $logoutAt < $loginAt) {
                     $logoutAt = null;
                 }
@@ -2794,15 +3646,40 @@ class App extends BaseController
                 $logoutCell = '<span title="' . esc($logoutAt) . '">' . esc(substr($logoutAt, 11, 8)) . '</span>';
             }
 
+            $ua  = strtolower((string) ($r['user_agent'] ?? ''));
+            $mod = strtolower((string) ($r['module'] ?? ''));
+            if ($mod === 'api' || preg_match('/curl|python|java(?!script)|go-http|ruby|axios|requests|okhttp|httpie|wget|postman|insomnia/i', $ua)) {
+                $srcLabel = 'API';
+                $srcClass = 'bg-warning text-dark';
+                $srcIcon  = 'bi-braces';
+            } elseif (preg_match('/android|iphone|ipad|mobile|tablet/i', $ua)) {
+                $srcLabel = 'Mobile';
+                $srcClass = 'bg-info text-dark';
+                $srcIcon  = 'bi-phone';
+            } elseif ($ua !== '') {
+                $srcLabel = 'Web';
+                $srcClass = 'bg-primary';
+                $srcIcon  = 'bi-globe';
+            } else {
+                $srcLabel = '—';
+                $srcClass = '';
+                $srcIcon  = '';
+            }
+            $sourceCell = '<span class="text-muted">—</span>';
+            if ($srcLabel !== '—') {
+                $sourceCell = '<span class="badge ' . $srcClass . '"><i class="bi ' . $srcIcon . ' me-1"></i>' . $srcLabel . '</span>';
+            }
+
             $data[] = [
                 'created_at'  => esc((string) $r['created_at']),
                 'user'        => $userLabel,
                 'module'      => '<span class="badge bg-secondary">' . esc($r['module']) . '</span>',
                 'action'      => '<span class="badge bg-info text-dark">' . esc($r['action']) . '</span>' . $statusBadge,
                 'entity'      => $entityLabel,
-                'summary'     => esc((string) $r['summary']) . $metaTip,
+                'summary'     => esc((string) $r['summary']),
                 'login'       => $loginCell,
                 'logout'      => $logoutCell,
+                'source'      => $sourceCell,
             ];
         }
 
@@ -2820,6 +3697,9 @@ class App extends BaseController
         $fUser    = trim((string) $this->request->getGet('f_user'));
         $fModule  = trim((string) $this->request->getGet('f_module'));
         $fAction  = trim((string) $this->request->getGet('f_action'));
+        $fRole    = trim((string) $this->request->getGet('f_role'));
+        $fStatus  = trim((string) $this->request->getGet('f_status'));
+        $fProject = trim((string) $this->request->getGet('f_project'));
         $fFrom    = trim((string) $this->request->getGet('f_from'));
         $fTo      = trim((string) $this->request->getGet('f_to'));
         $fSearch  = trim((string) $this->request->getGet('q'));
@@ -2836,6 +3716,15 @@ class App extends BaseController
         }
         if ($fAction !== '') {
             $builder->where('action', $fAction);
+        }
+        if ($fRole   !== '') {
+            $builder->where('user_role', $fRole);
+        }
+        if ($fStatus !== '') {
+            $builder->where('status', $fStatus);
+        }
+        if ($fProject !== '') {
+            $builder->like('meta', $fProject);
         }
         if ($fFrom !== '') {
             $builder->where('created_at >=', $fFrom . ' 00:00:00');
@@ -2912,13 +3801,241 @@ class App extends BaseController
         // Audit the audit-export itself so an admin downloading the trail
         // also leaves a row behind. Won't appear in *this* CSV (already
         // streamed) but lands in the next export / live viewer.
-        activity_log('activity_logs', 'export', null, null,
+        activity_log(
+            'activity_logs',
+            'export',
+            null,
+            null,
             'Exported ' . count($rows) . ' activity rows to CSV',
             ['row_count' => count($rows), 'filters' => [
-                'user' => $fUser, 'module' => $fModule, 'action' => $fAction,
-                'from' => $fFrom, 'to' => $fTo, 'search' => $fSearch,
-            ]]);
+                'user' => $fUser,
+                'module' => $fModule,
+                'action' => $fAction,
+                'from' => $fFrom,
+                'to' => $fTo,
+                'search' => $fSearch,
+            ]]
+        );
         exit;
+    }
+
+    /** GET /activity_logs/analytics — JSON analytics summary for the Analytics tab.
+     *  Visible to super_admin by default; other roles need the 'analytics'
+     *  action granted on activity_logs in the Module Control Panel. */
+    public function activity_logs_analytics()
+    {
+        if (logged_user_role() !== 'super_admin' && !has_module_access('activity_logs', 'analytics')) {
+            return json_fail('Access denied', 403);
+        }
+
+        $fFrom = trim((string) $this->request->getGet('f_from'));
+        $fTo   = trim((string) $this->request->getGet('f_to'));
+
+        // Default to last 30 days when no range is supplied.
+        if ($fFrom === '') {
+            $fFrom = date('Y-m-d', strtotime('-30 days'));
+        }
+        if ($fTo === '') {
+            $fTo = date('Y-m-d');
+        }
+
+        $fromTs = $fFrom . ' 00:00:00';
+        $toTs   = $fTo   . ' 23:59:59';
+
+        // --- Login / logout / failure stats ---
+        $authRows = $this->db->table('activity_logs')
+            ->select('action, DATE(created_at) as day, COUNT(*) as cnt')
+            ->where('module', 'auth')
+            ->where('created_at >=', $fromTs)
+            ->where('created_at <=', $toTs)
+            ->groupBy('action, DATE(created_at)')
+            ->get()->getResultArray();
+
+        $today    = date('Y-m-d');
+        $weekAgo  = date('Y-m-d', strtotime('-7 days'));
+
+        $authStats = [
+            'logins_today'   => 0,
+            'logins_week'    => 0,
+            'logins_period'  => 0,
+            'failed_today'   => 0,
+            'failed_week'    => 0,
+            'failed_period'  => 0,
+            'logouts_period' => 0,
+        ];
+        foreach ($authRows as $a) {
+            $isToday = ($a['day'] === $today);
+            $isWeek  = ($a['day'] >= $weekAgo);
+            $cnt     = (int) $a['cnt'];
+            if ($a['action'] === 'login') {
+                $authStats['logins_period'] += $cnt;
+                if ($isWeek) {
+                    $authStats['logins_week']  += $cnt;
+                }
+                if ($isToday) {
+                    $authStats['logins_today'] += $cnt;
+                }
+            } elseif ($a['action'] === 'login_failed') {
+                $authStats['failed_period'] += $cnt;
+                if ($isWeek) {
+                    $authStats['failed_week']  += $cnt;
+                }
+                if ($isToday) {
+                    $authStats['failed_today'] += $cnt;
+                }
+            } elseif ($a['action'] === 'logout') {
+                $authStats['logouts_period'] += $cnt;
+            }
+        }
+
+        // --- Top 10 active users by event count ---
+        $topUsers = $this->db->table('activity_logs')
+            ->select('user_id, user_name, user_role, COUNT(*) as event_count, MAX(created_at) as last_seen')
+            ->where('created_at >=', $fromTs)
+            ->where('created_at <=', $toTs)
+            ->where('user_id IS NOT NULL')
+            ->groupBy('user_id, user_name, user_role')
+            ->orderBy('event_count', 'desc')
+            ->limit(10)
+            ->get()->getResultArray();
+
+        // --- Module usage breakdown ---
+        $moduleUsage = $this->db->table('activity_logs')
+            ->select('module, COUNT(*) as cnt')
+            ->where('created_at >=', $fromTs)
+            ->where('created_at <=', $toTs)
+            ->groupBy('module')
+            ->orderBy('cnt', 'desc')
+            ->get()->getResultArray();
+
+        // --- Action breakdown ---
+        $actionBreakdown = $this->db->table('activity_logs')
+            ->select('action, COUNT(*) as cnt')
+            ->where('created_at >=', $fromTs)
+            ->where('created_at <=', $toTs)
+            ->groupBy('action')
+            ->orderBy('cnt', 'desc')
+            ->limit(15)
+            ->get()->getResultArray();
+
+        // --- Failed events (last 30 in period) ---
+        $failedRaw = $this->db->table('activity_logs')
+            ->select('created_at, user_id, user_name, user_role, module, action, summary, user_agent')
+            ->where('status', 'fail')
+            ->where('created_at >=', $fromTs)
+            ->where('created_at <=', $toTs)
+            ->orderBy('created_at', 'desc')
+            ->limit(30)
+            ->get()->getResultArray();
+
+        $failedEvents = [];
+        foreach ($failedRaw as $fe) {
+            $ua  = strtolower((string) ($fe['user_agent'] ?? ''));
+            $mod = strtolower((string) ($fe['module'] ?? ''));
+            if ($mod === 'api' || preg_match('/curl|python|java(?!script)|go-http|ruby|axios|requests|okhttp|httpie|wget|postman|insomnia/i', $ua)) {
+                $source = 'API';
+            } elseif (preg_match('/android|iphone|ipad|mobile|tablet/i', $ua)) {
+                $source = 'Mobile';
+            } elseif ($ua !== '') {
+                $source = 'Web';
+            } else {
+                $source = 'Unknown';
+            }
+            $fe['source'] = $source;
+            unset($fe['user_agent']);
+            $failedEvents[] = $fe;
+        }
+
+        // --- Average session duration per user (login → next logout) ---
+        // Pull all login/logout pairs for the period and compute in PHP.
+        $sessionRows = $this->db->table('activity_logs')
+            ->select('user_id, user_name, action, created_at')
+            ->whereIn('action', ['login', 'logout'])
+            ->where('created_at >=', $fromTs)
+            ->where('created_at <=', $toTs)
+            ->where('user_id IS NOT NULL')
+            ->orderBy('user_id')->orderBy('created_at')
+            ->get()->getResultArray();
+
+        $userSessions = [];
+        foreach ($sessionRows as $s) {
+            $uid = (string) $s['user_id'];
+            if (!isset($userSessions[$uid])) {
+                $userSessions[$uid] = ['name' => (string) $s['user_name'], 'logins' => [], 'logouts' => []];
+            }
+            $userSessions[$uid][$s['action'] === 'login' ? 'logins' : 'logouts'][] = strtotime($s['created_at']);
+        }
+
+        $sessionAvg = [];
+        foreach ($userSessions as $uid => $sd) {
+            $durations = [];
+            $logoutIdx = 0;
+            foreach ($sd['logins'] as $loginTs) {
+                while ($logoutIdx < count($sd['logouts']) && $sd['logouts'][$logoutIdx] < $loginTs) {
+                    $logoutIdx++;
+                }
+                if ($logoutIdx < count($sd['logouts'])) {
+                    $durations[] = $sd['logouts'][$logoutIdx] - $loginTs;
+                    $logoutIdx++;
+                }
+            }
+            if (!empty($durations)) {
+                $avgSec = (int) (array_sum($durations) / count($durations));
+                $sessionAvg[] = [
+                    'user_id'       => $uid,
+                    'user_name'     => $sd['name'],
+                    'avg_minutes'   => round($avgSec / 60, 1),
+                    'session_count' => count($durations),
+                ];
+            }
+        }
+        usort($sessionAvg, function ($a, $b) {
+            return $b['avg_minutes'] <=> $a['avg_minutes'];
+        });
+
+        return json_ok([
+            'period'          => ['from' => $fFrom, 'to' => $fTo],
+            'auth'            => $authStats,
+            'top_users'       => array_values($topUsers),
+            'modules'         => array_values($moduleUsage),
+            'actions'         => array_values($actionBreakdown),
+            'failed'          => array_values($failedEvents),
+            'session_avg'     => array_slice($sessionAvg, 0, 10),
+        ]);
+    }
+
+    /** GET /activity_logs/user_events?user_id=X — all events for a
+     *  specific user, used by the drilldown modal in the Analytics tab. */
+    public function activity_logs_user_events()
+    {
+        if (logged_user_role() !== 'super_admin' && !has_module_access('activity_logs', 'analytics')) {
+            return json_fail('Access denied', 403);
+        }
+
+        $userId = trim((string) $this->request->getGet('user_id'));
+        if ($userId === '') {
+            return json_fail('user_id required');
+        }
+
+        $rows = $this->db->table('activity_logs')
+            ->select('created_at, module, action, entity_type, entity_id, summary, status')
+            ->where('user_id', $userId)
+            ->orderBy('created_at', 'desc')
+            ->get()->getResultArray();
+
+        $stats = $this->db->table('activity_logs')
+            ->select('COUNT(*) as total, MAX(created_at) as last_seen, user_name, user_role')
+            ->where('user_id', $userId)
+            ->get()->getRowArray();
+
+        return json_ok([
+            'user_id' => $userId,
+            'user_name' => $stats['user_name'] ?? $userId,
+            'user_role' => $stats['user_role'] ?? '',
+            'total_events' => (int) ($stats['total'] ?? 0),
+            'last_seen' => $stats['last_seen'] ?? '',
+            'events' => array_values($rows),
+        ]);
     }
 
     /** GET /projects/data_table */
@@ -2970,17 +4087,14 @@ class App extends BaseController
     {
         check_module_access('flows', 'view');
 
-        // Visible columns: Name | Project | States | Status | Created By | Created | Actions
-        // States count and Created By are not first-class sort keys here;
-        // fall back to f.name for those.
         $colMap = [
             0 => 'f.name',
             1 => 'p.name',
-            2 => 'f.name',         // States count — fallback
+            2 => 'f.name',
             3 => 'f.status',
-            4 => 'f.name',         // Created By — fallback
+            4 => 'f.name',
             5 => 'f.created_at',
-            6 => 'f.name',         // Actions — fallback
+            6 => 'f.name',
         ];
         $params = dt_parse_request($this->request, $colMap);
         $result = $this->app_model->flowsForDT($params);
@@ -3016,16 +4130,14 @@ class App extends BaseController
     {
         check_module_access('alerts', 'view');
 
-        // Visible columns: Name | Project | Flow | Severity | Threshold | Active | Actions
-        // Flow and Threshold aren't first-class sort keys; fall back to a.name.
         $colMap = [
             0 => 'a.name',
             1 => 'p.name',
-            2 => 'a.name',          // Flow — fallback
+            2 => 'a.name',
             3 => 'a.alert_type',
-            4 => 'a.name',          // Threshold — fallback
+            4 => 'a.name',
             5 => 'a.is_active',
-            6 => 'a.name',          // Actions — fallback
+            6 => 'a.name',
         ];
         $params = dt_parse_request($this->request, $colMap);
         $result = $this->app_model->alertsForDT($params);

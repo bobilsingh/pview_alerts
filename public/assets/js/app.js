@@ -1,8 +1,8 @@
-// app.js — pView Alert System
+// ============================================================
+// 01. GLOBALS & CONFIG
+// ============================================================
 
-// -------------------------------------------------------
-// Global colour palette used by charts
-// -------------------------------------------------------
+// Shared colour tokens — used by Chart.js and SVG utilities.
 var APP_COLORS = {
   primary: "#0EA5E9",
   primaryDark: "#0284C7",
@@ -14,9 +14,7 @@ var APP_COLORS = {
   border: "#E2E8F0",
 };
 
-// -------------------------------------------------------
-// Global state
-// -------------------------------------------------------
+// Page-level jQuery handles and shared state vars.
 var tatTimer = null;
 var $appDocument = $(document);
 var $appWindow = $(window);
@@ -24,11 +22,12 @@ var $appHtml = $("html");
 var $appBody = $("body");
 var APP_MOBILE_BREAKPOINT = "(max-width: 992px)";
 
-// -------------------------------------------------------
-// localStorage helpers
-// localStorage may throw in private-mode / cross-origin iframes.
-// -------------------------------------------------------
-function readPref(key) {
+// ============================================================
+// 02. UTILITY HELPERS
+// ============================================================
+
+// localStorage wrappers — silent in private-mode / cross-origin iframes.
+function getLocalPref(key) {
   try {
     return localStorage.getItem(key);
   } catch (error) {
@@ -36,7 +35,7 @@ function readPref(key) {
   }
 }
 
-function writePref(key, value) {
+function saveLocalPref(key, value) {
   try {
     localStorage.setItem(key, value);
   } catch (error) {
@@ -44,19 +43,12 @@ function writePref(key, value) {
   }
 }
 
-// -------------------------------------------------------
-// Utility Helpers
-// -------------------------------------------------------
+// General utility functions used across all modules.
 function escapeHtml(text) {
   if (text == null) {
     return "";
   }
-  return String(text)
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#39;");
+  return String(text).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
 }
 
 function getArrayFromText(value, separator) {
@@ -67,7 +59,7 @@ function getArrayFromText(value, separator) {
 }
 
 function getNumberArrayFromText(value) {
-  var separator = (value && value.indexOf("||") !== -1) ? "||" : ",";
+  var separator = value && value.indexOf("||") !== -1 ? "||" : ",";
   var parts = getArrayFromText(value, separator);
   var out = [];
   var i;
@@ -93,7 +85,7 @@ function showError(message) {
   }
 }
 
-function getResponseMessage(response, fallback) {
+function extractErrorMessage(response, fallback) {
   if (response && response.message) {
     return response.message;
   }
@@ -103,16 +95,8 @@ function getResponseMessage(response, fallback) {
   return fallback || "An error occurred";
 }
 
-// Shared AJAX response handler. Returns true when the server reported
-// success (and shows the success toast as a side effect), false on
-// failure (and shows the error toast). Used by submitNormalForm,
-// submitFileForm, bindPostButton and ad-hoc inline AJAX call sites that
-// want consistent toast feedback without duplicating the envelope check.
-//
-// Previously called from three places but never defined — every comment
-// submit / form post was throwing "handleAjaxResponse is not defined"
-// even though the server-side write had already succeeded.
-function handleAjaxResponse(response, successMessage) {
+// Shared AJAX response handler.
+function handleResponse(response, successMessage) {
   if (response && response.success) {
     var msg = successMessage;
     if (response.message) {
@@ -124,11 +108,12 @@ function handleAjaxResponse(response, successMessage) {
     showSuccess(msg);
     return true;
   }
-  showError(getResponseMessage(response, "Request failed"));
+  showError(extractErrorMessage(response, "Request failed"));
   return false;
 }
 
-function app_setting_int(key) {
+// Reads an integer from a <meta name="app-setting-*"> tag set by the PHP header.
+function getSettingInt(key) {
   var $el = $("meta[name='app-setting-" + key + "']");
   if ($el.length) {
     return parseInt($el.attr("content"), 10) || 0;
@@ -136,25 +121,28 @@ function app_setting_int(key) {
   return 0;
 }
 
-function getDefaultPageLength() {
-  var pageLength = app_setting_int("datatable_page_length");
-  if (pageLength > 0) {
-    return pageLength;
+// Converts "1", "true", true, 1 → true; everything else → false.
+function toBoolean(val) {
+  if (val === true || val === 1 || val === "1" || val === "true") {
+    return true;
   }
-  return 10;
+  return false;
 }
 
-// -------------------------------------------------------
-// Run setup that does not need the page body to be ready
-// -------------------------------------------------------
-function applyInitialPreferences() {
-  if (readPref("pview-sidebar") === "collapsed") {
+// ============================================================
+// 03. TOAST NOTIFICATIONS
+// ============================================================
+
+// Applies saved theme + sidebar state before the page renders (no flash).
+// Default is collapsed; expanded only when the user has explicitly chosen it.
+function applyUserPreferences() {
+  if (getLocalPref("pview-sidebar") === "collapsed") {
     $appHtml.attr("data-sidebar", "collapsed");
   } else {
     $appHtml.attr("data-sidebar", "expanded");
   }
 
-  var t = readPref("noc-theme") || "dark";
+  var t = getLocalPref("noc-theme") || "dark";
   $appHtml.attr("data-theme", t);
 }
 
@@ -170,53 +158,112 @@ function setupToastr() {
   };
 }
 
-applyInitialPreferences();
+// ============================================================
+// 27. PAGE INIT
+// ============================================================
+
+// Run immediately (before DOM ready) to prevent flash of wrong theme/sidebar.
+applyUserPreferences();
 setupToastr();
 setupChartDefaults();
-setupDataTablesDefaults();
 
-// -------------------------------------------------------
-// Run page setup after the HTML is ready
-// -------------------------------------------------------
+// Wire up every module after the DOM is ready.
 $appDocument.ready(function () {
-  initThemeToggle();
+  // Apply DataTables global language defaults (defined in datatable.js).
+  setupDataTablesDefaults();
+
+  // Auto-dismiss flash alerts (success / danger / warning) after 30 seconds.
+  var $flashAlerts = $(".alert-success, .alert-danger, .alert-warning").filter(".alert-dismissible");
+  if ($flashAlerts.length) {
+    setTimeout(function () {
+      $flashAlerts.each(function () {
+        var $a = $(this);
+        if ($a.is(":visible")) {
+          $a.fadeTo(500, 0, function () {
+            $(this).alert("close");
+          });
+        }
+      });
+    }, 15000);
+  }
+
+  // --- Layout ---
+  initThemeSwitch();
+  initSidebarMenu();
+  initSidebarScrollSave();
+  initSearchHotkey();
+
+  // --- Date range widget ---
+  initDateRangeWidgets();
+
+  // --- Forms & UI ---
+  initFormValidation();
   initConfirmForms();
   initConfirmLinks();
   initCustomTooltips();
-  initSimpleTables();
-  initServerSideListTables();
-  initTicketsTable();
+  initLoadingForms();
+  initCharCount();
+  initUnsavedFormWarning();
+  initCapsLockAlert();
+  initPasswordToggle();
+
+  // --- Dropdowns ---
   initSelectFields();
   initAjaxSelectLoaders();
-  initTatCountdowns();
+
+  // --- Data Tables ---
+  initSimpleTables();
+  initListTables();
+  initTicketsTable();
+
+  // --- Dashboard ---
   initTrendCharts();
   initSeverityCharts();
+  initTatCountdowns();
+
+  // --- Tickets ---
   initCopyButtons();
-  initTicketActions();
-  initFlowMermaid();
-  initStateSorter();
-  initPasswordToggle();
-  initLoadingForms();
-  initUserIdLiveCheck();
-  initSidebarToggle();
-  initSearchShortcut();
-  initCharCounters();
-  initDirtyFormGuard();
-  initCapsLockWarning();
-  initBellDropdown();
-  initBellLivePoll();
+  initTicketCreatePage();
+  initTicketDetailPage();
   initBulkActions();
+  initListReopenButtons();
   initSavedFilters();
   initTrendRangePicker();
   initTicketsAjaxFilters();
-  initMentionAutocomplete();
+
+  // --- Flows ---
+  initFlowVis();
+  initStateSorter();
+  initTransitionsDesigner();
+  initMoveStateTypedForms();
+
+  // --- Notifications ---
+  initBellDropdown();
+  startBellPoll();
+
+  // --- Users ---
+  initUserIdLiveCheck();
+
+  // --- Settings ---
   initSendTestEmail();
   initBumpAssetVersion();
-  initActivityLogsTable();
-  initSidebarScrollPersist();
+
+  // --- Activity Logs ---
+  initAuditLogTable();
+  initAnalyticsTab();
+
+  // --- Mentions ---
+  initMentionAutocomplete();
+
+  // --- Auto logout on idle ---
+  initAutoLogout();
 });
 
-function confirmAction(message, callback) {
+// ============================================================
+// 04. CONFIRM DIALOGS
+// ============================================================
+
+function confirmDialog(message, callback) {
   if (typeof Swal === "undefined") {
     if (window.confirm(message)) {
       callback();
@@ -255,11 +302,9 @@ function initConfirmLinks() {
 
     event.preventDefault();
 
-    confirmAction(message, function () {
+    confirmDialog(message, function () {
       if (method === "post") {
-        var $form = $("<form></form>")
-          .attr({ method: "post", action: href })
-          .css({ display: "none" });
+        var $form = $("<form></form>").attr({ method: "post", action: href }).css({ display: "none" });
         $("body").append($form);
         $form[0].submit();
         return;
@@ -280,192 +325,15 @@ function initConfirmForms() {
 
     event.preventDefault();
 
-    confirmAction(message, function () {
+    confirmDialog(message, function () {
       form.submit();
     });
   });
 }
 
-// --- DATATABLES ---
-
-function setupDataTablesDefaults() {
-  if (typeof $.fn === "undefined" || !$.fn.dataTable) {
-    return;
-  }
-
-  $.extend(true, $.fn.dataTable.defaults, {
-    language: {
-      processing: '<span class="dt-dots" role="status" aria-label="Loading"><span class="dt-dot"></span><span class="dt-dot"></span><span class="dt-dot"></span></span>',
-      emptyTable: '<div class="dt-empty"><i class="bi bi-inbox"></i><div class="dt-empty-title">Nothing here yet</div><div class="dt-empty-hint">Use the "Add" button above to create your first record.</div></div>',
-      zeroRecords: '<div class="dt-empty"><i class="bi bi-search"></i><div class="dt-empty-title">No matching records</div><div class="dt-empty-hint">Try a different search term or clear the filters.</div></div>',
-    },
-  });
-}
-
-// Registry of DataTable jQuery objects — used by adjustAllDataTables().
-var dtRegistry = [];
-
-function registerDataTableForAdjust($table) {
-  var tableNode;
-  var i;
-
-  if (!$table || !$table.length) {
-    return;
-  }
-
-  tableNode = $table[0];
-  for (i = 0; i < dtRegistry.length; i++) {
-    if (dtRegistry[i][0] === tableNode) {
-      return;
-    }
-  }
-  dtRegistry.push($table);
-}
-
-function adjustAllDataTables() {
-  var i;
-  var $t;
-
-  if (typeof $.fn.DataTable === "undefined") {
-    return;
-  }
-
-  for (i = 0; i < dtRegistry.length; i++) {
-    $t = dtRegistry[i];
-    if (!$t || !$t.length) {
-      continue;
-    }
-    if (!$.fn.DataTable.isDataTable($t[0])) {
-      continue;
-    }
-    $t.DataTable().columns.adjust();
-  }
-}
-
-// Re-align column widths on window resize and sidebar toggle.
-// Uses requestAnimationFrame to debounce the resize event.
-var dtAdjustPending = null;
-
-function initDataTableAutoAdjust() {
-  $appWindow.off("resize.dataTableAdjust").on("resize.dataTableAdjust", function () {
-    if (dtAdjustPending !== null) {
-      return;
-    }
-    if (window.requestAnimationFrame) {
-      dtAdjustPending = window.requestAnimationFrame(function () {
-        dtAdjustPending = null;
-        adjustAllDataTables();
-      });
-    } else {
-      dtAdjustPending = window.setTimeout(function () {
-        dtAdjustPending = null;
-        adjustAllDataTables();
-      }, 16);
-    }
-  });
-
-  $appDocument.off("click.dataTableAdjust").on("click.dataTableAdjust", "#sidebarToggle, [data-sidebar-toggle]", function () {
-    window.setTimeout(adjustAllDataTables, 300);
-  });
-}
-
-// Common wrapper for all server-side DataTables.
-function initServerTable(tableSelector, ajaxUrl, columns, extra) {
-  var $table;
-  var config;
-
-  if (typeof $.fn.DataTable === "undefined") {
-    return;
-  }
-
-  $table = $(tableSelector);
-  if (!$table.length || $.fn.DataTable.isDataTable($table[0])) {
-    return;
-  }
-
-  config = {
-    processing: true,
-    serverSide: true,
-    autoWidth: false,
-    scrollX: true,
-    pageLength: getDefaultPageLength(),
-    lengthMenu: [10, 25, 50, 100],
-    columns: columns,
-    ajax: {
-      url: ajaxUrl,
-      type: "GET",
-      dataSrc: "data",
-      error: function (xhr) {
-        var msg = "Failed to load data.";
-        if (xhr && xhr.responseJSON && xhr.responseJSON.message) {
-          msg = xhr.responseJSON.message;
-        }
-        showError(msg);
-      },
-    },
-    language: {
-      emptyTable: "No records found.",
-      zeroRecords: "No matching records found.",
-      info: "Showing _START_ to _END_ of _TOTAL_ entries",
-      infoEmpty: "No entries",
-      infoFiltered: "(filtered from _MAX_ total)",
-      search: "",
-      searchPlaceholder: "Search…",
-      paginate: {
-        first: "First",
-        last: "Last",
-        previous: "Previous",
-        next: "Next",
-      },
-    },
-    drawCallback: function () {
-      var api = this.api && this.api();
-      if (api && typeof api.columns === "function") {
-        api.columns.adjust();
-      }
-    },
-  };
-
-  if (extra && typeof extra === "object") {
-    $.each(extra, function (k, v) {
-      config[k] = v;
-    });
-  }
-
-  $table.DataTable(config);
-  registerDataTableForAdjust($table);
-}
-
-function initTableFromDataUrl(tableSelector, columns, extra) {
-  var $table = $(tableSelector);
-  var ajaxUrl;
-
-  if (!$table.length) {
-    return;
-  }
-
-  ajaxUrl = $table.attr("data-table-url");
-  if (!ajaxUrl) {
-    return;
-  }
-
-  initServerTable(tableSelector, ajaxUrl, columns, extra);
-}
-
-function dtTruncate(maxLen) {
-  return function (data, type, row) {
-    if (!data) {
-      return "";
-    }
-    var str = String(data);
-    if (str.length <= maxLen) {
-      return escapeHtml(str);
-    }
-    var truncated = str.substring(0, maxLen) + "...";
-    return '<span title="' + escapeHtml(str) + '" style="cursor: help; border-bottom: 1px dotted var(--text-muted);">' + escapeHtml(truncated) + '</span>';
-  };
-}
-
+// ============================================================
+// 05. TOOLTIPS — custom positioned tooltip (replaces browser default)
+// ============================================================
 function initCustomTooltips() {
   var $tooltipEl = null;
   var $activeTarget = null;
@@ -489,7 +357,7 @@ function initCustomTooltips() {
     var tooltipWidth = $tooltipEl.outerWidth();
     var tooltipHeight = $tooltipEl.outerHeight();
 
-    var left = rect.left + scrollLeft + (rect.width / 2) - (tooltipWidth / 2);
+    var left = rect.left + scrollLeft + rect.width / 2 - tooltipWidth / 2;
     var top = rect.top + scrollTop - tooltipHeight - 8; // default: above target
 
     // If the tooltip would render off-screen at the top, position it below the target instead
@@ -505,7 +373,7 @@ function initCustomTooltips() {
 
     $tooltipEl.css({
       top: top + "px",
-      left: left + "px"
+      left: left + "px",
     });
 
     setTimeout(function () {
@@ -547,234 +415,9 @@ function initCustomTooltips() {
   });
 }
 
-// -------------------------------------------------------
-// Individual server-side tables
-// -------------------------------------------------------
-
-function initUsersTable() {
-  initTableFromDataUrl(
-    "#usersTable",
-    [
-      { data: "user_id", orderable: true },
-      { data: "name", orderable: true },
-      { data: "email", orderable: false },
-      { data: "role", orderable: false },
-      { data: "phone", orderable: false },
-      { data: "is_active", orderable: true },
-      { data: "created_at", orderable: true },
-      { data: "actions", orderable: false },
-    ],
-    { order: [[6, "desc"]] },
-  );
-}
-
-function initProjectsTable() {
-  initTableFromDataUrl(
-    "#projectsTable",
-    [
-      { data: "name", orderable: true },
-      {
-        data: "description",
-        orderable: false,
-        render: dtTruncate(70),
-      },
-      { data: "status", orderable: true },
-      { data: "created_by", orderable: false },
-      { data: "created_at", orderable: true },
-      { data: "actions", orderable: false },
-    ],
-    { order: [[4, "desc"]] },
-  );
-}
-
-function initAlertsTable() {
-  initTableFromDataUrl(
-    "#alertsTable",
-    [
-      { data: "name", orderable: true },
-      { data: "project", orderable: true },
-      { data: "flow", orderable: true },
-      { data: "severity", orderable: true },
-      { data: "threshold", orderable: false },
-      { data: "active", orderable: true },
-      { data: "actions", orderable: false },
-    ],
-    { order: [[0, "asc"]] },
-  );
-}
-
-function initFlowsTable() {
-  initTableFromDataUrl(
-    "#flowsTable",
-    [
-      { data: "name", orderable: true },
-      { data: "project", orderable: true },
-      { data: "state_count", orderable: false },
-      { data: "status", orderable: true },
-      { data: "created_by", orderable: false },
-      { data: "created_at", orderable: true },
-      { data: "actions", orderable: false },
-    ],
-    { order: [[5, "desc"]] },
-  );
-}
-
-function initServerSideListTables() {
-  initUsersTable();
-  initProjectsTable();
-  initAlertsTable();
-  initFlowsTable();
-}
-
-// -------------------------------------------------------
-// Tickets DataTable
-// ticketFilters is module-scoped so initTicketsAjaxFilters
-// can mutate it and the DataTable's ajax.data() reads
-// the new values on every reload.
-// -------------------------------------------------------
-var ticketFilters = {};
-
-function getTicketFilters($table) {
-  return {
-    mode: $table.attr("data-ticket-mode") || "",
-    status: $table.attr("data-filter-status") || "",
-    q: $table.attr("data-filter-q") || "",
-    project_id: $table.attr("data-filter-project-id") || "",
-    flow_id: $table.attr("data-filter-flow-id") || "",
-    alert_type: $table.attr("data-filter-alert-type") || "",
-    priority: $table.attr("data-filter-priority") || "",
-  };
-}
-
-function initTicketsTable() {
-  var $table;
-  var ajaxUrl;
-  var ticketPageLen;
-
-  if (typeof $.fn.DataTable === "undefined") {
-    return;
-  }
-
-  $table = $("#ticketsTable");
-  if (!$table.length) {
-    return;
-  }
-
-  if ($.fn.DataTable.isDataTable($table[0])) {
-    return;
-  }
-
-  ajaxUrl = $table.attr("data-table-url");
-  if (!ajaxUrl) {
-    return;
-  }
-
-  ticketFilters = getTicketFilters($table);
-  ticketPageLen = getDefaultPageLength();
-
-  $table.DataTable({
-    processing: true,
-    serverSide: true,
-    autoWidth: false,
-    scrollX: true,
-    pageLength: ticketPageLen,
-    lengthMenu: [10, 25, 50, 100],
-    order: [[9, "desc"]],
-    ajax: {
-      url: ajaxUrl,
-      type: "GET",
-      data: function (data) {
-        $.each(ticketFilters, function (key, value) {
-          data[key] = value;
-        });
-        return data;
-      },
-    },
-    columns: [
-      { data: "select", orderable: false, className: "ticket-bulk-cell text-center" },
-      { data: "alarm_id_html", orderable: true },
-      { data: "title_html", orderable: true },
-      { data: "severity", orderable: true },
-      { data: "priority", orderable: true },
-      { data: "state", orderable: true },
-      { data: "level", orderable: false },
-      { data: "assignee", orderable: false },
-      { data: "tat", orderable: false },
-      { data: "created_at", orderable: true },
-    ],
-    drawCallback: function () {
-      initTatCountdowns();
-      adjustAllDataTables();
-    },
-  });
-
-  registerDataTableForAdjust($table);
-}
-
-function initSimpleTables() {
-  if (typeof $.fn.DataTable === "undefined") {
-    return;
-  }
-
-  $("[data-simple-table='1']").each(function () {
-    var table = this;
-    var $table = $(table);
-    var defaultLen = getDefaultPageLength();
-    var pageLength;
-    var orderColumn;
-    var orderDirection;
-    var lengthChange;
-    var options;
-
-    if ($.fn.DataTable.isDataTable(table)) {
-      return;
-    }
-
-    options = {
-      pageLength: defaultLen,
-      lengthMenu: [10, 25, 50, 100],
-      lengthChange: true,
-      autoWidth: false,
-      scrollX: false,
-      language: {
-        emptyTable: "No records to display yet.",
-        zeroRecords: "No matching records found.",
-        paginate: {
-          first: "First",
-          last: "Last",
-          previous: "Previous",
-          next: "Next",
-        },
-      },
-    };
-
-    pageLength = $table.attr("data-page-length");
-    orderColumn = $table.attr("data-order-col");
-    orderDirection = $table.attr("data-order-dir");
-    lengthChange = $table.attr("data-length-change");
-
-    if (pageLength !== undefined && pageLength !== "") {
-      options.pageLength = parseInt(pageLength, 10);
-    }
-
-    if (!orderDirection) {
-      orderDirection = "asc";
-    }
-
-    if (orderColumn !== undefined && orderColumn !== "") {
-      options.order = [[parseInt(orderColumn, 10), orderDirection]];
-    }
-
-    if (lengthChange !== undefined) {
-      options.lengthChange = toBoolean(lengthChange);
-    }
-
-    $table.DataTable(options);
-    registerDataTableForAdjust($table);
-  });
-}
-
-// --- SELECT2 ---
+// ============================================================
+// 07. DROPDOWNS & SELECT — Select2, AJAX-linked child selects
+// ============================================================
 
 function cleanPlaceholderText(text) {
   var value = $.trim(text || "");
@@ -1009,8 +652,9 @@ function initAjaxSelectLoaders() {
   });
 }
 
-// --- TAT COUNTDOWN TIMER ---
-
+// ============================================================
+// 13. TAT COUNTDOWN TIMERS — SLA expiry display, auto-tick
+// ============================================================
 function formatTimePart(number) {
   var value = String(number);
   if (value.length < 2) {
@@ -1125,8 +769,9 @@ function initTatCountdowns() {
   tatTimer = setInterval(updateTatCountdowns, 1000);
 }
 
-// --- CHARTS ---
-
+// ============================================================
+// 14. DASHBOARD — Charts (trend line + severity donut)
+// ============================================================
 function setupChartDefaults() {
   if (typeof Chart === "undefined") {
     return;
@@ -1143,7 +788,6 @@ function setupChartDefaults() {
 
 // Holds the live trend Chart instance for in-place range updates.
 var trendChart = null;
-
 function getTrendGridColor(isDarkTheme) {
   if (isDarkTheme) {
     return "rgba(148, 163, 184, 0.16)";
@@ -1338,8 +982,9 @@ function initSeverityCharts() {
   $canvas.attr("data-chart-ready", "1");
 }
 
-// --- AJAX FORM & BUTTON HELPERS ---
-
+// ============================================================
+// 08. FORM HELPERS — AJAX submit, file upload, post buttons
+// ============================================================
 function submitNormalForm($form, options) {
   var url = $form.data("url");
   var data;
@@ -1356,7 +1001,7 @@ function submitNormalForm($form, options) {
     data: data,
     dataType: "json",
     success: function (response) {
-      if (handleAjaxResponse(response, options.successMessage)) {
+      if (handleResponse(response, options.successMessage)) {
         if (options.reloadOnSuccess) {
           window.location.reload();
         }
@@ -1386,7 +1031,7 @@ function submitFileForm(form, options) {
     processData: false,
     contentType: false,
     success: function (response) {
-      if (handleAjaxResponse(response, options.successMessage)) {
+      if (handleResponse(response, options.successMessage)) {
         if (options.reloadOnSuccess) {
           window.location.reload();
         }
@@ -1411,6 +1056,10 @@ function bindPostForm(selector, options) {
 
   $form.off("submit.app").on("submit.app", function (event) {
     event.preventDefault();
+
+    if (!validateForm($(this))) {
+      return;
+    }
 
     if (options.isFile) {
       submitFileForm(this, options);
@@ -1443,14 +1092,14 @@ function bindPostButton(selector) {
       return;
     }
 
-    confirmAction(label + "?", function () {
+    confirmDialog(label + "?", function () {
       $.ajax({
         url: url,
         type: "POST",
         data: {},
         dataType: "json",
         success: function (response) {
-          if (handleAjaxResponse(response, "Action completed")) {
+          if (handleResponse(response, "Action completed")) {
             window.location.reload();
           }
         },
@@ -1462,8 +1111,9 @@ function bindPostButton(selector) {
   });
 }
 
-// --- TICKET DETAIL ---
-
+// ============================================================
+// 18. TICKET DETAIL — Actions, inline editing, copy alarm ID
+// ============================================================
 function initPriorityInline() {
   var $field = $("#priorityInline");
 
@@ -1491,7 +1141,7 @@ function initPriorityInline() {
         if (response && response.success) {
           showSuccess("Priority updated");
         } else {
-          showError(getResponseMessage(response, "Failed to update priority"));
+          showError(extractErrorMessage(response, "Failed to update priority"));
         }
       },
       error: function () {
@@ -1557,10 +1207,10 @@ function saveEditableField($element, $input, fieldName, url, originalValue) {
     success: function (response) {
       $element.removeClass("editing");
       if (response && response.success) {
-        showSuccess(getResponseMessage(response, "Saved"));
+        showSuccess(extractErrorMessage(response, "Saved"));
         $element.text(newValue || getEmptyEditableText(fieldName));
       } else {
-        showError(getResponseMessage(response, "Failed to save"));
+        showError(extractErrorMessage(response, "Failed to save"));
         $element.text(originalValue || getEmptyEditableText(fieldName));
       }
     },
@@ -1607,6 +1257,23 @@ function initEditableFields() {
     });
 }
 
+function initTicketCreatePage() {
+  var $flowSelect = $("#flowSelect");
+  var $assigneeSelect = $("#assigneeSelect");
+
+  if (!$flowSelect.length) {
+    return;
+  }
+
+  // When flow is cleared, reset assignee back to placeholder.
+  $flowSelect.on("change.ticketCreate", function () {
+    if (!$(this).val()) {
+      $assigneeSelect.html('<option value="">Select flow first</option>');
+      $assigneeSelect.prop("disabled", true);
+    }
+  });
+}
+
 function initCopyButtons() {
   $appDocument.off("click.copyButtons").on("click.copyButtons", "[data-copy]", function () {
     var text = $(this).data("copy");
@@ -1624,7 +1291,7 @@ function initCopyButtons() {
   });
 }
 
-function initTicketActions() {
+function initTicketDetailPage() {
   bindPostForm("#commentForm", {
     successMessage: "Comment added",
     errorMessage: "Network error",
@@ -1644,309 +1311,449 @@ function initTicketActions() {
     isFile: true,
   });
 
-  bindPostForm("#moveStateForm", {
-    successMessage: "State moved",
-    errorMessage: "Network error",
-    reloadOnSuccess: true,
+  // Single-target forward button: sends target_state_id + transition_type via AJAX.
+  $appDocument.on("click", "#moveStateBtn", function () {
+    var $btn = $(this);
+    var url = $btn.data("url");
+    var targetId = $btn.data("targetId");
+    var transType = $btn.data("transitionType") || "forward";
+    if ($btn.prop("disabled") || !url || !targetId) {
+      return;
+    }
+    $btn.prop("disabled", true);
+    $.ajax({
+      url: url,
+      type: "POST",
+      data: { target_state_id: targetId, transition_type: transType, reason: "" },
+      dataType: "json",
+      success: function (res) {
+        $btn.prop("disabled", false);
+        if (res && res.success) {
+          showSuccess(res.message || "State moved");
+          setTimeout(function () {
+            window.location.reload();
+          }, 600);
+        } else {
+          showError(res && res.message ? res.message : "Failed to move state.");
+        }
+      },
+      error: function () {
+        $btn.prop("disabled", false);
+        showError("Network error.");
+      },
+    });
   });
 
-  bindPostButton("#moveStateBtn");
   bindPostButton("#resolveBtn");
   bindPostButton("#closeBtn");
+  bindPostButton("#reopenBtn");
 
   initPriorityInline();
   initEditableFields();
 }
 
-// --- MERMAID ---
+// ============================================================
+// 19. FLOWS — VIS NETWORK DIAGRAM
+//     Node colours, edges, zoom, canvas animation, click-to-edit
+// ============================================================
+var flowNetworks = {};
+var flowNetMeta = {};
+var flowNetworkSeq = 0;
+var flowAnimRAF = null;
+var flowAnimLast = 0;
 
-function escapeMermaidLabel(name) {
-  var clean = String(name == null ? "" : name);
-  clean = clean.replace(/\\/g, "\\\\");
-  clean = clean.replace(/"/g, '\\"');
-  clean = clean.replace(/[\r\n]+/g, " ");
-  return '"' + clean + '"';
+function getVisNodeStyle(status) {
+  var map = {
+    initial: { bg: "#10b981", border: "#059669", fg: "#ffffff" },
+    process: { bg: "#7c5cf2", border: "#6d4ee6", fg: "#ffffff" },
+    final: { bg: "#64748b", border: "#475569", fg: "#ffffff" },
+    passed: { bg: "#10b981", border: "#059669", fg: "#ffffff" },
+    current: { bg: "#0ea5e9", border: "#0284c7", fg: "#ffffff" },
+    pending: { bg: "#cbd5e1", border: "#94a3b8", fg: "#334155" },
+  };
+  return map[status] || map.process;
 }
 
-function buildDesignerMermaidSource($list) {
-  var items = [];
-  var allIds = {};
-  var lines;
-  var i;
-  var item;
-  var nodeId;
-  var label;
-  var hasParentLinks;
-
-  $list.find(".state-item").each(function () {
-    var $item = $(this);
-    var id = parseInt($item.attr("data-id"), 10);
-    var parentId;
-    var name;
-    var isInitial;
-    var isFinal;
-
-    if (!id) {
-      return;
-    }
-
-    parentId = parseInt($item.attr("data-parent-id") || "0", 10);
-    name = $.trim($item.find("strong").first().text());
-    isInitial = $item.find(".badge.bg-success").length > 0;
-    isFinal = $item.find(".badge.bg-dark").length > 0;
-
-    items.push({ id: id, parentId: parentId, name: name, isInitial: isInitial, isFinal: isFinal });
-    allIds[id] = true;
-  });
-
-  if (items.length === 0) {
-    return "";
-  }
-
-  lines = ["flowchart LR"];
-
-  // Declare each node.
-  for (i = 0; i < items.length; i++) {
-    item = items[i];
-    nodeId = "s" + item.id;
-    label = escapeMermaidLabel(item.name);
-
-    if (item.isInitial || item.isFinal) {
-      lines.push("  " + nodeId + "([" + label + "])");
+function buildVisNodes(rawNodes) {
+  var i, n, status, style, isCurrent, shadow;
+  var result = [];
+  for (i = 0; i < rawNodes.length; i++) {
+    n = rawNodes[i];
+    status = n.status || n.type || "process";
+    style = getVisNodeStyle(status);
+    isCurrent = status === "current";
+    if (isCurrent) {
+      shadow = { enabled: true, color: "rgba(14,165,233,0.55)", size: 20, x: 0, y: 0 };
     } else {
-      lines.push("  " + nodeId + "[" + label + "]");
+      shadow = { enabled: true, color: "rgba(2,6,23,0.35)", size: 8, x: 0, y: 3 };
     }
+    result.push({
+      id: n.id,
+      // Wrap label in <b> so vis-network's html multi-font renders it bold.
+      // escapeHtml() handles any < or > in state names before the <b> wrap.
+      label: "<b>" + escapeHtml(n.label) + "</b>",
+      shape: "box",
+      shapeProperties: { borderRadius: 10 },
+      color: {
+        background: style.bg,
+        border: style.border,
+        highlight: { background: style.bg, border: "#e2e8f0" },
+        hover: { background: style.bg, border: "#e2e8f0" },
+      },
+      borderWidth: isCurrent ? 3 : 1.5,
+      borderWidthSelected: isCurrent ? 3 : 2,
+      font: { face: "Inter, system-ui, sans-serif", size: 15, color: style.fg, multi: "html" },
+      widthConstraint: { minimum: 110 },
+      heightConstraint: { minimum: 46 },
+      margin: { top: 11, right: 16, bottom: 11, left: 16 },
+      shadow: shadow,
+    });
   }
-
-  // Draw edges using parent_state_id when available, otherwise fall back to sort order.
-  hasParentLinks = false;
-  for (i = 0; i < items.length; i++) {
-    item = items[i];
-    if (item.parentId > 0 && allIds[item.parentId]) {
-      lines.push("  s" + item.parentId + " --> s" + item.id);
-      hasParentLinks = true;
-    }
-  }
-
-  if (!hasParentLinks) {
-    for (i = 0; i < items.length - 1; i++) {
-      lines.push("  s" + items[i].id + " --> s" + items[i + 1].id);
-    }
-  }
-
-  // Apply styles for initial and final states.
-  lines.push("  classDef initialState fill:#10b981,stroke:#10b981,color:#fff,stroke-width:2px");
-  lines.push("  classDef finalState fill:#374151,stroke:#1f2937,color:#fff,stroke-width:2px");
-
-  for (i = 0; i < items.length; i++) {
-    item = items[i];
-    if (item.isInitial) {
-      lines.push("  class s" + item.id + " initialState");
-    } else {
-      if (item.isFinal) {
-        lines.push("  class s" + item.id + " finalState");
-      }
-    }
-  }
-
-  return lines.join("\n");
+  return result;
 }
 
-var mermaidRenderSeq = 0;
+// Pull the live node id + edge list out of the raw data so the animation
+// loop knows what to pulse and where to send the flowing dots.
+function setFlowNetMeta(netId, rawData) {
+  var i,
+    currentId = null,
+    edges = [];
+  var nodes = rawData.nodes || [];
+  var rawEdges = rawData.edges || [];
+  for (i = 0; i < nodes.length; i++) {
+    if (nodes[i].status === "current") {
+      currentId = nodes[i].id;
+    }
+  }
+  for (i = 0; i < rawEdges.length; i++) {
+    // Only animate flowing dots along forward edges; skip backward arcs.
+    if ((rawEdges[i].transition_type || "forward") !== "backward") {
+      edges.push({ from: rawEdges[i].from, to: rawEdges[i].to });
+    }
+  }
+  flowNetMeta[netId] = {
+    currentId: currentId,
+    edges: edges,
+    animate: false,
+  };
+}
 
-function getMermaidThemeConfig() {
+var TRANSITION_STYLES = {
+  forward: { color: "rgba(100,116,139,0.55)", dash: false, roundness: 0.45, type: "cubicBezier" },
+  backward: { color: "rgba(239,68,68,0.9)", dash: true, roundness: 0.4, type: "curvedCCW" },
+};
+
+function buildVisEdges(rawEdges) {
+  var i,
+    edge,
+    style,
+    transType,
+    smooth,
+    result = [];
+  for (i = 0; i < rawEdges.length; i++) {
+    edge = rawEdges[i];
+    transType = edge.transition_type || "forward";
+    style = TRANSITION_STYLES[transType] || TRANSITION_STYLES.forward;
+    // Forward edges use forced-horizontal bezier to align with the LR layout.
+    // Backward edges drop forceDirection so the arc hugs the forward path
+    // rather than sweeping far below the canvas.
+    if (transType === "forward") {
+      smooth = { enabled: true, type: style.type, forceDirection: "horizontal", roundness: style.roundness };
+    } else {
+      smooth = { enabled: true, type: style.type, roundness: style.roundness };
+    }
+    result.push({
+      from: edge.from,
+      to: edge.to,
+      title: transType.charAt(0).toUpperCase() + transType.slice(1) + " transition",
+      arrows: { to: { enabled: true, scaleFactor: 0.55, type: "arrow" } },
+      smooth: smooth,
+      color: { color: style.color, highlight: "#0ea5e9", hover: "#0ea5e9" },
+      dashes: style.dash,
+      width: 3,
+      selectionWidth: 1,
+    });
+  }
+  return result;
+}
+
+function getVisOptions() {
   return {
-    startOnLoad: false,
-    securityLevel: "loose",
-    theme: "base",
-    themeVariables: {
-      fontFamily: "Inter, system-ui, -apple-system, Segoe UI, Roboto, sans-serif",
-      fontSize: "14px",
-      primaryColor: "transparent",
-      primaryBorderColor: "transparent",
-      primaryTextColor: "#e5e7eb",
-      lineColor: "#64748b",
-      textColor: "#e5e7eb",
+    layout: {
+      hierarchical: {
+        enabled: true,
+        direction: "LR",
+        sortMethod: "directed",
+        shakeTowards: "roots",
+        levelSeparation: 230,
+        nodeSpacing: 110,
+        treeSpacing: 130,
+        blockShifting: true,
+        edgeMinimization: true,
+        parentCentralization: true,
+      },
     },
-    flowchart: {
-      curve: "basis",
-      htmlLabels: true,
-      useMaxWidth: false,
-      nodeSpacing: 60,
-      rankSpacing: 80,
-      padding: 14,
+    physics: { enabled: false },
+    interaction: {
+      dragNodes: true,
+      dragView: true,
+      zoomView: true,
+      hover: true,
+      zoomSpeed: 0.4,
+      minZoomLevel: 0.25,
+      maxZoomLevel: 2.0,
+      navigationButtons: false,
+      keyboard: false,
+      selectConnectedEdges: false,
+    },
+    nodes: {
+      shape: "box",
+      shapeProperties: { borderRadius: 10 },
+      borderWidth: 1.5,
+      font: { face: "Inter, system-ui, sans-serif", size: 15, color: "#ffffff", multi: "html" },
+      margin: { top: 11, right: 16, bottom: 11, left: 16 },
+    },
+    edges: {
+      arrows: { to: { enabled: true, scaleFactor: 0.55 } },
+      color: { color: "rgba(100,116,139,0.5)", highlight: "#0ea5e9", hover: "#0ea5e9" },
+      width: 1.5,
+      smooth: { enabled: true, type: "cubicBezier", forceDirection: "horizontal", roundness: 0.45 },
     },
   };
 }
 
-function onMermaidRenderDone(svg, done) {
-  done(svg || null);
+function getWidgetNetworkId($widget) {
+  var id = $widget.data("flow-net-id");
+  if (!id) {
+    flowNetworkSeq++;
+    id = "fnet-" + flowNetworkSeq;
+    $widget.data("flow-net-id", id);
+  }
+  return id;
 }
 
-function onMermaidRenderFail(err, done) {
-  console.error("Mermaid render failed", err);
-  done(null);
-}
-
-function renderMermaidSvg(source, done) {
-  var renderId;
-  var maybePromise;
-
-  if (typeof mermaid === "undefined") {
-    done(null);
+function updateZoomPctDisplay($widget) {
+  var netId = $widget.data("flow-net-id");
+  var net = netId ? flowNetworks[netId] : null;
+  var pct;
+  if (!net) {
     return;
   }
-
-  mermaidRenderSeq++;
-  renderId = "mermaid-render-" + Date.now() + "-" + mermaidRenderSeq;
-
-  try {
-    maybePromise = mermaid.render(renderId, source);
-
-    if (maybePromise && typeof maybePromise.then === "function") {
-      maybePromise.then(
-        function (result) {
-          onMermaidRenderDone(result.svg || null, done);
-        },
-        function (err) {
-          onMermaidRenderFail(err, done);
-        },
-      );
-    } else {
-      done(String(maybePromise || ""));
-    }
-  } catch (err) {
-    console.error("Mermaid render error", err);
-    done(null);
-  }
-}
-
-function destroyPanZoom($widget) {
-  // svg-pan-zoom is deprecated; using native aspect-ratio-preserving zoom/fit handlers.
-}
-
-function leftAlignPanZoom(pz) {
-  // svg-pan-zoom is deprecated; using native aspect-ratio-preserving zoom/fit handlers.
-}
-
-function attachFlowWidgetZoom($widget) {
-  var $canvas = $widget.find("[data-flow-canvas]").first();
-  var svgEl = $canvas.find("svg")[0];
-
-  if (!svgEl) {
-    return;
-  }
-
-  // Parse viewBox to find aspect ratio.
-  var viewBox = svgEl.getAttribute("viewBox");
-  var aspectRatio = null;
-  if (viewBox) {
-    var parts = viewBox.split(/[\s,]+/);
-    if (parts.length >= 4) {
-      var naturalWidth = parseFloat(parts[2]);
-      var naturalHeight = parseFloat(parts[3]);
-      if (naturalWidth > 0 && naturalHeight > 0) {
-        aspectRatio = naturalWidth / naturalHeight;
-      }
-    }
-  }
-
-  // Store zoom percentage and aspect ratio in the widget.
-  $widget.data("flow-zoom-pct", 100);
-  $widget.data("flow-aspect-ratio", aspectRatio);
-
-  // Set initial styles on the SVG to allow natural responsive sizing.
-  // flex-shrink:0 is needed because we previously applied display:flex
-  // to the wrap, which made the SVG shrink-to-fit on zoom-in (silently
-  // ignoring the inline width we set). Keeping the SVG as a block child
-  // of an overflow:auto wrap is the simpler, more predictable layout.
-  svgEl.style.setProperty("max-width", "none", "important");
-  svgEl.style.setProperty("display", "block", "important");
-  svgEl.style.setProperty("flex-shrink", "0", "important");
-
-  updateFlowWidgetZoom($widget, 100);
-}
-
-function updateFlowWidgetZoom($widget, zoomPct) {
-  var $canvas = $widget.find("[data-flow-canvas]").first();
-  var svgEl = $canvas.find("svg")[0];
-
-  if (!svgEl) {
-    return;
-  }
-
-  // Constrain zoom percentage
-  if (zoomPct < 40) zoomPct = 40;
-  if (zoomPct > 300) zoomPct = 300;
-
-  $widget.data("flow-zoom-pct", zoomPct);
-  $widget.find("[data-flow-zoom-pct]").text(zoomPct + "%");
-
-  // Determine standard base height (content area height)
-  var baseHeight = 220;
-  if ($widget.hasClass("is-fullscreen")) {
-    baseHeight = $widget.find(".flow-mermaid-wrap").height() - 20;
-  }
-
-  var targetHeight = Math.round(baseHeight * (zoomPct / 100));
-  svgEl.style.setProperty("height", targetHeight + "px", "important");
-
-  // Calculate target width using aspect ratio if available
-  var aspectRatio = $widget.data("flow-aspect-ratio");
-  if (aspectRatio) {
-    var targetWidth = Math.round(targetHeight * aspectRatio);
-    svgEl.style.setProperty("width", targetWidth + "px", "important");
-  } else {
-    svgEl.style.setProperty("width", "auto", "important");
-  }
+  pct = Math.round(net.getScale() * 100);
+  $widget.data("flow-zoom-pct", pct);
+  $widget.find("[data-flow-zoom-pct]").text(pct + "%");
 }
 
 function renderFlowWidget($widget) {
-  var source = $widget.data("flow-mermaid-source");
   var $canvas = $widget.find("[data-flow-canvas]").first();
-  var $pre;
+  var $container, $dataScript, rawData, netId, net;
+  var allEdgesRaw, fwdEdgesRaw, bwdEdgesRaw, nodes, edges;
 
   if (!$canvas.length) {
     return;
   }
 
-  if (!source) {
-    // First call — snapshot the inline Mermaid source.
-    $pre = $canvas.find("pre.mermaid").first();
-    if ($pre.length) {
-      source = $pre.text();
-      $widget.data("flow-mermaid-source", source);
-    }
-  }
+  $container = $canvas.find(".flow-vis-container").first();
+  $dataScript = $canvas.find(".flow-vis-data").first();
 
-  if (!source) {
+  if (!$container.length || !$dataScript.length) {
     return;
   }
 
-  renderMermaidSvg(source, function (svg) {
-    if (svg === null) {
+  try {
+    rawData = JSON.parse($dataScript.text());
+  } catch (e) {
+    return;
+  }
+
+  if (!rawData || !rawData.nodes) {
+    return;
+  }
+
+  // Split edges by transition_type: forward edges define the LR hierarchy;
+  // backward edges are overlaid as curved arcs after the layout is locked.
+  allEdgesRaw = rawData.edges || [];
+  fwdEdgesRaw = allEdgesRaw.filter(function (e) {
+    return (e.transition_type || "forward") !== "backward";
+  });
+  bwdEdgesRaw = allEdgesRaw.filter(function (e) {
+    return e.transition_type === "backward";
+  });
+
+  nodes = new vis.DataSet(buildVisNodes(rawData.nodes));
+  edges = new vis.DataSet(buildVisEdges(fwdEdgesRaw));
+
+  netId = getWidgetNetworkId($widget);
+  if (flowNetworks[netId]) {
+    flowNetworks[netId].destroy();
+    delete flowNetworks[netId];
+  }
+
+  net = new vis.Network($container[0], { nodes: nodes, edges: edges }, getVisOptions());
+  flowNetworks[netId] = net;
+  setFlowNetMeta(netId, rawData);
+
+  $widget.data("flow-zoom-pct", 100);
+  $widget.find("[data-flow-zoom-pct]").text("100%");
+
+  net.once("afterDrawing", function () {
+    // The hierarchical LR layout is now stable with forward-only edges.
+    // Before touching anything else:
+    //   1. storePositions() writes the computed x,y back into the DataSet.
+    //   2. Disable hierarchical layout so that adding backward edges does NOT
+    //      trigger a re-run of the algorithm (which would collapse back to TB).
+    //   3. Add backward edges — vis-network now treats them as free curved
+    //      overlays on top of the locked LR positions.
+    net.storePositions();
+    net.setOptions({ layout: { hierarchical: { enabled: false } }, physics: { enabled: false } });
+    if (bwdEdgesRaw.length > 0) {
+      edges.add(buildVisEdges(bwdEdgesRaw));
+    }
+    // fit() only accounts for node bounding boxes; backward arcs curve below
+    // the nodes (curvedCW). Extra padding keeps those arcs within the viewport.
+    net.fit({ animation: false, padding: bwdEdgesRaw.length > 0 ? 90 : 20 });
+    var fitScale = Math.max(net.getScale(), 0.1);
+    net.setOptions({ interaction: { minZoomLevel: fitScale } });
+    $widget.data("flow-min-scale", fitScale);
+    updateZoomPctDisplay($widget);
+  });
+
+  net.on("afterDrawing", function (ctx) {
+    drawFlowAnimation(netId, ctx);
+  });
+
+  // Hard-enforce the zoom floor on every zoom event.
+  // When the user tries to zoom out past the fit level, call net.fit()
+  // instead of moveTo() so the graph stays centred — moveTo() sets scale
+  // only and lets the position drift, which pushes the tree to one side.
+  net.on("zoom", function (params) {
+    var minScale = $widget.data("flow-min-scale") || 0.25;
+    if (params.scale < minScale) {
+      net.fit({ animation: false });
+      updateZoomPctDisplay($widget);
       return;
     }
-    $canvas.html(svg);
-    attachFlowWidgetZoom($widget);
+    updateZoomPctDisplay($widget);
   });
+
+  // Node interaction: clicking a node on the designer preview scrolls to
+  // and highlights the matching state row in the editor list below.
+  // Only active on the states designer page (where #stateList exists).
+  net.on("click", function (params) {
+    var clickedId, $row;
+    if (!params.nodes || !params.nodes.length) {
+      return;
+    }
+    // params.nodes[0] is a number; coerce to string for the attribute selector.
+    clickedId = String(params.nodes[0]);
+    $row = $("#stateList .state-item[data-id='" + clickedId + "']");
+    if (!$row.length) {
+      return;
+    }
+    // Remove any existing focus, add to clicked row, scroll it into view.
+    $(".state-item--focus").removeClass("state-item--focus");
+    $row.addClass("state-item--focus");
+    $row[0].scrollIntoView({ behavior: "smooth", block: "center" });
+    setTimeout(function () {
+      $row.removeClass("state-item--focus");
+    }, 2000);
+  });
+
+  // Show a pointer cursor when hovering a node so the click is discoverable.
+  net.on("hoverNode", function () {
+    $container.css("cursor", "pointer");
+  });
+  net.on("blurNode", function () {
+    $container.css("cursor", "grab");
+  });
+
+  ensureFlowAnim();
 }
 
-function rerenderAllFlowMermaid() {
-  if (typeof mermaid === "undefined") {
+function fitFlowWidget($widget) {
+  var netId = $widget.data("flow-net-id");
+  var net = netId ? flowNetworks[netId] : null;
+  if (!net) {
     return;
   }
+  net.fit({ animation: { duration: 250, easingFunction: "easeInOutQuad" } });
+  setTimeout(function () {
+    var fitScale = Math.max(net.getScale(), 0.1);
+    net.setOptions({ interaction: { minZoomLevel: fitScale } });
+    $widget.data("flow-min-scale", fitScale);
+    updateZoomPctDisplay($widget);
+  }, 300);
+}
 
-  $(".flow-widget").each(function () {
-    renderFlowWidget($(this));
+function zoomFlowWidget($widget, direction) {
+  var netId = $widget.data("flow-net-id");
+  var net = netId ? flowNetworks[netId] : null;
+  var scale, newScale;
+  if (!net) {
+    return;
+  }
+  scale = net.getScale();
+  newScale = direction > 0 ? scale * 1.15 : scale / 1.15;
+  var minScale = $widget.data("flow-min-scale") || 0.25;
+  if (newScale < minScale) {
+    newScale = minScale;
+  }
+  if (newScale > 2.0) {
+    newScale = 2.0;
+  }
+  net.moveTo({ scale: newScale, animation: { duration: 150, easingFunction: "linear" } });
+  setTimeout(function () {
+    updateZoomPctDisplay($widget);
+  }, 200);
+}
+
+function buildDesignerVisData($list) {
+  var items = [],
+    allIds = {},
+    edges = [],
+    i,
+    item,
+    hasParentLinks;
+
+  $list.find(".state-item").each(function () {
+    var $item = $(this);
+    var id = parseInt($item.attr("data-id"), 10);
+    var parentId, name, type;
+    if (!id) {
+      return;
+    }
+    parentId = parseInt($item.attr("data-parent-id") || "0", 10);
+    name = $.trim($item.find("strong").first().text());
+    type = $item.find(".badge.bg-success").length ? "initial" : $item.find(".badge.bg-dark").length ? "final" : "process";
+    items.push({ id: id, label: name, type: type, parentId: parentId });
+    allIds[id] = true;
   });
+
+  if (items.length === 0) {
+    return null;
+  }
+
+  hasParentLinks = false;
+  for (i = 0; i < items.length; i++) {
+    item = items[i];
+    if (item.parentId > 0 && allIds[item.parentId]) {
+      edges.push({ from: item.parentId, to: item.id });
+      hasParentLinks = true;
+    }
+  }
+  if (!hasParentLinks) {
+    for (i = 0; i < items.length - 1; i++) {
+      edges.push({ from: items[i].id, to: items[i + 1].id });
+    }
+  }
+
+  return { nodes: items, edges: edges };
 }
 
 function refreshFlowPreview($list) {
   var previewSelector = $list.attr("data-preview-target");
   var $target = $(previewSelector);
-  var $widget;
-  var newSource;
+  var $widget, $dataScript, newData, netId, net, nodes, edges;
 
   if (!$target.length) {
     return;
@@ -1962,44 +1769,34 @@ function refreshFlowPreview($list) {
     return;
   }
 
-  newSource = buildDesignerMermaidSource($list);
-  if (!newSource) {
+  newData = buildDesignerVisData($list);
+  if (!newData) {
     return;
   }
 
-  $widget.data("flow-mermaid-source", newSource);
-  renderFlowWidget($widget);
-}
-
-function fitFlowWidget($widget) {
-  var $canvas = $widget.find("[data-flow-canvas]").first();
-  var svgEl = $canvas.find("svg")[0];
-
-  if (!svgEl) {
-    return;
+  $dataScript = $widget.find(".flow-vis-data").first();
+  if ($dataScript.length) {
+    $dataScript.text(JSON.stringify(newData));
   }
 
-  var aspectRatio = $widget.data("flow-aspect-ratio");
-  if (!aspectRatio) {
-    updateFlowWidgetZoom($widget, 100);
-    return;
+  netId = $widget.data("flow-net-id");
+  net = netId ? flowNetworks[netId] : null;
+
+  if (net) {
+    nodes = new vis.DataSet(buildVisNodes(newData.nodes));
+    edges = new vis.DataSet(buildVisEdges(newData.edges || []));
+    net.setOptions({ layout: { hierarchical: { enabled: true, direction: "LR", sortMethod: "directed" } } });
+    net.setData({ nodes: nodes, edges: edges });
+    net.once("afterDrawing", function () {
+      net.storePositions();
+      net.setOptions({ layout: { hierarchical: { enabled: false } }, physics: { enabled: false } });
+    });
+    setFlowNetMeta(netId, newData);
+    net.fit({ animation: { duration: 200, easingFunction: "easeInOutQuad" } });
+    ensureFlowAnim();
+  } else {
+    renderFlowWidget($widget);
   }
-
-  var containerWidth = $widget.find(".flow-mermaid-wrap").width() - 40;
-  var baseHeight = 220;
-  if ($widget.hasClass("is-fullscreen")) {
-    baseHeight = $widget.find(".flow-mermaid-wrap").height() - 20;
-  }
-
-  // Width to fit container: fitHeight = containerWidth / aspectRatio
-  var fitHeight = containerWidth / aspectRatio;
-  var fitZoomPct = Math.round((fitHeight / baseHeight) * 100);
-
-  // Apply sensible min/max constraints so it remains perfectly legible
-  if (fitZoomPct < 40) fitZoomPct = 40;
-  if (fitZoomPct > 120) fitZoomPct = 120;
-
-  updateFlowWidgetZoom($widget, fitZoomPct);
 }
 
 function initFlowWidgets() {
@@ -2016,13 +1813,11 @@ function initFlowWidgets() {
     });
 
     $widget.on("click", "[data-flow-zoom-in]", function () {
-      var currentZoom = $widget.data("flow-zoom-pct") || 100;
-      updateFlowWidgetZoom($widget, currentZoom + 15);
+      zoomFlowWidget($widget, 1);
     });
 
     $widget.on("click", "[data-flow-zoom-out]", function () {
-      var currentZoom = $widget.data("flow-zoom-pct") || 100;
-      updateFlowWidgetZoom($widget, currentZoom - 15);
+      zoomFlowWidget($widget, -1);
     });
 
     $widget.on("click", "[data-flow-fullscreen]", function () {
@@ -2032,10 +1827,8 @@ function initFlowWidgets() {
       } else {
         if (elem.requestFullscreen) {
           elem.requestFullscreen();
-        } else {
-          if (elem.webkitRequestFullscreen) {
-            elem.webkitRequestFullscreen();
-          }
+        } else if (elem.webkitRequestFullscreen) {
+          elem.webkitRequestFullscreen();
         }
       }
     });
@@ -2044,6 +1837,7 @@ function initFlowWidgets() {
   $appDocument.off("fullscreenchange.flowWidget").on("fullscreenchange.flowWidget", function () {
     $(".flow-widget").each(function () {
       var $widget = $(this);
+      var netId, net;
 
       if (document.fullscreenElement === $widget[0]) {
         $widget.addClass("is-fullscreen");
@@ -2051,25 +1845,160 @@ function initFlowWidgets() {
         $widget.removeClass("is-fullscreen");
       }
 
-      // Defer zoom update slightly until the DOM container dimensions settle
-      setTimeout(function () {
-        var currentZoom = $widget.data("flow-zoom-pct") || 100;
-        updateFlowWidgetZoom($widget, currentZoom);
-      }, 100);
+      netId = $widget.data("flow-net-id");
+      net = netId ? flowNetworks[netId] : null;
+      if (net) {
+        setTimeout(function () {
+          net.redraw();
+          net.fit({ animation: false });
+          updateZoomPctDisplay($widget);
+        }, 150);
+      }
     });
   });
 }
 
-function initFlowMermaid() {
-  if (typeof mermaid === "undefined") {
-    return;
-  }
-  mermaid.initialize(getMermaidThemeConfig());
-  initFlowWidgets();
-  rerenderAllFlowMermaid();
+// --- Flow canvas animation (flowing edge dots + pulsing live node) -------
+// vis-network renders to <canvas>, so motion cannot come from CSS. We hook
+// each network's afterDrawing event (its ctx is already transformed into
+// network coordinates) and drive a single rAF loop that redraws every
+// active widget so the dots and pulse animate smoothly.
+
+function flowBezierPoint(p0, p1, p2, p3, t) {
+  var mt = 1 - t;
+  var a = mt * mt * mt;
+  var b = 3 * mt * mt * t;
+  var c = 3 * mt * t * t;
+  var d = t * t * t;
+  return {
+    x: a * p0.x + b * p1.x + c * p2.x + d * p3.x,
+    y: a * p0.y + b * p1.y + c * p2.y + d * p3.y,
+  };
 }
 
-// --- FLOW DESIGNER ---
+function drawFlowAnimation(netId, ctx) {
+  var net = flowNetworks[netId];
+  var meta = flowNetMeta[netId];
+  var now, positions, i, e, p0, p3, cp1, cp2, base, k, t, pt, box, cx, cy, rx, ry, pulse, alpha;
+
+  if (!net || !meta || !meta.animate) {
+    return;
+  }
+
+  now = window.performance && performance.now ? performance.now() : Date.now();
+  positions = net.getPositions();
+
+  // Flowing dots that ride each edge from parent -> child. The control
+  // points mirror vis-network's horizontal cubicBezier so the dots track
+  // the rendered line exactly, even after a node is dragged.
+  ctx.save();
+  for (i = 0; i < meta.edges.length; i++) {
+    e = meta.edges[i];
+    p0 = positions[e.from];
+    p3 = positions[e.to];
+    if (!p0 || !p3) {
+      continue;
+    }
+    cp1 = { x: (p0.x + p3.x) / 2, y: p0.y };
+    cp2 = { x: (p0.x + p3.x) / 2, y: p3.y };
+    base = (now / 1600 + i * 0.13) % 1;
+    for (k = 0; k < 2; k++) {
+      t = (base + k * 0.5) % 1;
+      t = 0.14 + t * 0.72;
+      pt = flowBezierPoint(p0, cp1, cp2, p3, t);
+      ctx.beginPath();
+      ctx.arc(pt.x, pt.y, 2.6, 0, Math.PI * 2);
+      ctx.fillStyle = "rgba(56,189,248,0.95)";
+      ctx.shadowColor = "rgba(14,165,233,0.85)";
+      ctx.shadowBlur = 8;
+      ctx.fill();
+    }
+  }
+  ctx.restore();
+
+  // Pulsing ring around the live (current) node on the ticket view.
+  if (meta.currentId !== null && positions[meta.currentId]) {
+    box = net.getBoundingBox(meta.currentId);
+    if (box) {
+      cx = (box.left + box.right) / 2;
+      cy = (box.top + box.bottom) / 2;
+      rx = (box.right - box.left) / 2;
+      ry = (box.bottom - box.top) / 2;
+      pulse = (Math.sin(now / 420) + 1) / 2;
+      alpha = 0.55 - pulse * 0.4;
+      ctx.save();
+      ctx.beginPath();
+      ctx.strokeStyle = "rgba(14,165,233," + alpha.toFixed(3) + ")";
+      ctx.lineWidth = 2.5;
+      ctx.ellipse(cx, cy, rx + 7 + pulse * 9, ry + 7 + pulse * 9, 0, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.restore();
+    }
+  }
+}
+
+function flowAnimTick(ts) {
+  var id,
+    meta,
+    anyAnimated = false,
+    doRedraw;
+
+  if (!ts) {
+    ts = 0;
+  }
+
+  // Throttle redraws to ~30fps — smooth enough, far lighter than 60fps.
+  doRedraw = ts - flowAnimLast >= 32;
+  if (doRedraw) {
+    flowAnimLast = ts;
+  }
+
+  for (id in flowNetworks) {
+    if (flowNetworks.hasOwnProperty(id)) {
+      meta = flowNetMeta[id];
+      if (meta && meta.animate) {
+        anyAnimated = true;
+        if (doRedraw) {
+          flowNetworks[id].redraw();
+        }
+      }
+    }
+  }
+
+  if (anyAnimated && !document.hidden) {
+    flowAnimRAF = window.requestAnimationFrame(flowAnimTick);
+  } else {
+    flowAnimRAF = null;
+  }
+}
+
+function ensureFlowAnim() {
+  if (flowAnimRAF === null && window.requestAnimationFrame) {
+    flowAnimRAF = window.requestAnimationFrame(flowAnimTick);
+  }
+}
+
+function initFlowVis() {
+  if (typeof vis === "undefined" || !vis.Network) {
+    return;
+  }
+  initFlowWidgets();
+  $(".flow-widget").each(function () {
+    renderFlowWidget($(this));
+  });
+
+  // Resume the animation loop when the tab becomes visible again — the
+  // loop parks itself (flowAnimRAF = null) whenever the page is hidden.
+  $appDocument.off("visibilitychange.flowAnim").on("visibilitychange.flowAnim", function () {
+    if (!document.hidden) {
+      ensureFlowAnim();
+    }
+  });
+}
+
+// ============================================================
+// 20. FLOWS — STATE DESIGNER — drag-sort, order save, live preview
+// ============================================================
 
 function getStateOrder($list) {
   var order = [];
@@ -2105,12 +2034,150 @@ function saveStateOrder($list) {
       if (response && response.success) {
         showSuccess("Order saved");
       } else {
-        showError(getResponseMessage(response, "Failed to save order"));
+        showError(extractErrorMessage(response, "Failed to save order"));
       }
     },
     error: function () {
       showError("Network error while saving order");
     },
+  });
+}
+
+// ============================================================
+// TRANSITIONS DESIGNER — add/delete transitions in flow states page
+// ============================================================
+
+function initTransitionsDesigner() {
+  var $form = $("#addTransitionForm");
+  if (!$form.length) {
+    return;
+  }
+
+  var flowId = $form.attr("data-flow-id");
+  var saveUrl = $form.attr("data-url");
+
+  $form.on("submit", function (e) {
+    e.preventDefault();
+    var fromId = $form.find("[name='from_state_id']").val();
+    var toId = $form.find("[name='to_state_id']").val();
+    var type = $form.find("[name='transition_type']").val();
+    var reqCmt = $form.find("[name='requires_comment']").is(":checked") ? 1 : 0;
+
+    if (!fromId || !toId) {
+      showError("Select both From and To states.");
+      return;
+    }
+    if (fromId === toId) {
+      showError("From and To must be different states.");
+      return;
+    }
+
+    $.ajax({
+      url: saveUrl,
+      type: "POST",
+      data: { flow_id: flowId, from_state_id: fromId, to_state_id: toId, transition_type: type, requires_comment: reqCmt },
+      dataType: "json",
+      success: function (res) {
+        if (res && res.success) {
+          showSuccess("Transition saved. Reloading…");
+          setTimeout(function () {
+            window.location.reload();
+          }, 800);
+        } else {
+          showError(res && res.message ? res.message : "Failed to save transition.");
+        }
+      },
+      error: function () {
+        showError("Network error saving transition.");
+      },
+    });
+  });
+
+  $appDocument.on("click", ".delete-transition-btn", function () {
+    var $btn = $(this);
+    var url = $btn.attr("data-url");
+    confirmDialog("Delete this transition?", function () {
+      $.ajax({
+        url: url,
+        type: "POST",
+        dataType: "json",
+        success: function (res) {
+          if (res && res.success) {
+            $btn.closest("tr").fadeOut(300, function () {
+              $(this).remove();
+            });
+            showSuccess("Transition removed.");
+          } else {
+            showError(res && res.message ? res.message : "Failed to delete.");
+          }
+        },
+        error: function () {
+          showError("Network error.");
+        },
+      });
+    });
+  });
+}
+
+// ============================================================
+// MOVE-STATE TYPED FORMS — show/hide reason field, handle submit
+// ============================================================
+
+function initMoveStateTypedForms() {
+  // Show/hide reason field for forward forms based on requires_comment flag.
+  // Backward forms always show the reason field (rendered visible in PHP).
+  $appDocument.on("change", ".move-state-typed-form select[name='target_state_id']", function () {
+    var $select = $(this);
+    var $form = $select.closest(".move-state-typed-form");
+    var $wrap = $form.find(".transition-reason-wrap");
+    var type = $form.find("input[name='transition_type']").val();
+    var req = $select.find("option:selected").attr("data-requires-comment");
+    if (type === "backward" || req === "1") {
+      $wrap.show();
+      $wrap.find("input[name='reason']").attr("required", true);
+    } else {
+      $wrap.hide();
+      $wrap.find("input[name='reason']").removeAttr("required").val("");
+    }
+  });
+
+  $appDocument.on("submit", ".move-state-typed-form", function (e) {
+    e.preventDefault();
+    var $form = $(this);
+
+    if (!validateForm($form)) {
+      return;
+    }
+
+    var url = $form.attr("data-url");
+    var targetId = $form.find("[name='target_state_id']").val();
+    var transType = $form.find("[name='transition_type']").val();
+    var reason = $form.find("[name='reason']").val() || "";
+
+    var $btn = $form.find("button[type='submit']");
+    $btn.prop("disabled", true);
+
+    $.ajax({
+      url: url,
+      type: "POST",
+      data: { target_state_id: targetId, transition_type: transType, reason: reason },
+      dataType: "json",
+      success: function (res) {
+        $btn.prop("disabled", false);
+        if (res && res.success) {
+          showSuccess(res.message || "Done");
+          setTimeout(function () {
+            window.location.reload();
+          }, 600);
+        } else {
+          showError(res && res.message ? res.message : "Failed to move state.");
+        }
+      },
+      error: function () {
+        $btn.prop("disabled", false);
+        showError("Network error.");
+      },
+    });
   });
 }
 
@@ -2144,8 +2211,9 @@ function initStateSorter() {
   $list.disableSelection();
 }
 
-// --- PASSWORD SHOW/HIDE TOGGLE ---
-
+// ============================================================
+// 12. FORMS — VALIDATION UI (password, loading, counters, guards)
+// ============================================================
 function initPasswordToggle() {
   $appDocument.off("click.passwordToggle").on("click.passwordToggle", "[data-toggle-password]", function () {
     var $btn = $(this);
@@ -2174,11 +2242,16 @@ function initPasswordToggle() {
   });
 }
 
-// --- LOADING FORMS ---
-
+// Shows a spinner on the submit button so the user knows the form is saving.
 function initLoadingForms() {
-  $appDocument.off("submit.loadingForms").on("submit.loadingForms", "form[data-loading-form]", function () {
+  $appDocument.off("submit.loadingForms").on("submit.loadingForms", "form[data-loading-form]", function (event) {
     var $form = $(this);
+
+    if (!validateForm($form)) {
+      event.preventDefault();
+      return;
+    }
+
     var $btn = $form.find("button[type=submit]");
     var $icon;
     var originalClass;
@@ -2222,8 +2295,9 @@ function initLoadingForms() {
   });
 }
 
-// --- USER-ID LIVE AVAILABILITY CHECK ---
-
+// ============================================================
+// 23. USERS — Username availability live check
+// ============================================================
 function initUserIdLiveCheck() {
   var $input = $("#userIdInput");
   var $status = $("#userIdStatus");
@@ -2313,9 +2387,10 @@ function initUserIdLiveCheck() {
   }
 }
 
-// --- THEME TOGGLE ---
-
-function initThemeToggle() {
+// ============================================================
+// 09. LAYOUT — THEME SWITCH
+// ============================================================
+function initThemeSwitch() {
   var $toggle = $("#themeToggle");
   if (!$toggle.length) {
     return;
@@ -2324,20 +2399,20 @@ function initThemeToggle() {
   $toggle.off("click.themeToggle").on("click.themeToggle", function (e) {
     e.preventDefault();
     var currentTheme = $appHtml.attr("data-theme") || "dark";
-    var newTheme = (currentTheme === "dark") ? "light" : "dark";
+    var newTheme = currentTheme === "dark" ? "light" : "dark";
 
     // Update HTML attribute
     $appHtml.attr("data-theme", newTheme);
 
     // Persist in localStorage
-    writePref("noc-theme", newTheme);
+    saveLocalPref("noc-theme", newTheme);
 
     // Persist in cookie (expires in 1 year)
     document.cookie = "theme=" + newTheme + ";path=/;max-age=31536000;SameSite=Lax";
 
     // Redraw charts if present
     if (trendChart) {
-      var isDark = (newTheme === "dark");
+      var isDark = newTheme === "dark";
       trendChart.options.scales.y.grid.color = getTrendGridColor(isDark);
       trendChart.options.scales.y.grid.lineWidth = getTrendGridLineWidth(isDark);
       trendChart.update();
@@ -2358,15 +2433,16 @@ function initThemeToggle() {
         },
         error: function () {
           // silent ignore
-        }
+        },
       });
     }
   });
 }
 
-// --- SIDEBAR TOGGLE ---
-
-function initSidebarToggle() {
+// ============================================================
+// 10. LAYOUT — SIDEBAR — collapse, mobile drawer, scroll persist
+// ============================================================
+function initSidebarMenu() {
   var $toggle = $("#sidebarToggle");
   var $sidebar = $("#appSidebar");
   var $backdrop = $("#sidebarBackdrop");
@@ -2471,12 +2547,12 @@ function initSidebarToggle() {
       next = "expanded";
     }
     applyDesktopState(next);
-    writePref("pview-sidebar", next);
+    saveLocalPref("pview-sidebar", next);
   }
 
   // Apply the saved state on init so aria-label is correct immediately.
   if (!isMobile()) {
-    if (readPref("pview-sidebar") === "collapsed") {
+    if (getLocalPref("pview-sidebar") === "collapsed") {
       applyDesktopState("collapsed");
     } else {
       applyDesktopState("expanded");
@@ -2490,7 +2566,7 @@ function initSidebarToggle() {
         closeDrawer();
       } else {
         openDrawer();
-      }
+      }z
     } else {
       toggleDesktopCollapse();
     }
@@ -2514,7 +2590,7 @@ function initSidebarToggle() {
   $appWindow.off("resize.sidebarToggle").on("resize.sidebarToggle", function () {
     if (!isMobile()) {
       closeDrawer();
-      if (readPref("pview-sidebar") === "collapsed") {
+      if (getLocalPref("pview-sidebar") === "collapsed") {
         applyDesktopState("collapsed");
       } else {
         applyDesktopState("expanded");
@@ -2526,9 +2602,11 @@ function initSidebarToggle() {
   });
 }
 
-// --- SEARCH SHORTCUT ---
+// ============================================================
+// 11. LAYOUT — SEARCH HOTKEY (press / to focus search)
+// ============================================================
 
-function initSearchShortcut() {
+function initSearchHotkey() {
   $appDocument.off("keydown.searchShortcut").on("keydown.searchShortcut", function (event) {
     var tag;
     var $search;
@@ -2564,9 +2642,9 @@ function initSearchShortcut() {
   });
 }
 
-// --- CHARACTER COUNTER ---
+// Character counter — shows "N / max" below any input with data-char-counter.
 
-function initCharCounters() {
+function initCharCount() {
   $("[data-char-counter='1']").each(function () {
     var $field = $(this);
     var max;
@@ -2601,9 +2679,9 @@ function initCharCounters() {
   });
 }
 
-// --- DIRTY FORM GUARD ---
+// Warns before navigating away from a form that has unsaved changes.
 
-function initDirtyFormGuard() {
+function initUnsavedFormWarning() {
   $("form[data-dirty-guard='1']").each(function () {
     var $form = $(this);
     var initial;
@@ -2635,9 +2713,9 @@ function initDirtyFormGuard() {
   });
 }
 
-// --- CAPS LOCK WARNING ---
+// Shows a warning under password fields when Caps Lock is on.
 
-function initCapsLockWarning() {
+function initCapsLockAlert() {
   $("input[type=password][data-caps-warn='1']").each(function () {
     var $field = $(this);
     var $warn;
@@ -2669,7 +2747,9 @@ function initCapsLockWarning() {
   });
 }
 
-// --- BELL BADGE ---
+// ============================================================
+// 21. NOTIFICATIONS — BELL BADGE & LIVE POLL
+// ============================================================
 
 var bellRefreshInFlight = false;
 
@@ -2742,7 +2822,7 @@ function readMetaSetting(name, fallback) {
   return v;
 }
 
-function maybeBeepOnce() {
+function playAlertBeep() {
   // Tiny synthesized beep — no external audio file, works offline / on VPN.
   // Falls through silently in browsers without Web Audio (very old IE etc.).
   try {
@@ -2768,7 +2848,7 @@ function maybeBeepOnce() {
   }
 }
 
-function maybeNotifyOnce(total, counts) {
+function sendPushNotification(total, counts) {
   // Browser notification — only after the user has explicitly granted
   // permission. We don't *request* permission here (handled separately in
   // initBellLivePoll); silently noop if denied/default so we don't surprise
@@ -2790,7 +2870,11 @@ function maybeNotifyOnce(total, counts) {
     var body = total + " actionable ticket(s): " + parts.join(" · ");
     var n = new Notification("pView — new actionable ticket", { body: body });
     // Auto-close after 8 seconds so a flurry doesn't pile up on screen.
-    setTimeout(function () { try { n.close(); } catch (e) {} }, 8000);
+    setTimeout(function () {
+      try {
+        n.close();
+      } catch (e) {}
+    }, 8000);
   } catch (e) {
     // ignore
   }
@@ -2909,10 +2993,10 @@ function refreshBellBadge() {
           var audioOn = readMetaSetting("live_audio_enabled", "1") === "1";
           var notifyOn = readMetaSetting("live_browser_notify", "1") === "1";
           if (audioOn) {
-            maybeBeepOnce();
+            playAlertBeep();
           }
           if (notifyOn) {
-            maybeNotifyOnce(total, data);
+            sendPushNotification(total, data);
           }
         }
         bellLastSeenTotal = total;
@@ -2943,7 +3027,7 @@ window.refreshBellBadge = refreshBellBadge;
 // refresh on init so the user gets a fresh count without waiting a full
 // interval; subsequent polls run on the timer.
 var bellPollTimer = null;
-function initBellLivePoll() {
+function startBellPoll() {
   if (!$("#topbarBell").length) {
     return;
   }
@@ -2952,7 +3036,7 @@ function initBellLivePoll() {
     return;
   }
   if (n < 5) {
-    n = 5;  // safety floor — don't hammer the DB
+    n = 5; // safety floor — don't hammer the DB
   }
   if (n > 120) {
     n = 120;
@@ -2980,7 +3064,9 @@ function initBellLivePoll() {
   bellPollTimer = setInterval(refreshBellBadge, n * 1000);
 }
 
-// --- BELL DROPDOWN ---
+// ============================================================
+// 22. NOTIFICATIONS — BELL DROPDOWN (list of actionable tickets)
+// ============================================================
 
 var bellListLoaded = false;
 var bellListInFlight = false;
@@ -3024,7 +3110,7 @@ function renderBellList(items, mentions) {
       html += "</div>";
       html += '<div class="bell-row-title">' + escapeHtml(m.title || "(no title)") + "</div>";
       if (m.from_name) {
-        html += '<div class="bell-row-meta"><span class="text-muted small">from ' + escapeHtml(m.from_name) + '</span></div>';
+        html += '<div class="bell-row-meta"><span class="text-muted small">from ' + escapeHtml(m.from_name) + "</span></div>";
       }
       html += "</a>";
     }
@@ -3152,270 +3238,9 @@ function initBellDropdown() {
   });
 }
 
-// --- BULK ACTIONS ---
-
-var bulkSelected = {}; // ticket id -> true
-
-function getSelectedIds() {
-  var ids = [];
-  var key;
-
-  for (key in bulkSelected) {
-    if (bulkSelected.hasOwnProperty(key)) {
-      ids.push(parseInt(key, 10));
-    }
-  }
-
-  return ids;
-}
-
-function countSelected() {
-  var count = 0;
-  var key;
-
-  for (key in bulkSelected) {
-    if (bulkSelected.hasOwnProperty(key)) {
-      count++;
-    }
-  }
-
-  return count;
-}
-
-function refreshBulkToolbar() {
-  var $toolbar = $("#bulkToolbar");
-  var count;
-
-  if (!$toolbar.length) {
-    return;
-  }
-
-  count = countSelected();
-  $("#bulkSelectedCount").text(count);
-
-  if (count === 0) {
-    $toolbar.attr("hidden", "hidden");
-  } else {
-    $toolbar.removeAttr("hidden");
-  }
-}
-
-function clearBulkSelection() {
-  bulkSelected = {};
-  $(".bulk-select").prop("checked", false);
-  $("#bulkSelectAll").prop("checked", false);
-  refreshBulkToolbar();
-}
-
-function postBulkAction($btn) {
-  var url = $btn.attr("data-bulk-url");
-  var action = $btn.attr("data-bulk-action");
-  var ids = getSelectedIds();
-  var verb;
-  var $icon;
-  var origIconClass;
-
-  if (!url || !action || ids.length === 0) {
-    return;
-  }
-
-  verb = "resolve";
-  if (action === "close") {
-    verb = "close";
-  }
-
-  confirmAction(verb + " " + ids.length + " ticket(s)?", function () {
-    $btn.prop("disabled", true);
-    $icon = $btn.find("i").first();
-    origIconClass = "";
-
-    if ($icon.length) {
-      origIconClass = $icon.attr("class") || "";
-      $icon.attr("class", "spinner-border spinner-border-sm me-1");
-    }
-
-    $.ajax({
-      url: url,
-      type: "POST",
-      data: { ids: ids, action: action },
-      dataType: "json",
-      success: function (response) {
-        var $table;
-
-        if (response && response.success) {
-          showSuccess(response.message || "Done");
-          clearBulkSelection();
-
-          // Reload the DataTable in-place so the user sees new statuses without losing filters.
-          $table = $("#ticketsTable");
-          if ($.fn.DataTable && $.fn.DataTable.isDataTable($table[0])) {
-            $table.DataTable().ajax.reload(null, false);
-          }
-
-          if (typeof refreshBellBadge === "function") {
-            refreshBellBadge();
-          }
-        } else {
-          showError(getResponseMessage(response, "Bulk action failed"));
-        }
-      },
-      error: function () {
-        showError("Network error during bulk action");
-      },
-      complete: function () {
-        $btn.prop("disabled", false);
-        if ($icon.length && origIconClass) {
-          $icon.attr("class", origIconClass);
-        }
-      },
-    });
-  });
-}
-
-function initBulkActions() {
-  $appDocument.off("change.bulkSelect").on("change.bulkSelect", ".bulk-select", function () {
-    var id = $(this).attr("data-bulk-id");
-    if (!id) {
-      return;
-    }
-
-    if (this.checked) {
-      bulkSelected[id] = true;
-    } else {
-      delete bulkSelected[id];
-    }
-    refreshBulkToolbar();
-  });
-
-  $appDocument.off("change.bulkSelectAll").on("change.bulkSelectAll", "#bulkSelectAll", function () {
-    var checked = this.checked;
-
-    $(".bulk-select").each(function () {
-      var id = $(this).attr("data-bulk-id");
-      this.checked = checked;
-      if (!id) {
-        return;
-      }
-      if (checked) {
-        bulkSelected[id] = true;
-      } else {
-        delete bulkSelected[id];
-      }
-    });
-
-    refreshBulkToolbar();
-  });
-
-  $appDocument.off("click.bulkAction").on("click.bulkAction", "[data-bulk-action]", function () {
-    postBulkAction($(this));
-  });
-
-  $appDocument.off("click.bulkClear").on("click.bulkClear", "#bulkClearBtn", clearBulkSelection);
-
-  // After every DataTables redraw, re-apply checked state so selections persist across pages.
-  $appDocument.off("draw.dt.bulkRestore").on("draw.dt.bulkRestore", function () {
-    $(".bulk-select").each(function () {
-      var id = $(this).attr("data-bulk-id");
-      if (id && bulkSelected[id]) {
-        this.checked = true;
-      }
-    });
-  });
-}
-
-// --- SAVED FILTERS ---
-
-function initSavedFilters() {
-  $appDocument.off("click.savedFilterAdd").on("click.savedFilterAdd", "#savedFilterAddBtn", function () {
-    var $btn = $(this);
-    var url = $btn.attr("data-save-url");
-    var qs = $btn.attr("data-current-qs") || "";
-    var name;
-
-    if (!url) {
-      return;
-    }
-
-    name = window.prompt("Name this filter:", "");
-    if (name === null) {
-      return;
-    }
-
-    name = $.trim(name || "");
-    if (name === "") {
-      return;
-    }
-
-    $.ajax({
-      url: url,
-      type: "POST",
-      data: { name: name, query_params: qs },
-      dataType: "json",
-      success: function (response) {
-        if (response && response.success) {
-          showSuccess(response.message || "Saved");
-          window.location.reload();
-        } else {
-          showError(getResponseMessage(response, "Failed to save filter"));
-        }
-      },
-      error: function () {
-        showError("Network error");
-      },
-    });
-  });
-
-  $appDocument.off("click.savedFilterDelete").on("click.savedFilterDelete", ".saved-filter-delete", function (event) {
-    var $btn = $(this);
-    var url = $btn.attr("data-saved-url");
-
-    event.preventDefault();
-    event.stopPropagation();
-
-    if (!url) {
-      return;
-    }
-
-    confirmAction("Remove this saved filter?", function () {
-      $.ajax({
-        url: url,
-        type: "POST",
-        dataType: "json",
-        success: function (response) {
-          if (response && response.success) {
-            showSuccess(response.message || "Removed");
-            // Hide the row inline so the dropdown doesn't snap shut.
-            var $dropdown = $btn.closest(".saved-filters-dropdown");
-            $btn.closest(".saved-filter-row").remove();
-
-            // Keep the trigger button's count badge in sync. If the row
-            // we just removed was the last one, also restore the empty-
-            // state text so the dropdown doesn't end up just showing the
-            // divider + Save button.
-            var $menu = $dropdown.find(".dropdown-menu");
-            var remaining = $menu.find(".saved-filter-row").length;
-            var $badge = $dropdown.find("> button .badge");
-            if (remaining > 0) {
-              $badge.text(remaining);
-            } else {
-              $badge.remove();
-              if ($menu.find(".no-saved-filters-msg").length === 0) {
-                $menu.prepend('<span class="dropdown-item-text text-muted small no-saved-filters-msg">No saved filters yet.</span>');
-              }
-            }
-          } else {
-            showError(getResponseMessage(response, "Failed to remove filter"));
-          }
-        },
-        error: function () {
-          showError("Network error");
-        },
-      });
-    });
-  });
-}
-
-// --- TREND RANGE PICKER ---
+// ============================================================
+// 14. DASHBOARD — TREND RANGE PICKER
+// ============================================================
 
 function initTrendRangePicker() {
   $appDocument.off("click.trendRange").on("click.trendRange", ".trend-range-picker .filter-pill", function (event) {
@@ -3460,7 +3285,7 @@ function initTrendRangePicker() {
           trendChart.data.datasets[0].data = response.data.values || [];
           trendChart.update();
         } else {
-          showError(getResponseMessage(response, "Failed to load trend"));
+          showError(extractErrorMessage(response, "Failed to load trend"));
         }
       },
       error: function () {
@@ -3470,259 +3295,9 @@ function initTrendRangePicker() {
   });
 }
 
-// --- TICKETS AJAX FILTERS ---
-
-function parseQueryString(url) {
-  var qs;
-  var hashCut;
-  var qIdx;
-  var out = {};
-  var pairs;
-  var i;
-  var p;
-  var eq;
-  var k;
-  var v;
-
-  if (typeof url !== "string") {
-    return out;
-  }
-
-  hashCut = url.split("#")[0];
-  qIdx = hashCut.indexOf("?");
-  qs = "";
-
-  if (qIdx >= 0) {
-    qs = hashCut.substring(qIdx + 1);
-  }
-
-  if (qs === "") {
-    return out;
-  }
-
-  pairs = qs.split("&");
-  for (i = 0; i < pairs.length; i++) {
-    p = pairs[i];
-    if (!p) {
-      continue;
-    }
-
-    eq = p.indexOf("=");
-    k = "";
-    v = "";
-
-    if (eq < 0) {
-      k = decodeURIComponent(p);
-    } else {
-      k = decodeURIComponent(p.substring(0, eq));
-      v = decodeURIComponent(p.substring(eq + 1).replace(/\+/g, " "));
-    }
-
-    if (k !== "") {
-      out[k] = v;
-    }
-  }
-
-  return out;
-}
-
-function syncTicketsFilterUI(params) {
-  var status;
-  var $form;
-  var $hiddenStatus;
-  var count;
-  var $summary;
-  var $saveBtn;
-  var rebuilt;
-  var keysInOrder;
-  var k;
-  var key;
-  var v;
-
-  // Highlight active status pill.
-  status = params.status || "";
-  $(".filter-pills .filter-pill").each(function () {
-    var $a = $(this);
-    var hrefParams = parseQueryString($a.attr("href") || "");
-    var pStatus = hrefParams.status || "";
-
-    if (pStatus === status) {
-      $a.addClass("active");
-    } else {
-      $a.removeClass("active");
-    }
-  });
-
-  // Update filter form inputs.
-  $form = $("#ticketsFilterForm");
-  if ($form.length) {
-    $form.find("[name='q']").val(params.q || "");
-    $form.find("[name='project_id']").val(params.project_id || "");
-    $form.find("[name='flow_id']").val(params.flow_id || "");
-    $form.find("[name='alert_type']").val(params.alert_type || "");
-    $form.find("[name='priority']").val(params.priority || "");
-
-    // Keep the hidden status field in sync.
-    $hiddenStatus = $form.find("input[type=hidden][name='status']");
-    if (status === "") {
-      $hiddenStatus.remove();
-    } else {
-      if ($hiddenStatus.length) {
-        $hiddenStatus.val(status);
-      } else {
-        $form.find(".card-body > .row").prepend('<input type="hidden" name="status" value="' + escapeHtml(status) + '">');
-      }
-    }
-
-    // Re-render Select2 widgets after programmatic .val() change.
-    $form.find("select").each(function () {
-      if ($(this).hasClass("select2-hidden-accessible")) {
-        $(this).trigger("change.select2");
-      }
-    });
-  }
-
-  // Update "N filters active" pill.
-  count = 0;
-  if ((params.q || "") !== "") {
-    count++;
-  }
-  if (parseInt(params.project_id || "0", 10) > 0) {
-    count++;
-  }
-  if (parseInt(params.flow_id || "0", 10) > 0) {
-    count++;
-  }
-  if ((params.alert_type || "") !== "") {
-    count++;
-  }
-  if ((params.priority || "") !== "") {
-    count++;
-  }
-
-  $summary = $("#filterActiveSummary");
-  if ($summary.length) {
-    $("#filterActiveCount").text(count);
-
-    if (count === 1) {
-      $("#filterActiveLabel").text("filter");
-    } else {
-      $("#filterActiveLabel").text("filters");
-    }
-
-    if (count === 0) {
-      $summary.attr("hidden", "hidden");
-    } else {
-      $summary.removeAttr("hidden");
-    }
-  }
-
-  // Keep "Save current filter" button's data-current-qs in sync, and
-  // swap between the button and the "Apply a filter to save it." hint
-  // based on whether anything is actually narrowing the list right now.
-  $saveBtn = $("#savedFilterAddBtn");
-  if ($saveBtn.length) {
-    rebuilt = [];
-    keysInOrder = ["status", "q", "project_id", "flow_id", "alert_type", "priority"];
-
-    for (k = 0; k < keysInOrder.length; k++) {
-      key = keysInOrder[k];
-      v = params[key] || "";
-      if (v !== "" && v !== "0") {
-        rebuilt.push(encodeURIComponent(key) + "=" + encodeURIComponent(v));
-      }
-    }
-
-    $saveBtn.attr("data-current-qs", rebuilt.join("&"));
-
-    // The button counts the same five "real filter" fields as the badge;
-    // the leading status pill on its own doesn't unlock save unless it
-    // narrows to something other than "All".
-    var hasFilter = (count > 0) || ((params.status || "") !== "");
-    var $saveHint = $("#savedFilterAddHint");
-    if (hasFilter) {
-      $saveBtn.removeAttr("hidden");
-      if ($saveHint.length) {
-        $saveHint.attr("hidden", "hidden");
-      }
-    } else {
-      $saveBtn.attr("hidden", "hidden");
-      if ($saveHint.length) {
-        $saveHint.removeAttr("hidden");
-      }
-    }
-  }
-}
-
-function applyTicketUrl(url, doPushState) {
-  var $table = $("#ticketsTable");
-  var params;
-
-  if (!$table.length) {
-    return;
-  }
-  if (typeof $.fn.DataTable === "undefined") {
-    return;
-  }
-  if (!$.fn.DataTable.isDataTable($table[0])) {
-    return;
-  }
-
-  params = parseQueryString(url);
-
-  ticketFilters.status = params.status || "";
-  ticketFilters.q = params.q || "";
-  ticketFilters.project_id = params.project_id || "";
-  ticketFilters.flow_id = params.flow_id || "";
-  ticketFilters.alert_type = params.alert_type || "";
-  ticketFilters.priority = params.priority || "";
-
-  syncTicketsFilterUI(params);
-  $table.DataTable().ajax.reload(null, false);
-
-  if (doPushState && window.history && window.history.pushState) {
-    window.history.pushState({ ticketsUrl: url }, "", url);
-  }
-}
-
-function initTicketsAjaxFilters() {
-  var clickSelector;
-
-  if (!$("#ticketsTable").length) {
-    return;
-  }
-
-  clickSelector = ".filter-pills .filter-pill, .saved-filter-link, .tickets-filter-reset, .filter-active-summary .clear-link";
-
-  $appDocument.off("click.ticketsAjax", clickSelector).on("click.ticketsAjax", clickSelector, function (event) {
-    var href = $(this).attr("href");
-    if (!href) {
-      return;
-    }
-    event.preventDefault();
-    applyTicketUrl(href, true);
-  });
-
-  $appDocument.off("submit.ticketsAjax").on("submit.ticketsAjax", "#ticketsFilterForm", function (event) {
-    var $form = $(this);
-    var qs = $form.serialize();
-    var target = $form.attr("action") || window.location.pathname;
-
-    event.preventDefault();
-
-    if (qs) {
-      target = target + "?" + qs;
-    }
-
-    applyTicketUrl(target, true);
-  });
-
-  $appWindow.off("popstate.ticketsAjax").on("popstate.ticketsAjax", function () {
-    applyTicketUrl(window.location.href, false);
-  });
-}
-
-// --- @MENTION AUTOCOMPLETE ---
+// ============================================================
+// 26. MENTIONS — @mention autocomplete in comment textarea
+// ============================================================
 //
 // Attaches to any textarea with `data-mentions="1"`. As the user types, when
 // they hit `@` followed by ≥1 word character, a small dropdown of active
@@ -3815,7 +3390,7 @@ function renderMentionDropdown($ta, items) {
       cls += " is-active";
     }
     html += '<div class="' + cls + '" data-idx="' + i + '" data-user-id="' + escapeHtml(items[i].user_id) + '">';
-    html += '<strong>@' + escapeHtml(items[i].user_id) + "</strong> ";
+    html += "<strong>@" + escapeHtml(items[i].user_id) + "</strong> ";
     html += '<span class="text-muted small">' + escapeHtml(items[i].name) + "</span>";
     html += "</div>";
   }
@@ -3826,15 +3401,17 @@ function renderMentionDropdown($ta, items) {
   // compute exact caret coordinates (which is browser-flaky).
   var off = $ta.offset();
   var height = $ta.outerHeight();
-  $dd.css({
-    position: "absolute",
-    top: (off.top + height + 2) + "px",
-    left: off.left + "px",
-    minWidth: $ta.outerWidth() + "px",
-    maxHeight: "180px",
-    overflowY: "auto",
-    zIndex: 9999,
-  }).removeAttr("hidden");
+  $dd
+    .css({
+      position: "absolute",
+      top: off.top + height + 2 + "px",
+      left: off.left + "px",
+      minWidth: $ta.outerWidth() + "px",
+      maxHeight: "180px",
+      overflowY: "auto",
+      zIndex: 9999,
+    })
+    .removeAttr("hidden");
 }
 
 function findMentionTrigger($ta) {
@@ -3955,7 +3532,9 @@ function initMentionAutocomplete() {
   });
 }
 
-// --- SETTINGS: SEND TEST EMAIL ---
+// ============================================================
+// 24. SETTINGS — Test email, asset version bump
+// ============================================================
 //
 // Tiny wrapper around the /settings/send_test_email POST endpoint. Wired
 // once on document.ready; lives at the bottom of the file alongside the
@@ -3977,7 +3556,7 @@ function initSendTestEmail() {
         if (response && response.success) {
           showSuccess(response.message || "Test email sent");
         } else {
-          showError(getResponseMessage(response, "Test email failed"));
+          showError(extractErrorMessage(response, "Test email failed"));
         }
       },
       error: function () {
@@ -4016,7 +3595,7 @@ function initBumpAssetVersion() {
           }
           showSuccess(response.message || "Asset version bumped");
         } else {
-          showError(getResponseMessage(response, "Bump failed"));
+          showError(extractErrorMessage(response, "Bump failed"));
         }
       },
       error: function () {
@@ -4029,181 +3608,198 @@ function initBumpAssetVersion() {
   });
 }
 
-// Activity Log viewer (read-only audit feed). Initialises the server-side
-// DataTable, wires the filter form so filter values ride along on every
-// ajax reload, and pops a Bootstrap modal when the row's meta icon is
-// clicked so the admin can read the JSON details.
-function initActivityLogsTable() {
-  var $table = $("#activityLogsTable");
-  if (!$table.length || typeof $.fn.DataTable === "undefined") {
-    return;
-  }
-  if ($.fn.DataTable.isDataTable($table[0])) {
-    return;
-  }
+// ============================================================
+// 27. DATE RANGE WIDGET — global reusable date-range picker
+// ============================================================
+//
+// Usage: drop <div class="date-range-widget" data-date-range> into any
+// filter form. Call initDateRangeWidgets() once on page load (already
+// wired in page init). Use getDateRange($widget) to read {from, to}.
 
-  var ajaxUrl = $table.attr("data-table-url");
-  if (!ajaxUrl) {
-    return;
-  }
+function drwDateStr(d) {
+  var y = d.getFullYear();
+  var m = ("0" + (d.getMonth() + 1)).slice(-2);
+  var day = ("0" + d.getDate()).slice(-2);
+  return y + "-" + m + "-" + day;
+}
 
-  var dt = $table.DataTable({
-    processing: true,
-    serverSide: true,
-    autoWidth: false,
-    scrollX: true,
-    pageLength: getDefaultPageLength(),
-    lengthMenu: [10, 25, 50, 100],
-    order: [[0, "desc"]],
-    columns: [
-      { data: "created_at", orderable: true },
-      { data: "user", orderable: true },
-      { data: "module", orderable: true },
-      { data: "action", orderable: true },
-      { data: "entity", orderable: false },
-      { data: "summary", orderable: false },
-      { data: "login", orderable: false },
-      { data: "logout", orderable: false },
-    ],
-    ajax: {
-      url: ajaxUrl,
-      type: "GET",
-      dataSrc: "data",
-      data: function (d) {
-        d.f_user   = $("#filterUser").val() || "";
-        d.f_module = $("#filterModule").val() || "";
-        d.f_action = $("#filterAction").val() || "";
-        d.f_from   = $("#filterFrom").val() || "";
-        d.f_to     = $("#filterTo").val() || "";
-      },
-      error: function (xhr) {
-        var msg = "Failed to load activity log.";
-        if (xhr && xhr.responseJSON && xhr.responseJSON.message) {
-          msg = xhr.responseJSON.message;
-        }
-        showError(msg);
-      },
-    },
-    language: {
-      emptyTable: "No activity recorded yet.",
-      zeroRecords: "No matching events.",
-      info: "Showing _START_ to _END_ of _TOTAL_ events",
-      infoEmpty: "No events",
-      infoFiltered: "(filtered from _MAX_ total)",
-      search: "",
-      searchPlaceholder: "Search…",
-    },
-    drawCallback: function () {
-      var api = this.api && this.api();
-      if (api && typeof api.columns === "function") {
-        api.columns.adjust();
-      }
-    },
-  });
-  registerDataTableForAdjust($table);
+function setDateRangePreset($widget, preset) {
+  var today = new Date();
+  var from = new Date();
+  var to = new Date();
 
-  $("#activityApplyBtn").on("click", function () {
-    dt.ajax.reload();
-  });
+  $widget.find(".drw-preset").removeClass("active");
+  $widget.find('.drw-preset[data-preset="' + preset + '"]').addClass("active");
 
-  // CSV export — assemble the same filter payload the table uses and
-  // navigate to the streaming endpoint. Browser handles the download.
-  $("#activityExportBtn").on("click", function () {
-    var url = $(this).attr("data-export-url");
-    if (!url) {
+  switch (preset) {
+    case "today":
+      break;
+    case "yesterday":
+      from.setDate(from.getDate() - 1);
+      to.setDate(to.getDate() - 1);
+      break;
+    case "7d":
+      from.setDate(from.getDate() - 6);
+      break;
+    case "30d":
+      from.setDate(from.getDate() - 29);
+      break;
+    case "month":
+      from = new Date(today.getFullYear(), today.getMonth(), 1);
+      break;
+    case "all":
+      $widget.find("[data-date-range-from]").val("");
+      $widget.find("[data-date-range-to]").val("");
       return;
+    default:
+      return;
+  }
+
+  $widget.find("[data-date-range-from]").val(drwDateStr(from));
+  $widget.find("[data-date-range-to]").val(drwDateStr(to));
+}
+
+// Returns {from, to} strings from the nearest [data-date-range] ancestor
+// or from the supplied widget element.
+function getDateRange($widget) {
+  if (!$widget || !$widget.length) {
+    $widget = $("[data-date-range]").first();
+  }
+  return {
+    from: $widget.find("[data-date-range-from]").val() || "",
+    to: $widget.find("[data-date-range-to]").val() || "",
+  };
+}
+
+function initDateRangeWidgets() {
+  $("[data-date-range]").each(function () {
+    var $widget = $(this);
+
+    // Apply the active preset to ensure the date inputs start at the right values.
+    var $active = $widget.find(".drw-preset.active").first();
+    if ($active.length) {
+      setDateRangePreset($widget, $active.data("preset"));
     }
-    var params = $.param({
-      f_user:   $("#filterUser").val() || "",
-      f_module: $("#filterModule").val() || "",
-      f_action: $("#filterAction").val() || "",
-      f_from:   $("#filterFrom").val() || "",
-      f_to:     $("#filterTo").val() || "",
-      q:        ($(".dataTables_filter input").val() || ""),
+
+    // Preset button click.
+    $widget.find(".drw-preset").on("click", function () {
+      setDateRangePreset($widget, $(this).data("preset"));
     });
-    var sep = url.indexOf("?") === -1 ? "?" : "&";
-    window.location.href = url + sep + params;
-  });
 
-  $("#activityResetBtn").on("click", function () {
-    $("#filterUser").val("");
-    $("#filterModule").val("");
-    $("#filterAction").val("");
-    // Restore the From/To inputs to their server-rendered default
-    // (today's date) rather than blanking them, so Reset matches the
-    // initial page-load behaviour instead of switching to "show all".
-    $("#filterFrom").val($("#filterFrom").attr("data-default") || "");
-    $("#filterTo").val($("#filterTo").attr("data-default") || "");
-    dt.ajax.reload();
-  });
-
-  // Click the info icon to see full JSON meta in a custom overlay
-  // (vanilla, not a Bootstrap modal — see the view template for why).
-  //
-  // The overlay lives inside the page content by default, which is a
-  // descendant of elements with `transform:` declarations. CSS spec says
-  // any transformed ancestor creates a new containing block, which makes
-  // `position: fixed` resolve against that ancestor instead of the
-  // viewport — that's why the overlay was anchoring to the bottom of the
-  // page. Reparenting it to <body> once on init keeps it viewport-fixed.
-  var $overlayEl = $("#activityMetaOverlay");
-  if ($overlayEl.length && $overlayEl.parent("body").length === 0) {
-    $overlayEl.appendTo("body");
-  }
-
-  function openActivityMetaOverlay(pretty) {
-    var $overlay = $("#activityMetaOverlay");
-    if (!$overlay.length) {
-      return;
-    }
-    $("#activityMetaBody").text(pretty);
-    $overlay.removeAttr("hidden");
-  }
-  function closeActivityMetaOverlay() {
-    $("#activityMetaOverlay").attr("hidden", "hidden");
-  }
-
-  $appDocument.on("click", ".activity-meta-toggle", function () {
-    var raw = $(this).attr("data-meta") || "";
-    var pretty = raw;
-    try {
-      pretty = JSON.stringify(JSON.parse(raw), null, 2);
-    } catch (e) {
-      // Not valid JSON — show raw.
-    }
-    openActivityMetaOverlay(pretty);
-  });
-
-  // X button + footer Close button both carry data-activity-meta-close.
-  $appDocument.on("click", "[data-activity-meta-close]", function () {
-    closeActivityMetaOverlay();
-  });
-
-  // Click on the backdrop (the overlay itself, NOT the inner dialog) closes.
-  $appDocument.on("click", "#activityMetaOverlay", function (e) {
-    if (e.target === this) {
-      closeActivityMetaOverlay();
-    }
-  });
-
-  // Escape key closes when the overlay is visible.
-  $appDocument.on("keydown.activityMetaOverlay", function (e) {
-    if (e.key === "Escape" && !$("#activityMetaOverlay").attr("hidden")) {
-      closeActivityMetaOverlay();
-    }
+    // Manual edit clears the active preset marker.
+    $widget.find("[data-date-range-from], [data-date-range-to]").on("change", function () {
+      $widget.find(".drw-preset").removeClass("active");
+    });
   });
 }
 
-// Persist sidebar scroll position across navigation so clicking a link
-// near the bottom of the menu (e.g. Settings) doesn't drop the user back
-// at the top on the next render. sessionStorage scopes to the current
-// tab only — opening a new tab gives a fresh state.
-//
-// The actual scrolling container is `.sidebar .nav` (CSS sets
-// overflow-y:auto there), NOT #appSidebar itself which is flex-column
-// fixed-positioned and doesn't scroll. Listening on the wrong element
-// is why a previous attempt silently no-op'd.
-function initSidebarScrollPersist() {
+// ============================================================
+// AUTO LOGOUT — idle detection + countdown warning
+// ============================================================
+
+function initAutoLogout() {
+  var timeoutMins = parseInt($('meta[name="app-setting-session_idle_timeout_minutes"]').attr("content") || "0", 10);
+  if (isNaN(timeoutMins) || timeoutMins <= 0) {
+    return;
+  }
+
+  var timeoutMs = timeoutMins * 60 * 1000;
+  // Warn 2 minutes before logout, or 20% of the timeout if it is very short.
+  var warnLeadMs = Math.min(120000, Math.max(30000, timeoutMs * 0.2));
+  var warnMs = timeoutMs - warnLeadMs;
+
+  var logoutTimer = null;
+  var warnTimer = null;
+  var countdownInt = null;
+  var warnOpen = false;
+
+  function doLogout() {
+    // POST to /logout reusing the CSRF token from the logout form in the sidebar.
+    var $logoutForm = $('form[action*="logout"]').first();
+    var $csrfInput = $logoutForm.find('input[type="hidden"]').first();
+    var $f = $('<form method="post" style="display:none">').attr("action", $logoutForm.attr("action"));
+    if ($csrfInput.length) {
+      $f.append($('<input type="hidden">').attr("name", $csrfInput.attr("name")).val($csrfInput.val()));
+    }
+    $("body").append($f);
+    $f[0].submit();
+  }
+
+  function showWarning() {
+    if (warnOpen) {
+      return;
+    }
+    warnOpen = true;
+    var remaining = Math.round(warnLeadMs / 1000);
+
+    if (typeof Swal === "undefined") {
+      // Fallback: no SweetAlert2 — just logout immediately.
+      doLogout();
+      return;
+    }
+
+    Swal.fire({
+      title: "Session expiring",
+      html: 'You will be logged out in <strong id="idleCountdown">' + remaining + "</strong> seconds due to inactivity.",
+      icon: "warning",
+      showCancelButton: true,
+      confirmButtonText: "Stay logged in",
+      cancelButtonText: "Logout now",
+      allowOutsideClick: false,
+      allowEscapeKey: false,
+      confirmButtonColor: "#0ea5e9",
+      cancelButtonColor: "#ef4444",
+    }).then(function (result) {
+      clearInterval(countdownInt);
+      warnOpen = false;
+      if (result.isConfirmed) {
+        resetTimers();
+      } else {
+        doLogout();
+      }
+    });
+
+    countdownInt = setInterval(function () {
+      remaining--;
+      var $el = $("#idleCountdown");
+      if ($el.length) {
+        $el.text(remaining);
+      }
+      if (remaining <= 0) {
+        clearInterval(countdownInt);
+      }
+    }, 1000);
+  }
+
+  function resetTimers() {
+    clearTimeout(logoutTimer);
+    clearTimeout(warnTimer);
+    clearInterval(countdownInt);
+
+    if (warnOpen) {
+      Swal.close();
+      warnOpen = false;
+    }
+
+    warnTimer = setTimeout(showWarning, warnMs);
+    logoutTimer = setTimeout(doLogout, timeoutMs);
+  }
+
+  // Treat any user interaction as activity.
+  $(document).on("mousemove keydown mousedown touchstart scroll click", function () {
+    if (!warnOpen) {
+      resetTimers();
+    }
+  });
+
+  // Start the timers.
+  resetTimers();
+}
+
+// ============================================================
+// Persists sidebar scroll via sessionStorage. Listens on .sidebar .nav
+// (the overflow-y:auto container), not #appSidebar which is fixed and doesn't scroll.
+function initSidebarScrollSave() {
   var sidebar = document.getElementById("appSidebar");
   if (!sidebar) {
     return;
@@ -4257,5 +3853,94 @@ function initSidebarScrollPersist() {
     } catch (e) {
       // ignore
     }
+  });
+}
+
+// ============================================================
+// 28. INLINE FORM VALIDATION
+// ============================================================
+
+function markInvalid($field, message) {
+  $field.addClass("is-invalid").removeClass("is-valid");
+  var $feedback = $field.next(".invalid-feedback");
+  if (!$feedback.length) {
+    $feedback = $('<div class="invalid-feedback"></div>');
+    $field.after($feedback);
+  }
+  $feedback.text(message);
+}
+
+function markValid($field) {
+  $field.removeClass("is-invalid").addClass("is-valid");
+  $field.next(".invalid-feedback").remove();
+}
+
+function validateField($field) {
+  var val = $.trim($field.val());
+  var type = ($field.attr("type") || "text").toLowerCase();
+  var tag = $field.prop("tagName").toLowerCase();
+  var minLen = parseInt($field.attr("minlength") || "0", 10);
+  var customMsg = $field.data("error-msg") || "";
+  var error = "";
+
+  if (type === "file") {
+    if (!$field[0].files || $field[0].files.length === 0) {
+      error = customMsg || "Please select a file";
+    }
+  } else if (tag === "select") {
+    if (!val) {
+      error = customMsg || "Please select an option";
+    }
+  } else if (type === "email") {
+    if (!val) {
+      error = customMsg || "This field is required";
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(val)) {
+      error = customMsg || "Enter a valid email address";
+    }
+  } else {
+    if (!val) {
+      error = customMsg || "This field is required";
+    } else if (minLen > 0 && val.length < minLen) {
+      error = customMsg || "Must be at least " + minLen + " characters";
+    }
+  }
+
+  if (error) {
+    markInvalid($field, error);
+    return false;
+  }
+  markValid($field);
+  return true;
+}
+
+function validateForm($form) {
+  var valid = true;
+  $form.find("[required]").each(function () {
+    if (!validateField($(this))) {
+      valid = false;
+    }
+  });
+  if (!valid) {
+    var $first = $form.find(".is-invalid").first();
+    if ($first.length) {
+      $first[0].scrollIntoView({ behavior: "smooth", block: "center" });
+      $first.focus();
+    }
+  }
+  return valid;
+}
+
+function initFormValidation() {
+  // Live feedback on blur — only after the user has touched the field
+  $appDocument.on("blur.validation", "form [required]", function () {
+    var $field = $(this);
+    if ($field.hasClass("is-invalid") || $field.hasClass("is-valid") || $.trim($field.val()) !== "") {
+      validateField($field);
+    }
+  });
+
+  // Clear error as the user types/selects a valid value
+  $appDocument.on("input.validation change.validation", "form [required].is-invalid", function () {
+    validateField($(this));
   });
 }

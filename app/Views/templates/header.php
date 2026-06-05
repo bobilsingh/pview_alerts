@@ -26,6 +26,9 @@ if ($sessionTheme) {
    <meta name="app-setting-live_poll_seconds" content="<?= app_setting_int('live_poll_seconds', 15); ?>">
    <meta name="app-setting-live_audio_enabled" content="<?= app_setting_bool('live_audio_enabled', true) ? '1' : '0'; ?>">
    <meta name="app-setting-live_browser_notify" content="<?= app_setting_bool('live_browser_notify', true) ? '1' : '0'; ?>">
+   <!-- Session idle timeout and analytics refresh — read by initAutoLogout() / initAnalyticsTab() -->
+   <meta name="app-setting-session_idle_timeout_minutes" content="<?= app_setting_int('session_idle_timeout_minutes', 30); ?>">
+   <meta name="app-setting-analytics_refresh_seconds" content="<?= app_setting_int('analytics_refresh_seconds', 30); ?>">
 
    <!-- ===== Stylesheets ===== -->
    <link rel="stylesheet" href="<?= base_url('assets/vendor/bootstrap/css/bootstrap.min.css'); ?>">
@@ -61,10 +64,11 @@ if ($sessionTheme) {
    <script src="<?= base_url('assets/vendor/toastr/toastr.min.js'); ?>"></script>
    <script src="<?= base_url('assets/vendor/sweetalert2/sweetalert2.min.js'); ?>"></script>
    <script src="<?= base_url('assets/vendor/chartjs/chart.umd.min.js'); ?>"></script>
-   <script src="<?= base_url('assets/vendor/mermaid/mermaid.min.js'); ?>"></script>
-   <script src="<?= base_url('assets/vendor/svg-pan-zoom/svg-pan-zoom.min.js'); ?>"></script>
+   <script src="<?= base_url('assets/vendor/vis-network/vis-network.min.js'); ?>"></script>
    <script src="<?= base_url('assets/js/app.js'); ?>?v=<?= esc($assetVersion); ?>"></script>
+   <script src="<?= base_url('assets/js/datatable.js'); ?>?v=<?= esc($assetVersion); ?>"></script>
 </head>
 
 <body>
+   <a href="#mainContent" class="skip-to-content">Skip to main content</a>
    <div class="layout">

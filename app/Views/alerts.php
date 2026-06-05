@@ -1,4 +1,5 @@
 <?php
+
 /**
  * ALERTS VIEW.
  * Combines four related admin screens. Controller passes $view:
@@ -8,18 +9,18 @@
  *   - 'api_keys'   : API keys list + generate form
  */
 if (!function_exists('view_value')) {
-    function view_value($source, $key, $default = '')
-    {
-        if (is_array($source) && array_key_exists($key, $source)) {
-            return $source[$key];
-        }
-
-        return $default;
+  function view_value($source, $key, $default = '')
+  {
+    if (is_array($source) && array_key_exists($key, $source)) {
+      return $source[$key];
     }
+
+    return $default;
+  }
 }
 
 if (!isset($view) || $view === '') {
-    $view = 'list';
+  $view = 'list';
 }
 ?>
 
@@ -57,20 +58,20 @@ if (!isset($view) || $view === '') {
   <?php
   $isEdit = !empty($alert);
   if ($isEdit) {
-      $action = site_url('alerts/update/' . $alert['id']);
-      $pageTitle = 'Edit Alert Definition';
+    $action = site_url('alerts/update/' . $alert['id']);
+    $pageTitle = 'Edit Alert Definition';
   } else {
-      $action = site_url('alerts/save');
-      $pageTitle = 'Add Alert Definition';
+    $action = site_url('alerts/save');
+    $pageTitle = 'Add Alert Definition';
   }
 
   $existingNotify = [];
   if ($isEdit && !empty($alert['notify_user_ids'])) {
-      $tmp = json_decode((string) $alert['notify_user_ids'], true);
-      if (is_array($tmp)) {
-          // Post-2026-05-21: notify_user_ids stores user_id strings.
-          $existingNotify = array_map('strval', $tmp);
-      }
+    $tmp = json_decode((string) $alert['notify_user_ids'], true);
+    if (is_array($tmp)) {
+      // Post-2026-05-21: notify_user_ids stores user_id strings.
+      $existingNotify = array_map('strval', $tmp);
+    }
   }
 
   $currentType = 'info';
@@ -83,36 +84,36 @@ if (!isset($view) || $view === '') {
   $isActive = false;
 
   if ($isEdit) {
-      if (isset($alert['alert_type'])) {
-          $currentType = $alert['alert_type'];
-      }
-      if (isset($alert['name'])) {
-          $alertName = $alert['name'];
-      }
-      if (isset($alert['description'])) {
-          $alertDescription = $alert['description'];
-      }
-      if (isset($alert['project_id'])) {
-          $currentProject = (int) $alert['project_id'];
-      }
-      if (isset($alert['flow_id'])) {
-          $currentFlow = (int) $alert['flow_id'];
-      }
-      if (isset($alert['threshold_value'])) {
-          $thresholdValue = $alert['threshold_value'];
-      }
-      if (isset($alert['threshold_unit'])) {
-          $thresholdUnit = $alert['threshold_unit'];
-      }
-      if (!empty($alert['is_active'])) {
-          $isActive = true;
-      }
+    if (isset($alert['alert_type'])) {
+      $currentType = $alert['alert_type'];
+    }
+    if (isset($alert['name'])) {
+      $alertName = $alert['name'];
+    }
+    if (isset($alert['description'])) {
+      $alertDescription = $alert['description'];
+    }
+    if (isset($alert['project_id'])) {
+      $currentProject = (int) $alert['project_id'];
+    }
+    if (isset($alert['flow_id'])) {
+      $currentFlow = (int) $alert['flow_id'];
+    }
+    if (isset($alert['threshold_value'])) {
+      $thresholdValue = $alert['threshold_value'];
+    }
+    if (isset($alert['threshold_unit'])) {
+      $thresholdUnit = $alert['threshold_unit'];
+    }
+    if (!empty($alert['is_active'])) {
+      $isActive = true;
+    }
   }
 
   $severityOptions = [
-      'info' => 'Info',
-      'major' => 'Major',
-      'critical' => 'Critical',
+    'info' => 'Info',
+    'major' => 'Major',
+    'critical' => 'Critical',
   ];
   ?>
 
@@ -131,14 +132,16 @@ if (!isset($view) || $view === '') {
           <div class="col-md-6">
             <label class="form-label">Name *</label>
             <input type="text" name="name" class="form-control" required maxlength="200"
-                   autofocus data-char-counter="1"
-                   value="<?= esc($alertName); ?>">
+              autofocus data-char-counter="1"
+              value="<?= esc($alertName); ?>">
           </div>
           <div class="col-md-6">
             <label class="form-label">Severity</label>
             <select name="alert_type" class="form-select">
               <?php foreach ($severityOptions as $key => $label) { ?>
-                <option value="<?= $key; ?>" <?php if ($currentType === $key) { echo 'selected'; } ?>>
+                <option value="<?= $key; ?>" <?php if ($currentType === $key) {
+                                                echo 'selected';
+                                              } ?>>
                   <?= $label; ?>
                 </option>
               <?php } ?>
@@ -148,7 +151,7 @@ if (!isset($view) || $view === '') {
           <div class="col-12">
             <label class="form-label">Description</label>
             <textarea name="description" class="form-control" rows="3" maxlength="1000"
-                      data-char-counter="1"><?= esc($alertDescription); ?></textarea>
+              data-char-counter="1"><?= esc($alertDescription); ?></textarea>
           </div>
 
           <div class="col-md-6">
@@ -156,7 +159,9 @@ if (!isset($view) || $view === '') {
             <select name="project_id" class="form-select" required>
               <option value="">- Select project -</option>
               <?php foreach ($projects as $p) { ?>
-                <option value="<?= (int) $p['id']; ?>" <?php if ((int) $p['id'] === $currentProject) { echo 'selected'; } ?>>
+                <option value="<?= (int) $p['id']; ?>" <?php if ((int) $p['id'] === $currentProject) {
+                                                          echo 'selected';
+                                                        } ?>>
                   <?= esc($p['name']); ?>
                 </option>
               <?php } ?>
@@ -167,7 +172,9 @@ if (!isset($view) || $view === '') {
             <select name="flow_id" class="form-select" required>
               <option value="">Select flow</option>
               <?php foreach ($flows as $f) { ?>
-                <option value="<?= (int) $f['id']; ?>" <?php if ((int) $f['id'] === $currentFlow) { echo 'selected'; } ?>>
+                <option value="<?= (int) $f['id']; ?>" <?php if ((int) $f['id'] === $currentFlow) {
+                                                          echo 'selected';
+                                                        } ?>>
                   <?= esc($f['name']); ?>
                 </option>
               <?php } ?>
@@ -191,7 +198,9 @@ if (!isset($view) || $view === '') {
               <?php foreach ($users as $u) { ?>
                 <?php $uVal = (string) $u['user_id']; ?>
                 <option value="<?= esc($uVal); ?>"
-                  <?php if (in_array($uVal, $existingNotify, true)) { echo 'selected'; } ?>>
+                  <?php if (in_array($uVal, $existingNotify, true)) {
+                    echo 'selected';
+                  } ?>>
                   <?= esc($u['name']); ?> - <?= esc($u['email']); ?>
                 </option>
               <?php } ?>
@@ -202,23 +211,21 @@ if (!isset($view) || $view === '') {
             <div class="col-12">
               <div class="form-check">
                 <input class="form-check-input" type="checkbox" name="is_active" id="isActive"
-                  <?php if ($isActive) { echo 'checked'; } ?>>
+                  <?php if ($isActive) {
+                    echo 'checked';
+                  } ?>>
                 <label class="form-check-label" for="isActive">Active</label>
               </div>
             </div>
           <?php } ?>
         </div>
 
-        <div class="mt-3">
+        <div class="mt-3 d-flex justify-content-end gap-2">
+          <a href="<?= site_url('alerts'); ?>" class="btn btn-light">Cancel</a>
           <button type="submit" class="btn btn-primary">
             <i class="bi bi-check-lg"></i>
-            <?php if ($isEdit) { ?>
-              Update
-            <?php } else { ?>
-              Create
-            <?php } ?>
+            <?php if ($isEdit) { ?>Update<?php } else { ?>Create<?php } ?>
           </button>
-          <a href="<?= site_url('alerts'); ?>" class="btn btn-light">Cancel</a>
         </div>
       </form>
     </div>
@@ -256,10 +263,10 @@ if (!isset($view) || $view === '') {
                   $flowName = null;
                   $stateName = null;
                   if (isset($r['flow_name'])) {
-                      $flowName = $r['flow_name'];
+                    $flowName = $r['flow_name'];
                   }
                   if (isset($r['state_name'])) {
-                      $stateName = $r['state_name'];
+                    $stateName = $r['state_name'];
                   }
                   ?>
                   <tr>
@@ -350,7 +357,9 @@ if (!isset($view) || $view === '') {
                 <?php } ?>
               </select>
             </div>
-            <button class="btn btn-primary"><i class="bi bi-plus-lg"></i> Add rule</button>
+            <div class="d-flex justify-content-end mt-2">
+              <button class="btn btn-primary"><i class="bi bi-plus-lg"></i> Add rule</button>
+            </div>
           </form>
         </div>
       </div>
@@ -358,7 +367,10 @@ if (!isset($view) || $view === '') {
   </div>
 
 <?php } else if ($view === 'api_keys') { ?>
-  <?php $newKeyValue = ''; if (!empty($newKey)) { $newKeyValue = $newKey; } ?>
+  <?php $newKeyValue = '';
+  if (!empty($newKey)) {
+    $newKeyValue = $newKey;
+  } ?>
 
   <div class="page-head">
     <div>
@@ -398,10 +410,10 @@ if (!isset($view) || $view === '') {
                   $projectName = null;
                   $lastUsed = null;
                   if (isset($k['project_name'])) {
-                      $projectName = $k['project_name'];
+                    $projectName = $k['project_name'];
                   }
                   if (isset($k['last_used'])) {
-                      $lastUsed = $k['last_used'];
+                    $lastUsed = $k['last_used'];
                   }
                   ?>
                   <tr>

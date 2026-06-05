@@ -1,6 +1,6 @@
 -- MariaDB dump 10.19  Distrib 10.4.32-MariaDB, for Win64 (AMD64)
 --
--- Host: 127.0.0.1    Database: pview_alerts
+-- Host: localhost    Database: pview_alerts
 -- ------------------------------------------------------
 -- Server version	10.4.32-MariaDB
 
@@ -35,6 +35,8 @@ CREATE TABLE `activity_logs` (
   `meta` text DEFAULT NULL,
   `ip_address` varchar(45) DEFAULT NULL,
   `user_agent` varchar(255) DEFAULT NULL,
+  `browser` varchar(80) DEFAULT NULL,
+  `project_id` int(10) unsigned DEFAULT NULL,
   `url` varchar(255) DEFAULT NULL,
   `method` varchar(10) DEFAULT NULL,
   `status` varchar(10) DEFAULT NULL,
@@ -158,6 +160,29 @@ CREATE TABLE `app_settings` (
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
+-- Table structure for table `cron_runs`
+--
+
+DROP TABLE IF EXISTS `cron_runs`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!40101 SET character_set_client = utf8 */;
+CREATE TABLE `cron_runs` (
+  `id` int(10) unsigned NOT NULL AUTO_INCREMENT,
+  `script` varchar(100) NOT NULL,
+  `started_at` datetime NOT NULL,
+  `finished_at` datetime DEFAULT NULL,
+  `duration_ms` int(10) unsigned DEFAULT 0,
+  `status` enum('ok','failed') NOT NULL DEFAULT 'ok',
+  `tickets_checked` int(10) unsigned DEFAULT 0,
+  `notifs_sent` int(10) unsigned DEFAULT 0,
+  `notifs_failed` int(10) unsigned DEFAULT 0,
+  `output_summary` text DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  KEY `idx_cron_script_started` (`script`,`started_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
 -- Table structure for table `escalation_matrix`
 --
 
@@ -178,6 +203,7 @@ CREATE TABLE `escalation_matrix` (
   KEY `escalation_matrix_flow_id_foreign` (`flow_id`),
   KEY `escalation_matrix_state_id_foreign` (`state_id`),
   KEY `escalation_matrix_created_by_foreign` (`created_by`),
+  KEY `idx_flow_state_level` (`flow_id`,`state_id`,`level`),
   CONSTRAINT `escalation_matrix_created_by_foreign` FOREIGN KEY (`created_by`) REFERENCES `users` (`user_id`),
   CONSTRAINT `escalation_matrix_flow_id_foreign` FOREIGN KEY (`flow_id`) REFERENCES `flows` (`id`),
   CONSTRAINT `escalation_matrix_state_id_foreign` FOREIGN KEY (`state_id`) REFERENCES `states` (`id`)
@@ -196,6 +222,7 @@ CREATE TABLE `flows` (
   `project_id` int(10) unsigned NOT NULL,
   `name` varchar(200) NOT NULL,
   `status` enum('active','inactive') NOT NULL DEFAULT 'active',
+  `tat_level_count` tinyint(3) unsigned NOT NULL DEFAULT 4,
   `created_by` varchar(64) NOT NULL,
   `created_at` datetime NOT NULL DEFAULT current_timestamp(),
   `updated_at` datetime NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
@@ -355,6 +382,35 @@ CREATE TABLE `saved_filters` (
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
+-- Table structure for table `state_transitions`
+--
+
+DROP TABLE IF EXISTS `state_transitions`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!40101 SET character_set_client = utf8 */;
+CREATE TABLE `state_transitions` (
+  `id` int(10) unsigned NOT NULL AUTO_INCREMENT,
+  `flow_id` int(10) unsigned NOT NULL,
+  `from_state_id` int(10) unsigned NOT NULL,
+  `to_state_id` int(10) unsigned NOT NULL,
+  `transition_type` enum('forward','backward','rework') NOT NULL DEFAULT 'forward',
+  `requires_comment` tinyint(1) NOT NULL DEFAULT 0,
+  `sort_order` int(11) NOT NULL DEFAULT 0,
+  `created_by` varchar(64) NOT NULL DEFAULT '',
+  `created_at` datetime NOT NULL DEFAULT current_timestamp(),
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uq_transition` (`flow_id`,`from_state_id`,`to_state_id`,`transition_type`),
+  KEY `idx_from` (`flow_id`,`from_state_id`),
+  KEY `idx_to` (`flow_id`,`to_state_id`),
+  KEY `fk_st_from` (`from_state_id`),
+  KEY `fk_st_to` (`to_state_id`),
+  CONSTRAINT `fk_st_flow` FOREIGN KEY (`flow_id`) REFERENCES `flows` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `fk_st_from` FOREIGN KEY (`from_state_id`) REFERENCES `states` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `fk_st_to` FOREIGN KEY (`to_state_id`) REFERENCES `states` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
 -- Table structure for table `states`
 --
 
@@ -401,9 +457,10 @@ DROP TABLE IF EXISTS `ticket_actions`;
 CREATE TABLE `ticket_actions` (
   `id` int(10) unsigned NOT NULL AUTO_INCREMENT,
   `ticket_id` int(10) unsigned NOT NULL,
-  `action_type` enum('created','commented','state_changed','level_escalated','assigned','attachment','resolved','closed','api_update','title_changed','description_changed','priority_changed') NOT NULL,
+  `action_type` enum('created','commented','state_changed','level_escalated','assigned','attachment','resolved','closed','reopened','api_update','title_changed','description_changed','priority_changed') NOT NULL,
   `from_state_id` int(10) unsigned DEFAULT NULL,
   `to_state_id` int(10) unsigned DEFAULT NULL,
+  `transition_type` enum('forward','backward') DEFAULT NULL,
   `from_level` tinyint(4) DEFAULT NULL,
   `to_level` tinyint(4) DEFAULT NULL,
   `comment` text DEFAULT NULL,
@@ -438,6 +495,8 @@ CREATE TABLE `tickets` (
   `description` text DEFAULT NULL,
   `alert_type` enum('info','major','critical') NOT NULL DEFAULT 'info',
   `priority` enum('low','medium','high','urgent') NOT NULL DEFAULT 'medium',
+  `actual_start_date` date DEFAULT NULL,
+  `actual_end_date` date DEFAULT NULL,
   `current_state_id` int(10) unsigned DEFAULT NULL,
   `current_level` tinyint(4) NOT NULL DEFAULT 1,
   `current_assignee` varchar(64) DEFAULT NULL,
@@ -461,6 +520,7 @@ CREATE TABLE `tickets` (
   KEY `idx_tickets_created_at` (`created_at`),
   KEY `idx_tickets_alert_type` (`alert_type`),
   KEY `idx_tickets_status_alert_type` (`status`,`alert_type`),
+  KEY `idx_state_entered_at` (`state_entered_at`),
   CONSTRAINT `tickets_current_assignee_foreign` FOREIGN KEY (`current_assignee`) REFERENCES `users` (`user_id`) ON DELETE SET NULL,
   CONSTRAINT `tickets_current_state_id_foreign` FOREIGN KEY (`current_state_id`) REFERENCES `states` (`id`) ON DELETE SET NULL,
   CONSTRAINT `tickets_flow_id_foreign` FOREIGN KEY (`flow_id`) REFERENCES `flows` (`id`),
@@ -516,14 +576,6 @@ CREATE TABLE `users` (
   UNIQUE KEY `uq_users_user_id` (`user_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
-
---
--- Dumping events for database 'pview_alerts'
---
-
---
--- Dumping routines for database 'pview_alerts'
---
 /*!40103 SET TIME_ZONE=@OLD_TIME_ZONE */;
 
 /*!40101 SET SQL_MODE=@OLD_SQL_MODE */;
@@ -534,4 +586,4 @@ CREATE TABLE `users` (
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
--- Dump completed on 2026-05-29 16:38:40
+-- Dump completed on 2026-06-05  9:57:51

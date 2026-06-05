@@ -29,8 +29,8 @@ $showDemo   = (int) app_setting('login_show_demo_creds', 0);
     <span class="input-group-text"><i class="bi bi-lock"></i></span>
     <input type="password" name="password" id="loginPassword" class="form-control" required placeholder="********"
       data-caps-warn="1">
-    <button type="button" class="btn btn-outline-secondary" data-toggle-password="loginPassword" tabindex="-1" title="Show / hide password">
-      <i class="bi bi-eye"></i>
+    <button type="button" class="btn btn-outline-secondary" data-toggle-password="loginPassword" tabindex="-1" title="Show / hide password" aria-label="Show or hide password">
+      <i class="bi bi-eye" aria-hidden="true"></i>
     </button>
   </div>
 

@@ -6,38 +6,38 @@
 
 $layoutArr = [];
 if (isset($layout) && is_array($layout)) {
-    $layoutArr = $layout;
+  $layoutArr = $layout;
 }
 
 $defaultProjectId = 0;
 if (isset($layoutArr['default_project_id'])) {
-    $defaultProjectId = (int) $layoutArr['default_project_id'];
+  $defaultProjectId = (int) $layoutArr['default_project_id'];
 }
 
 $kpiVisible = ['open' => 1, 'critical' => 1, 'major' => 1, 'resolved' => 1];
 if (isset($layoutArr['kpi_visible']) && is_array($layoutArr['kpi_visible'])) {
-    foreach (['open', 'critical', 'major', 'resolved'] as $k) {
-        if (isset($layoutArr['kpi_visible'][$k])) {
-            $kpiVisible[$k] = (int) $layoutArr['kpi_visible'][$k];
-        }
+  foreach (['open', 'critical', 'major', 'resolved'] as $k) {
+    if (isset($layoutArr['kpi_visible'][$k])) {
+      $kpiVisible[$k] = (int) $layoutArr['kpi_visible'][$k];
     }
+  }
 }
 
 $defaultTrendRange = 0;
 if (isset($layoutArr['default_trend_range'])) {
-    $defaultTrendRange = (int) $layoutArr['default_trend_range'];
+  $defaultTrendRange = (int) $layoutArr['default_trend_range'];
 }
 
 $rangeOptions = app_setting_csv('dashboard_trend_ranges', ['7', '15', '30']);
 $rangesInt = [];
 foreach ($rangeOptions as $r) {
-    $n = (int) $r;
-    if ($n >= 1 && $n <= 365) {
-        $rangesInt[] = $n;
-    }
+  $n = (int) $r;
+  if ($n >= 1 && $n <= 365) {
+    $rangesInt[] = $n;
+  }
 }
 if (empty($rangesInt)) {
-    $rangesInt = [7, 15, 30];
+  $rangesInt = [7, 15, 30];
 }
 ?>
 
@@ -59,7 +59,9 @@ if (empty($rangesInt)) {
       <select name="default_project_id" class="form-select" style="max-width: 420px;">
         <option value="0">All projects (no filter)</option>
         <?php foreach ($projects as $p) { ?>
-          <option value="<?= (int) $p['id']; ?>" <?php if ($defaultProjectId === (int) $p['id']) { echo 'selected'; } ?>>
+          <option value="<?= (int) $p['id']; ?>" <?php if ($defaultProjectId === (int) $p['id']) {
+                                                    echo 'selected';
+                                                  } ?>>
             <?= esc($p['name']); ?>
           </option>
         <?php } ?>
@@ -77,28 +79,36 @@ if (empty($rangesInt)) {
         <div class="col-md-3">
           <div class="form-check form-switch">
             <input type="checkbox" class="form-check-input" name="kpi_open" id="kpi_open"
-              <?php if ($kpiVisible['open'] === 1) { echo 'checked'; } ?>>
+              <?php if ($kpiVisible['open'] === 1) {
+                echo 'checked';
+              } ?>>
             <label class="form-check-label" for="kpi_open">Open Tickets</label>
           </div>
         </div>
         <div class="col-md-3">
           <div class="form-check form-switch">
             <input type="checkbox" class="form-check-input" name="kpi_critical" id="kpi_critical"
-              <?php if ($kpiVisible['critical'] === 1) { echo 'checked'; } ?>>
+              <?php if ($kpiVisible['critical'] === 1) {
+                echo 'checked';
+              } ?>>
             <label class="form-check-label" for="kpi_critical">Critical</label>
           </div>
         </div>
         <div class="col-md-3">
           <div class="form-check form-switch">
             <input type="checkbox" class="form-check-input" name="kpi_major" id="kpi_major"
-              <?php if ($kpiVisible['major'] === 1) { echo 'checked'; } ?>>
+              <?php if ($kpiVisible['major'] === 1) {
+                echo 'checked';
+              } ?>>
             <label class="form-check-label" for="kpi_major">Major</label>
           </div>
         </div>
         <div class="col-md-3">
           <div class="form-check form-switch">
             <input type="checkbox" class="form-check-input" name="kpi_resolved" id="kpi_resolved"
-              <?php if ($kpiVisible['resolved'] === 1) { echo 'checked'; } ?>>
+              <?php if ($kpiVisible['resolved'] === 1) {
+                echo 'checked';
+              } ?>>
             <label class="form-check-label" for="kpi_resolved">Resolved</label>
           </div>
         </div>
@@ -115,7 +125,9 @@ if (empty($rangesInt)) {
       <select name="default_trend_range" class="form-select" style="max-width: 220px;">
         <option value="0">Use system default (<?= (int) $rangesInt[0]; ?> days)</option>
         <?php foreach ($rangesInt as $r) { ?>
-          <option value="<?= (int) $r; ?>" <?php if ($defaultTrendRange === (int) $r) { echo 'selected'; } ?>>
+          <option value="<?= (int) $r; ?>" <?php if ($defaultTrendRange === (int) $r) {
+                                              echo 'selected';
+                                            } ?>>
             <?= (int) $r; ?> days
           </option>
         <?php } ?>

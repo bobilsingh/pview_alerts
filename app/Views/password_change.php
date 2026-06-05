@@ -33,8 +33,8 @@ $rotateDays = (int) app_setting('password_rotate_days', 90);
     <span class="input-group-text"><i class="bi bi-lock"></i></span>
     <input type="password" name="current_password" id="currentPassword" class="form-control" required autofocus
       data-caps-warn="1">
-    <button type="button" class="btn btn-outline-secondary" data-toggle-password="currentPassword" tabindex="-1" title="Show / hide password">
-      <i class="bi bi-eye"></i>
+    <button type="button" class="btn btn-outline-secondary" data-toggle-password="currentPassword" tabindex="-1" title="Show / hide password" aria-label="Show or hide password">
+      <i class="bi bi-eye" aria-hidden="true"></i>
     </button>
   </div>
 
@@ -62,7 +62,10 @@ $rotateDays = (int) app_setting('password_rotate_days', 90);
     <i class="bi bi-check-lg"></i> <span class="btn-label">Update password</span>
   </button>
 
-  <a href="<?= site_url('logout'); ?>" class="d-block text-center text-muted mt-3 small">
-    <i class="bi bi-box-arrow-right"></i> Sign out
-  </a>
+  <form method="post" action="<?= site_url('logout'); ?>" class="text-center mt-3">
+    <?= csrf_field(); ?>
+    <button type="submit" class="btn btn-link text-muted small p-0">
+      <i class="bi bi-box-arrow-right"></i> Sign out
+    </button>
+  </form>
 </form>

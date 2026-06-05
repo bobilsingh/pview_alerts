@@ -161,8 +161,8 @@ if (!isset($view) || $view === '') {
                 <?php if (!$isEdit) {
                   echo 'required';
                 } ?>>
-              <button type="button" class="btn btn-outline-secondary" data-toggle-password="userPassword" tabindex="-1" title="Show / hide password">
-                <i class="bi bi-eye"></i>
+              <button type="button" class="btn btn-outline-secondary" data-toggle-password="userPassword" tabindex="-1" title="Show / hide password" aria-label="Show or hide password">
+                <i class="bi bi-eye" aria-hidden="true"></i>
               </button>
             </div>
             <small class="text-muted" id="pwHelp">
@@ -209,14 +209,14 @@ if (!isset($view) || $view === '') {
           <?php } ?>
         </div>
 
-        <div class="mt-3">
+        <div class="mt-3 d-flex justify-content-end gap-2">
+          <a href="<?= site_url('users'); ?>" class="btn btn-light">Cancel</a>
           <button type="submit" class="btn btn-primary">
             <i class="bi bi-check-lg"></i>
             <span class="btn-label">
               <?php if ($isEdit) { ?>Update<?php } else { ?>Create<?php } ?>
             </span>
           </button>
-          <a href="<?= site_url('users'); ?>" class="btn btn-light">Cancel</a>
         </div>
       </form>
     </div>

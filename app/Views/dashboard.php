@@ -51,7 +51,7 @@ if (isset($prefProjectName) && $prefProjectName !== '') {
 
 <div class="page-head">
   <div>
-    <h2>NOC Dashboard</h2>
+    <h2>Dashboard</h2>
     <div class="subtitle">Live overview of network alerts, ticket flow and escalations.</div>
     <?php if ($pinnedProjectLabel !== '') { ?>
       <div class="mt-2">
@@ -64,12 +64,93 @@ if (isset($prefProjectName) && $prefProjectName !== '') {
   </div>
   <div class="d-flex align-items-center gap-2">
     <span class="time-chip"><i class="bi bi-clock"></i> <?= esc(strtoupper(date('D, d M Y H:i'))); ?></span>
-    <a href="<?= site_url('me/dashboard'); ?>" class="btn btn-light" title="Customize my dashboard">
+    <button type="button" class="btn btn-light" id="dashCustomizeToggle"
+      aria-expanded="false" aria-controls="dashCustomizePanel"
+      title="Customize dashboard">
       <i class="bi bi-sliders"></i> Customize
-    </a>
+    </button>
     <a href="<?= site_url('tickets/create'); ?>" class="btn btn-primary"><i class="bi bi-plus-lg"></i> Raise Ticket</a>
   </div>
 </div>
+
+<?php
+$custKpi = isset($custKpiVisible) && is_array($custKpiVisible) ? $custKpiVisible : ['open' => 1, 'critical' => 1, 'major' => 1, 'resolved' => 1];
+$custProjId = (int) ($custDefaultProjectId ?? 0);
+$custTrendRange = (int) ($custDefaultTrendRange ?? 0);
+$custRanges = isset($custRangesInt) && is_array($custRangesInt) ? $custRangesInt : [7, 15, 30];
+$custProjectsList = isset($custProjects) && is_array($custProjects) ? $custProjects : [];
+?>
+
+<!-- Inline Customize panel (same settings as me/dashboard page) -->
+<div id="dashCustomizePanel" class="card mb-3 d-none">
+  <form method="post" action="<?= site_url('me/dashboard'); ?>" data-loading-form="1">
+    <?= csrf_field(); ?>
+
+    <div class="card-header filter-bar-header">
+      <span class="filter-bar-title"><i class="bi bi-sliders"></i> Dashboard Preferences</span>
+      <div class="filter-bar-actions">
+        <button type="button" class="btn btn-sm btn-light" id="dashCustomizeClose">
+          <i class="bi bi-x-lg"></i>
+        </button>
+      </div>
+    </div>
+
+    <div class="card-body">
+      <!-- Row 1: project + trend range -->
+      <div class="row g-3 mb-3">
+        <div class="col-md-6">
+          <label class="form-label fw-semibold">Default Project</label>
+          <select name="default_project_id" class="form-select">
+            <option value="0">All projects (no filter)</option>
+            <?php foreach ($custProjectsList as $p) { ?>
+              <option value="<?= (int) $p['id']; ?>" <?= $custProjId === (int) $p['id'] ? 'selected' : ''; ?>>
+                <?= esc($p['name']); ?>
+              </option>
+            <?php } ?>
+          </select>
+          <div class="form-text">Scopes KPIs, severity mix and trend chart to a single project.</div>
+        </div>
+        <div class="col-md-4">
+          <label class="form-label fw-semibold">Default Trend Range</label>
+          <select name="default_trend_range" class="form-select">
+            <option value="0" <?= $custTrendRange === 0 ? 'selected' : ''; ?>>
+              System default (<?= (int) ($custRanges[0] ?? 7); ?> days)
+            </option>
+            <?php foreach ($custRanges as $r) { ?>
+              <option value="<?= (int) $r; ?>" <?= $custTrendRange === (int) $r ? 'selected' : ''; ?>>
+                <?= (int) $r; ?> days
+              </option>
+            <?php } ?>
+          </select>
+          <div class="form-text">Starting time window for the Ticket Trend chart.</div>
+        </div>
+      </div>
+
+      <!-- Row 2: KPI card toggles -->
+      <div>
+        <label class="form-label fw-semibold">KPI Cards</label>
+        <div class="row g-2">
+          <?php foreach (['open' => 'Open Tickets', 'critical' => 'Critical', 'major' => 'Major', 'resolved' => 'Resolved'] as $key => $lbl) { ?>
+            <div class="col-md-3 col-6">
+              <div class="form-check form-switch">
+                <input type="checkbox" class="form-check-input" name="kpi_<?= $key; ?>" id="dkpi_<?= $key; ?>"
+                  <?= !empty($custKpi[$key]) ? 'checked' : ''; ?>>
+                <label class="form-check-label" for="dkpi_<?= $key; ?>"><?= esc($lbl); ?></label>
+              </div>
+            </div>
+          <?php } ?>
+        </div>
+      </div>
+    </div>
+
+    <div class="card-footer d-flex justify-content-end gap-2">
+      <button type="button" class="btn btn-light" id="dashCustomizeCancel">Cancel</button>
+      <button type="submit" class="btn btn-primary"><i class="bi bi-check-lg"></i> Save Preferences</button>
+    </div>
+
+  </form>
+</div>
+
 
 <div class="kpi-grid">
   <?php if ($show['open'] === 1) { ?>
@@ -180,73 +261,56 @@ if (isset($prefProjectName) && $prefProjectName !== '') {
 
 <div class="card recent-card">
   <div class="card-header">
-    <strong><i class="bi bi-list-ul text-primary"></i> Recent Tickets</strong>
-    <span class="text-muted small">Escalated: <span class="badge bg-danger"><?= (int) $tatBreached; ?></span></span>
+    <strong><i class="bi bi-list-ul text-primary"></i> Active Tickets</strong>
+    <?php if ((int) $tatBreached > 0) { ?>
+      <span class="badge bg-danger ms-1"><i class="bi bi-exclamation-triangle-fill"></i> <?= (int) $tatBreached; ?> Escalated</span>
+    <?php } ?>
+    <a href="<?= site_url('tickets'); ?>" class="btn btn-sm btn-light ms-auto">View all</a>
   </div>
   <div class="card-body p-0">
-    <table
-      id="recentTickets"
-      class="table align-middle mb-0"
-      data-simple-table="1"
-      data-order-col="6"
-      data-order-dir="desc">
-      <thead>
+    <table class="table align-middle mb-0">
+      <thead class="table-light">
         <tr>
           <th>Alarm ID</th>
           <th>Title</th>
+          <th>Priority</th>
           <th>Severity</th>
           <th>Status</th>
           <th>State</th>
           <th>TAT</th>
-          <th>Created</th>
         </tr>
       </thead>
       <tbody>
-        <?php foreach ($recentTickets as $t) { ?>
-          <?php
-          // tat_expires_at() returns '' for resolved/closed tickets and final states
-          // so the countdown stops automatically. JS renders an "—" pill on empty.
-          $expires = tat_expires_at($t);
-
-          $assigneeName = '-';
-          if (isset($t['assignee_name']) && $t['assignee_name'] !== '') {
-            $assigneeName = $t['assignee_name'];
-          }
-
-          $alertType = '';
-          if (isset($t['alert_type'])) {
-            $alertType = $t['alert_type'];
-          }
-
-          $status = '';
-          if (isset($t['status'])) {
-            $status = $t['status'];
-          }
-
-          $stateName = '-';
-          if (isset($t['state_name']) && $t['state_name'] !== '') {
-            $stateName = $t['state_name'];
-          }
-          ?>
+        <?php if (empty($recentTickets)) { ?>
           <tr>
-            <td><a href="<?= site_url('tickets/detail/' . $t['alarm_id']); ?>" class="alarm-id"><?= esc($t['alarm_id']); ?></a></td>
-            <td>
-              <div class="fw-semibold text-truncate" style="max-width:320px;" title="<?= esc($t['title']); ?>"><?= esc($t['title']); ?></div>
-              <small class="text-muted">by <?= esc($assigneeName); ?></small>
+            <td colspan="7" class="text-center text-muted py-4">
+              <i class="bi bi-check-circle text-success"></i> No active tickets — all clear.
             </td>
-            <td><?= alert_badge($alertType); ?></td>
-            <td><?= status_badge($status); ?></td>
-            <td><span class="text-muted"><?= esc($stateName); ?></span></td>
-            <td><span class="tat-countdown" data-tat-expires="<?= esc($expires); ?>" data-tat-total-ms="<?= (int) (tat_total_minutes($t) * 60000); ?>"></span></td>
-            <td class="text-muted small"><?= esc($t['created_at']); ?></td>
           </tr>
         <?php } ?>
-        <?php /* No custom empty-state row here — DataTables initialises
-                 this table via data-simple-table="1" and counts <td> cells
-                 per row to validate column count (TN/18). A single
-                 colspan="7" row throws "Incorrect column count"; instead
-                 we leave tbody empty and let DataTables show its built-in
-                 "No data available in table" message. */ ?>
+        <?php foreach ($recentTickets as $t) { ?>
+          <?php
+          $expires    = tat_expires_at($t);
+          $status     = isset($t['status'])     ? $t['status']     : '';
+          $alertType  = isset($t['alert_type']) ? $t['alert_type'] : '';
+          $priority   = isset($t['priority'])   ? $t['priority']   : '';
+          $stateName  = (isset($t['state_name']) && $t['state_name'] !== '') ? $t['state_name'] : '-';
+          $assignee   = (isset($t['assignee_name']) && $t['assignee_name'] !== '') ? $t['assignee_name'] : 'Unassigned';
+          $rowClass   = $status === 'escalated' ? 'row-escalated' : '';
+          ?>
+          <tr class="<?= $rowClass; ?>">
+            <td><a href="<?= site_url('tickets/detail/' . $t['alarm_id']); ?>" class="alarm-id"><?= esc($t['alarm_id']); ?></a></td>
+            <td>
+              <div class="fw-semibold text-truncate" style="max-width:260px;" title="<?= esc($t['title']); ?>"><?= esc($t['title']); ?></div>
+              <small class="text-muted">Assignee: <?= esc($assignee); ?></small>
+            </td>
+            <td><?= priority_badge($priority); ?></td>
+            <td><?= alert_badge($alertType); ?></td>
+            <td><?= status_badge($status); ?></td>
+            <td><span class="text-muted small"><?= esc($stateName); ?></span></td>
+            <td><span class="tat-countdown" data-tat-expires="<?= esc($expires); ?>" data-tat-total-ms="<?= (int) (tat_total_minutes($t) * 60000); ?>"></span></td>
+          </tr>
+        <?php } ?>
       </tbody>
     </table>
   </div>

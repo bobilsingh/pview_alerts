@@ -16,12 +16,12 @@ if (!function_exists('setting_label')) {
 // Group keys logically so the page reads top-to-bottom.
 $groups = [
   'Branding'      => ['app_name', 'login_show_demo_creds'],
-  'Security'      => ['password_min_length', 'password_require_letter', 'password_require_digit', 'password_rotate_days', 'login_max_attempts', 'login_lockout_minutes'],
+  'Security'      => ['maintenance_mode', 'password_min_length', 'password_require_letter', 'password_require_digit', 'password_rotate_days', 'login_max_attempts', 'login_lockout_minutes', 'session_idle_timeout_minutes'],
   'Rate Limiting' => ['api_rate_per_minute', 'api_rate_per_hour'],
   'Attachments'   => ['upload_max_mb', 'upload_allowed_ext', 'upload_blocked_ext'],
   'TAT defaults'  => ['default_tat_l1_minutes', 'default_tat_l2_minutes', 'default_tat_l3_minutes', 'default_tat_l4_minutes'],
   'UI'            => ['datatable_page_length', 'dashboard_trend_ranges'],
-  'Live polling'  => ['live_poll_seconds', 'live_audio_enabled', 'live_browser_notify'],
+  'Live polling'  => ['live_poll_seconds', 'live_audio_enabled', 'live_browser_notify', 'analytics_refresh_seconds'],
   'Email / SMTP'  => ['email_protocol', 'email_smtp_host', 'email_smtp_port', 'email_smtp_user', 'email_smtp_pass', 'email_smtp_crypto', 'email_from_email', 'email_from_name'],
   'Notification queue' => ['notification_batch_size', 'notification_max_attempts'],
   // Bumping this number invalidates every browser's cached copy of
@@ -45,6 +45,8 @@ $numericKeys = [
   'default_tat_l4_minutes',
   'datatable_page_length',
   'live_poll_seconds',
+  'analytics_refresh_seconds',
+  'session_idle_timeout_minutes',
   'email_smtp_port',
   'notification_batch_size',
   'notification_max_attempts',
@@ -76,9 +78,12 @@ $descOverrides = [
   'default_tat_l4_minutes'  => 'Default TAT (minutes) for Level 4 before auto-escalation.',
   'datatable_page_length'   => 'Default rows per page shown in all data tables across the app.',
   'dashboard_trend_ranges'  => 'Comma-separated day windows for the dashboard trend chart (e.g. "7,15,30"). The first value is the default range. Each must be between 1 and 365.',
-  'live_poll_seconds'       => 'How often the bell badge / dashboard polls for new actionable tickets, in seconds (5-120). 0 disables polling.',
-  'live_audio_enabled'      => 'Play a short audio cue when the actionable-ticket count rises during live polling.',
-  'live_browser_notify'     => 'Show a browser notification (if the user has granted permission) when the actionable count rises.',
+  'live_poll_seconds'              => 'How often the bell badge / dashboard polls for new actionable tickets, in seconds (5-120). 0 disables polling.',
+  'live_audio_enabled'             => 'Play a short audio cue when the actionable-ticket count rises during live polling.',
+  'live_browser_notify'            => 'Show a browser notification (if the user has granted permission) when the actionable count rises.',
+  'analytics_refresh_seconds'      => 'How often the Activity Log Analytics tab auto-refreshes in seconds (10-300). 0 disables auto-refresh.',
+  'maintenance_mode'               => 'When enabled, non-admin users see a maintenance page instead of the app. Super-admin and admin-scope roles can still log in and work normally.',
+  'session_idle_timeout_minutes'   => 'Client-side idle timeout: log out after this many minutes with no mouse, keyboard, or scroll activity (browser-side check). 0 disables.',
   'email_protocol'          => 'Mail protocol. Usually "smtp" — alternatives are "sendmail" or "mail".',
   'email_smtp_host'         => 'SMTP server hostname (e.g. mail.example.com).',
   'email_smtp_port'         => 'SMTP port. 587 for STARTTLS, 465 for implicit SSL, 25 for plain.',
@@ -104,9 +109,14 @@ foreach ($groups as $keys) {
     $known[$k] = true;
   }
 }
+// Keys that exist in the DB but must never appear in the UI.
+// Managed only via code or direct DB — exposing them in the Settings page
+// caused accidental misconfiguration (e.g. session_timeout_minutes set to 1).
+$hidden = ['session_timeout_minutes'];
+
 $other = [];
 foreach ($byKey as $k => $row) {
-  if (!isset($known[$k])) {
+  if (!isset($known[$k]) && !in_array($k, $hidden, true)) {
     $other[] = $k;
   }
 }
@@ -183,33 +193,40 @@ if (!empty($other)) {
             $isPass = in_array($key, $passwordKeys, true);
             ?>
             <div class="col-md-6">
-              <label class="form-label" for="set_<?= esc($key); ?>">
-                <?= esc(setting_label($key)); ?>
-              </label>
-
               <?php if ($isBool) { ?>
-                <div class="form-check form-switch">
-                  <input type="checkbox" class="form-check-input"
-                    name="<?= esc($key); ?>" id="set_<?= esc($key); ?>"
-                    value="1" <?php if ($value === '1') {
-                                echo 'checked';
-                              } ?>>
-                  <label class="form-check-label" for="set_<?= esc($key); ?>">
-                    Enabled
+                <div class="d-flex align-items-center gap-3">
+                  <div class="form-check form-switch mb-0 ps-0">
+                    <input type="checkbox" class="form-check-input ms-0"
+                      role="switch"
+                      name="<?= esc($key); ?>" id="set_<?= esc($key); ?>"
+                      value="1" <?php if ($value === '1') {
+                                  echo 'checked';
+                                } ?>>
+                  </div>
+                  <label class="form-label mb-0 fw-semibold" for="set_<?= esc($key); ?>">
+                    <?= esc(setting_label($key)); ?>
                   </label>
                 </div>
-              <?php } else if ($isPass) { ?>
-                <input type="password" class="form-control"
-                  name="<?= esc($key); ?>" id="set_<?= esc($key); ?>"
-                  autocomplete="new-password"
-                  value="<?= esc($value); ?>">
-              <?php } else if ($isLong) { ?>
-                <textarea class="form-control" rows="2"
-                  name="<?= esc($key); ?>" id="set_<?= esc($key); ?>"><?= esc($value); ?></textarea>
               <?php } else { ?>
-                <input type="text" class="form-control"
-                  name="<?= esc($key); ?>" id="set_<?= esc($key); ?>"
-                  value="<?= esc($value); ?>">
+                <label class="form-label" for="set_<?= esc($key); ?>">
+                  <?= esc(setting_label($key)); ?>
+                </label>
+              <?php } ?>
+
+              <?php if (!$isBool) { ?>
+                <?php if ($isPass) { ?>
+                  <input type="password" class="form-control"
+                    name="<?= esc($key); ?>" id="set_<?= esc($key); ?>"
+                    autocomplete="new-password"
+                    value="<?= esc($value); ?>">
+                <?php } else if ($isLong) { ?>
+                  <textarea class="form-control" rows="2"
+                    name="<?= esc($key); ?>" id="set_<?= esc($key); ?>"><?= esc($value); ?></textarea>
+                <?php } else { ?>
+                  <input type="text" class="form-control"
+                    name="<?= esc($key); ?>" id="set_<?= esc($key); ?>"
+                    value="<?= esc($value); ?>">
+                <?php } ?>
               <?php } ?>
 
               <?php if ($desc !== '') { ?>
@@ -246,24 +263,6 @@ if (!empty($other)) {
 
   <div class="card mb-4">
     <div class="card-header">
-      <strong>Permissions Management</strong>
-    </div>
-    <div class="card-body">
-      <div class="row align-items-center">
-        <div class="col-md-8">
-          <p class="text-muted mb-0">Control sidebar visibility, dynamic page access, and granular CRUD action privileges (View, Add, Edit, Delete) for each role.</p>
-        </div>
-        <div class="col-md-4 text-md-end mt-3 mt-md-0">
-          <a href="<?= site_url('module_control_panel'); ?>" class="btn btn-outline-primary">
-            <i class="bi bi-shield-lock-fill"></i> Manage Module Permissions
-          </a>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <div class="card mb-4">
-    <div class="card-header">
       <strong>Roles</strong>
     </div>
     <div class="card-body">
@@ -272,7 +271,7 @@ if (!empty($other)) {
           <p class="text-muted mb-0">Define the operator and administrator roles available in the system. Each role gets its own tab in the Module Permissions panel where you toggle View / Add / Edit / Delete access per module, and an admin-tier flag that controls whether the role sees all tickets system-wide.</p>
         </div>
         <div class="col-md-4 text-md-end mt-3 mt-md-0">
-          <a href="<?= site_url('roles'); ?>" class="btn btn-outline-primary">
+          <a href="<?= site_url('roles'); ?>" class="btn btn-light">
             <i class="bi bi-people-fill"></i> Manage Roles
           </a>
         </div>
@@ -290,7 +289,7 @@ if (!empty($other)) {
           <p class="text-muted mb-0">Centralized read-only history of user events — logins, mutations, navigation, exports. Use it to investigate incidents, audit configuration changes, or track time-on-platform per operator.</p>
         </div>
         <div class="col-md-4 text-md-end mt-3 mt-md-0">
-          <a href="<?= site_url('activity_logs'); ?>" class="btn btn-outline-primary">
+          <a href="<?= site_url('activity_logs'); ?>" class="btn btn-light">
             <i class="bi bi-clipboard-data"></i> View Activity Log
           </a>
         </div>
@@ -298,9 +297,47 @@ if (!empty($other)) {
     </div>
   </div>
 
-  <button type="submit" class="btn btn-primary">
-    <i class="bi bi-check-lg"></i>
-    <span class="btn-label">Save Settings</span>
-  </button>
-  <a href="<?= site_url('dashboard'); ?>" class="btn btn-light">Cancel</a>
+  <div class="card mb-4">
+    <div class="card-header">
+      <strong>Cron Management</strong>
+    </div>
+    <div class="card-body">
+      <div class="row align-items-center">
+        <div class="col-md-8">
+          <p class="text-muted mb-0">Monitor the last run status, duration, and notification counts for all scheduled cron scripts (e.g. TAT monitor). Tracks the last 100 runs per script.</p>
+        </div>
+        <div class="col-md-4 text-md-end mt-3 mt-md-0">
+          <a href="<?= site_url('cron_panel'); ?>" class="btn btn-light">
+            <i class="bi bi-clock-history"></i> View Cron Panel
+          </a>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card mb-4">
+    <div class="card-header">
+      <strong>Permissions Management</strong>
+    </div>
+    <div class="card-body">
+      <div class="row align-items-center">
+        <div class="col-md-8">
+          <p class="text-muted mb-0">Control sidebar visibility, dynamic page access, and granular CRUD action privileges (View, Add, Edit, Delete) for each role.</p>
+        </div>
+        <div class="col-md-4 text-md-end mt-3 mt-md-0">
+          <a href="<?= site_url('module_control_panel'); ?>" class="btn btn-light">
+            <i class="bi bi-shield-lock-fill"></i> Manage Module Permissions
+          </a>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="d-flex justify-content-end gap-2 mb-4">
+    <a href="<?= site_url('dashboard'); ?>" class="btn btn-light">Cancel</a>
+    <button type="submit" class="btn btn-primary">
+      <i class="bi bi-check-lg"></i>
+      <span class="btn-label">Save Settings</span>
+    </button>
+  </div>
 </form>

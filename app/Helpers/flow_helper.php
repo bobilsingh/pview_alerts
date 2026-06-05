@@ -1,14 +1,44 @@
 <?php
 
-// Flow Mermaid source builders for the designer preview and the ticket
-// progress diagram. Views render with flow_widget_html() which wraps the
-// generated Mermaid source in the standard widget chrome.
+// Vis-network data builders for the workflow designer and ticket progress diagram.
 
 if (!function_exists('flow_ticket_ancestor_ids')) {
-    // All state IDs the ticket passed through to reach $currentStateId.
-    function flow_ticket_ancestor_ids(array $states, int $currentStateId): array
+    // Returns all state IDs upstream of $currentStateId via forward transitions (falls back to parent_state_id).
+    function flow_ticket_ancestor_ids($states, $currentStateId, $transitions = [])
     {
-        $byId = [];
+        // Build reverse-forward adjacency: for each state, which states point TO it
+        // via a forward transition?  BFS from currentStateId through this reverse
+        // map gives us everything "upstream" of the current state.
+        if (!empty($transitions)) {
+            $revFwd = [];
+            foreach ($transitions as $t) {
+                if (($t['transition_type'] ?? 'forward') !== 'forward') {
+                    continue;
+                }
+                $from = (int) $t['from_state_id'];
+                $to   = (int) $t['to_state_id'];
+                $revFwd[$to][] = $from;
+            }
+            if (!empty($revFwd)) {
+                $ancestors = [];
+                $queue     = [$currentStateId];
+                $visited   = [$currentStateId => true];
+                $guard     = 0;
+                while (!empty($queue) && $guard < 200) {
+                    $guard++;
+                    $node = array_shift($queue);
+                    foreach ($revFwd[$node] ?? [] as $prev) {
+                        if (!isset($visited[$prev])) {
+                            $visited[$prev]    = true;
+                            $ancestors[$prev]  = true;
+                            $queue[]           = $prev;
+                        }
+                    }
+                }
+                return $ancestors;
+            }
+        }
+        $byId     = [];
         foreach ($states as $s) {
             $byId[(int) $s['id']] = $s;
         }
@@ -29,87 +59,118 @@ if (!function_exists('flow_ticket_ancestor_ids')) {
     }
 }
 
-if (!function_exists('flow_mermaid_label')) {
-    // Escape a state name for use as a Mermaid double-quoted node label.
-    function flow_mermaid_label(string $name): string
+if (!function_exists('flow_vis_edges')) {
+    // Returns edges for the workflow diagram; priority: explicit transitions → parent tree → sequential sort_order.
+    function flow_vis_edges($states, $transitions = [])
     {
-        $clean = str_replace(["\\", "\"", "\n", "\r"], ["\\\\", "\\\"", ' ', ' '], $name);
-        return '"' . $clean . '"';
-    }
-}
+        // Collect only forward edges from the transitions table.
+        $fwdEdges = [];
+        foreach ($transitions as $t) {
+            if (($t['transition_type'] ?? 'forward') === 'forward') {
+                $fwdEdges[] = [
+                    'from'            => (int) $t['from_state_id'],
+                    'to'              => (int) $t['to_state_id'],
+                    'transition_type' => 'forward',
+                ];
+            }
+        }
 
-if (!function_exists('flow_mermaid_edges')) {
-    // Returns edge lines (parent --> child). Falls back to a linear chain
-    // when no parent_state_id links exist.
-    function flow_mermaid_edges(array $states): array
-    {
-        $stateIds = [];
+        if (!empty($fwdEdges)) {
+            return $fwdEdges;
+        }
+
+        $stateIds       = [];
         foreach ($states as $s) {
             $stateIds[] = (int) $s['id'];
         }
-        $lines = [];
         $hasParentLinks = false;
+        $parentSet      = []; // IDs that ARE a parent of at least one other state
         foreach ($states as $s) {
             $pid = isset($s['parent_state_id']) ? (int) $s['parent_state_id'] : 0;
             if ($pid > 0 && in_array($pid, $stateIds, true)) {
-                $lines[] = '  s' . $pid . ' --> s' . (int) $s['id'];
-                $hasParentLinks = true;
+                $fwdEdges[]      = ['from' => $pid, 'to' => (int) $s['id'], 'transition_type' => 'forward'];
+                $parentSet[$pid] = true;
+                $hasParentLinks  = true;
             }
         }
-        if (!$hasParentLinks) {
-            $count = count($states);
-            for ($i = 0; $i < $count - 1; $i++) {
-                $lines[] = '  s' . (int) $states[$i]['id'] . ' --> s' . (int) $states[$i + 1]['id'];
+        if ($hasParentLinks) {
+            // Leaf states implicitly route to the single closing/final state.
+            $closingId = null;
+            foreach ($states as $s) {
+                if (!empty($s['is_final'])) {
+                    $closingId = (int) $s['id'];
+                    break;
+                }
             }
+            if ($closingId !== null) {
+                foreach ($states as $s) {
+                    $sid = (int) $s['id'];
+                    if ($sid === $closingId) {
+                        continue;
+                    }
+                    if (isset($parentSet[$sid])) {
+                        continue;
+                    }
+                    $fwdEdges[] = ['from' => $sid, 'to' => $closingId, 'transition_type' => 'forward'];
+                }
+            }
+            return $fwdEdges;
         }
-        return $lines;
+
+        $count = count($states);
+        for ($i = 0; $i < $count - 1; $i++) {
+            $fwdEdges[] = [
+                'from'            => (int) $states[$i]['id'],
+                'to'              => (int) $states[$i + 1]['id'],
+                'transition_type' => 'forward',
+            ];
+        }
+        return $fwdEdges;
     }
 }
 
-if (!function_exists('flow_mermaid_designer_source')) {
-    // classDef is a stub — all visual styling is in CSS (.flow-widget selectors).
-    function flow_mermaid_designer_source(array $states): string
+if (!function_exists('flow_vis_designer_data')) {
+    // Returns vis-network nodes+edges for the designer preview widget.
+    function flow_vis_designer_data($states, $transitions = [])
     {
         if (empty($states)) {
-            return '';
+            return ['nodes' => [], 'edges' => []];
         }
-        $lines = ['flowchart LR'];
+        $nodes = [];
         foreach ($states as $s) {
-            $id    = 's' . (int) $s['id'];
-            $label = flow_mermaid_label((string) $s['name']);
-            if (!empty($s['is_initial']) || !empty($s['is_final'])) {
-                $lines[] = '  ' . $id . '([' . $label . '])';
-            } else {
-                $lines[] = '  ' . $id . '[' . $label . ']';
-            }
-        }
-        foreach (flow_mermaid_edges($states) as $edgeLine) {
-            $lines[] = $edgeLine;
-        }
-        $lines[] = '  classDef initialState font-weight:600';
-        $lines[] = '  classDef finalState font-weight:600';
-        $lines[] = '  classDef processState font-weight:600';
-        foreach ($states as $s) {
-            $id = 's' . (int) $s['id'];
+            $type = 'process';
             if (!empty($s['is_initial'])) {
-                $lines[] = '  class ' . $id . ' initialState';
-            } else if (!empty($s['is_final'])) {
-                $lines[] = '  class ' . $id . ' finalState';
-            } else {
-                $lines[] = '  class ' . $id . ' processState';
+                $type = 'initial';
+            } elseif (!empty($s['is_final'])) {
+                $type = 'final';
+            }
+            $nodes[] = [
+                'id'    => (int) $s['id'],
+                'label' => (string) $s['name'],
+                'type'  => $type,
+            ];
+        }
+        $edges = flow_vis_edges($states, $transitions);
+        foreach ($transitions as $t) {
+            if (($t['transition_type'] ?? '') === 'backward') {
+                $edges[] = [
+                    'from'            => (int) $t['from_state_id'],
+                    'to'              => (int) $t['to_state_id'],
+                    'transition_type' => 'backward',
+                ];
             }
         }
-        return implode("\n", $lines);
+        return ['nodes' => $nodes, 'edges' => $edges];
     }
 }
 
-if (!function_exists('flow_mermaid_ticket_source')) {
-    function flow_mermaid_ticket_source(array $states, int $currentStateId): string
+if (!function_exists('flow_vis_ticket_data')) {
+    // Returns vis-network nodes+edges for the ticket detail widget (node status: passed|current|pending).
+    function flow_vis_ticket_data($states, $currentStateId, $transitions = [])
     {
         if (empty($states)) {
-            return '';
+            return ['nodes' => [], 'edges' => []];
         }
-        // Fall back to initial state if current_state_id is missing or stale.
         $stateIds = [];
         foreach ($states as $s) {
             $stateIds[] = (int) $s['id'];
@@ -121,52 +182,48 @@ if (!function_exists('flow_mermaid_ticket_source')) {
                     break;
                 }
             }
-            // Still nothing? Use the first state in the list.
             if (($currentStateId === 0 || !in_array($currentStateId, $stateIds, true)) && !empty($states)) {
                 $currentStateId = (int) $states[0]['id'];
             }
         }
-        $ancestors = flow_ticket_ancestor_ids($states, $currentStateId);
+        $ancestors = flow_ticket_ancestor_ids($states, $currentStateId, $transitions);
 
-        $lines = ['flowchart LR'];
+        $nodes = [];
         foreach ($states as $s) {
-            $id    = 's' . (int) $s['id'];
-            $label = flow_mermaid_label((string) $s['name']);
-            if (!empty($s['is_initial']) || !empty($s['is_final'])) {
-                $lines[] = '  ' . $id . '([' . $label . '])';
-            } else {
-                $lines[] = '  ' . $id . '[' . $label . ']';
-            }
-        }
-        foreach (flow_mermaid_edges($states) as $edgeLine) {
-            $lines[] = $edgeLine;
-        }
-        $lines[] = '  classDef passed font-weight:600';
-        $lines[] = '  classDef current font-weight:700';
-        $lines[] = '  classDef pending font-weight:500';
-        foreach ($states as $s) {
-            $id  = 's' . (int) $s['id'];
             $sid = (int) $s['id'];
             if ($sid === $currentStateId) {
-                $lines[] = '  class ' . $id . ' current';
-            } else if (isset($ancestors[$sid])) {
-                $lines[] = '  class ' . $id . ' passed';
+                $status = 'current';
+            } elseif (isset($ancestors[$sid])) {
+                $status = 'passed';
             } else {
-                $lines[] = '  class ' . $id . ' pending';
+                $status = 'pending';
+            }
+            $nodes[] = ['id' => $sid, 'label' => (string) $s['name'], 'status' => $status];
+        }
+        $edges = flow_vis_edges($states, $transitions);
+        foreach ($transitions as $t) {
+            if (($t['transition_type'] ?? '') === 'backward') {
+                $edges[] = [
+                    'from'            => (int) $t['from_state_id'],
+                    'to'              => (int) $t['to_state_id'],
+                    'transition_type' => 'backward',
+                ];
             }
         }
-        return implode("\n", $lines);
+        return ['nodes' => $nodes, 'edges' => $edges];
     }
 }
 
 if (!function_exists('flow_widget_html')) {
-    // Wraps a Mermaid source in the widget chrome (toolbar + canvas + legend).
-    // $opts: subtitle, legend (bool), variant ('designer'|'ticket')
-    function flow_widget_html(string $mermaidSource, array $opts = []): string
+    // Wraps vis-network node/edge data in the standard widget chrome (toolbar + canvas + legend).
+    function flow_widget_html($visData, $opts = [])
     {
         $subtitle   = isset($opts['subtitle']) ? (string) $opts['subtitle'] : 'How tickets travel through this flow';
         $showLegend = isset($opts['legend']) ? (bool) $opts['legend'] : true;
         $variant    = isset($opts['variant']) ? (string) $opts['variant'] : 'designer';
+
+        // JSON_HEX_TAG prevents </script> from breaking the embedded JSON block.
+        $dataJson = json_encode($visData, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG);
 
         $html  = '<div class="flow-widget" data-flow-variant="' . esc($variant) . '">';
         $html .= '  <div class="flow-widget-toolbar">';
@@ -182,15 +239,17 @@ if (!function_exists('flow_widget_html')) {
         $html .= '      <button type="button" class="fw-btn fw-btn--icon" data-flow-fullscreen title="Fullscreen" aria-label="Fullscreen"><i class="bi bi-arrows-fullscreen"></i></button>';
         $html .= '    </div>';
         $html .= '  </div>';
-        $html .= '  <div class="flow-mermaid-wrap" data-flow-canvas>';
-        $html .= '<pre class="mermaid">' . $mermaidSource . '</pre>';
+        $html .= '  <div class="flow-vis-wrap" data-flow-canvas>';
+        $html .= '    <div class="flow-vis-container"></div>';
+        $html .= '    <script type="application/json" class="flow-vis-data">' . $dataJson . '</script>';
         $html .= '  </div>';
         if ($showLegend) {
             $html .= '  <div class="flow-widget-legend">';
             $html .= '    <span class="fw-lg"><span class="fw-lg-dot fw-lg-initial"></span> Start</span>';
             $html .= '    <span class="fw-lg"><span class="fw-lg-dot fw-lg-process"></span> Process</span>';
             $html .= '    <span class="fw-lg"><span class="fw-lg-dot fw-lg-final"></span> End</span>';
-            $html .= '    <span class="fw-lg"><span class="fw-lg-arrow"></span> Transition</span>';
+            $html .= '    <span class="fw-lg"><span class="fw-lg-arrow"></span> Forward</span>';
+            $html .= '    <span class="fw-lg"><span class="fw-lg-arrow fw-lg-arrow--back"></span> Send back</span>';
             $html .= '  </div>';
         }
         $html .= '</div>';

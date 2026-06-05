@@ -8,7 +8,9 @@ use CodeIgniter\Router\RouteCollection;
 $routes->get('/',                       'user::login');
 $routes->get('login',                   'user::login');
 $routes->post('login',                  'user::do_login');
-$routes->get('logout',                  'user::logout');
+$routes->get('maintenance',              'user::maintenance');
+$routes->post('maintenance/disable',     'user::maintenance_disable');
+$routes->post('logout',                 'user::logout');
 
 // Forced password rotation (and voluntary password change)
 $routes->get('password/change',         'user::password_change');
@@ -74,6 +76,9 @@ $routes->get('flows/states/(:num)',         'app::flow_states/$1');
 $routes->post('flows/save_state',           'app::state_save');
 $routes->post('flows/delete_state/(:num)',  'app::state_delete/$1');
 $routes->post('flows/reorder_states',       'app::state_reorder');
+$routes->get('flows/transitions/(:num)',    'app::state_transitions/$1');
+$routes->post('flows/transitions/save',     'app::state_transition_save');
+$routes->post('flows/transitions/delete/(:num)', 'app::state_transition_delete/$1');
 
 // ===== Alert Definitions =====
 $routes->get('alerts',                    'app::alerts');
@@ -106,8 +111,13 @@ $routes->post('settings/send_test_email', 'app::settings_send_test_email');
 $routes->post('settings/bump_asset_version', 'app::settings_bump_asset_version');
 
 // ===== Module Control Panel =====
-$routes->get('module_control_panel',                  'app::module_control_panel');
-$routes->post('module_control_panel/save',            'app::module_control_panel_save');
+$routes->get('module_control_panel',                              'app::module_control_panel');
+$routes->post('module_control_panel/save',                        'app::module_control_panel_save');
+$routes->post('module_control_panel/module/add',                  'app::module_add');
+$routes->post('module_control_panel/module/delete/(:segment)',    'app::module_delete/$1');
+
+// ===== Cron Management Panel =====
+$routes->get('cron_panel',                            'app::cron_panel');
 
 // ===== Tickets (UI) =====
 $routes->get('tickets',                                    'app::tickets_my');
@@ -123,16 +133,20 @@ $routes->get('tickets/download/(:segment)/(:num)',         'app::ticket_download
 $routes->post('tickets/assign/(:any)',                     'app::ticket_assign/$1');
 $routes->post('tickets/resolve/(:any)',                    'app::ticket_resolve/$1');
 $routes->post('tickets/close/(:any)',                      'app::ticket_close/$1');
+$routes->post('tickets/reopen/(:any)',                     'app::ticket_reopen/$1');
 $routes->get('tickets/flows_by_project/(:num)',            'app::ticket_flows_by_project/$1');
+$routes->get('tickets/assignable_users/(:num)',            'app::ticket_assignable_users/$1');
 $routes->get('tickets/export',                             'app::tickets_export');
 $routes->post('tickets/bulk',                              'app::tickets_bulk');
 $routes->post('tickets/saved/save',                        'app::tickets_saved_save');
 $routes->post('tickets/saved/delete/(:num)',               'app::tickets_saved_delete/$1');
 
 // ===== Activity Log (super_admin audit feed) =====
-$routes->get('activity_logs',             'app::activity_logs');
-$routes->get('activity_logs/data_table',  'app::activity_logs_data_table');
-$routes->get('activity_logs/export',      'app::activity_logs_export');
+$routes->get('activity_logs',              'app::activity_logs');
+$routes->get('activity_logs/data_table',   'app::activity_logs_data_table');
+$routes->get('activity_logs/export',       'app::activity_logs_export');
+$routes->get('activity_logs/analytics',    'app::activity_logs_analytics');
+$routes->get('activity_logs/user_events',  'app::activity_logs_user_events');
 
 // ===== REST API (external systems, X-API-KEY auth) =====
 $routes->post('api/raise',               'app::api_raise');

@@ -61,10 +61,7 @@ require_once APPPATH . 'Helpers/alert_helper.php';
 
 $appModel = new App_model();
 
-// CONC-01: Enforce single-instance execution via an exclusive file lock.
-// If a previous run is still in progress (e.g. SMTP is slow), the new
-// cron tick exits immediately instead of pulling the same notification
-// rows and sending duplicate emails.
+// Exclusive file lock prevents duplicate runs if a previous tick is still processing.
 $lockFile = WRITEPATH . 'cache/tat_monitor.lock';
 $lockFp = @fopen($lockFile, 'w');
 if ($lockFp === false) {
@@ -78,15 +75,22 @@ if (!flock($lockFp, LOCK_EX | LOCK_NB)) {
     exit;
 }
 
+$cronStartTime  = microtime(true);
+$cronStartedAt  = date('Y-m-d H:i:s');
+$cronStatus     = 'ok';
+$cronSummaryLog = [];
+
 $tickets = $appModel->ticketActiveForTatCheck();
 
-echo "TAT monitor - " . date('Y-m-d H:i:s') . " - checking " . count($tickets) . " active tickets\n";
+$cronTicketsChecked = count($tickets);
+echo "TAT monitor - " . date('Y-m-d H:i:s') . " - checking " . $cronTicketsChecked . " active tickets\n";
 
 foreach ($tickets as $ticket) {
-    $level     = (int) ($ticket['current_level'] ?? 1);
-    $flowId    = (int) ($ticket['flow_id'] ?? 0);
-    $stateId   = (int) ($ticket['current_state_id'] ?? 0);
-    $enteredAt = strtotime((string) ($ticket['state_entered_at'] ?? ''));
+    $level         = (int) ($ticket['current_level'] ?? 1);
+    $flowId        = (int) ($ticket['flow_id'] ?? 0);
+    $stateId       = (int) ($ticket['current_state_id'] ?? 0);
+    $enteredAt     = strtotime((string) ($ticket['state_entered_at'] ?? ''));
+    $tatLevelCount = max(1, min(4, (int) ($ticket['tat_level_count'] ?? 4)));
 
     if ($enteredAt === false) {
         echo "  [" . $ticket['alarm_id'] . "] skipped: invalid state_entered_at\n";
@@ -109,7 +113,7 @@ foreach ($tickets as $ticket) {
         continue;
     }
 
-    if ($level < 4) {
+    if ($level < $tatLevelCount) {
         $newLevel = $level + 1;
 
         $appModel->ticketEscalateLevel((int) $ticket['id'], $newLevel);
@@ -141,8 +145,7 @@ foreach ($tickets as $ticket) {
         continue;
     }
 
-    // Level == 4 → terminal escalation. Flip status, notify the L4 pool
-    // (admins) so the ticket doesn't sit silently at the top of the chain.
+    // Terminal escalation: flip status and notify the top-level pool.
     $appModel->ticketUpdate((int) $ticket['id'], [
         'status'     => 'escalated',
         'updated_at' => date('Y-m-d H:i:s'),
@@ -165,27 +168,58 @@ foreach ($tickets as $ticket) {
     echo "  [" . $ticket['alarm_id'] . "] L4 breached - flagged escalated and notified L4 pool\n";
 }
 
-// Drain anything enqueued during this run (or by user requests since the
-// last cron tick) so notifications go out within the same minute they
-// were triggered.
 $qResult = process_notification_queue();
 echo "Notification queue drained: sent=" . $qResult['sent']
    . " failed=" . $qResult['failed']
    . " retried=" . $qResult['retried'] . "\n";
+$cronNotifsSent   = (int) ($qResult['sent']   ?? 0);
+$cronNotifsFailed = (int) ($qResult['failed'] ?? 0);
 
-// PERF-01: Prune api_request_log once per cron sweep instead of on every
-// individual API call. Keeps the ingestion endpoint fast and avoids heavy
-// lock contention on the log table under telemetry floods.
+// Prune stale log tables once per cron sweep.
 try {
     $db = \Config\Database::connect();
-    $oldCutoff = date('Y-m-d H:i:s', time() - 86400);
-    $db->table('api_request_log')->where('requested_at <', $oldCutoff)->delete();
-    echo "api_request_log pruned: entries older than " . $oldCutoff . " removed.\n";
+    $retainDays    = (int) app_setting_int('log_retention_days', 30);
+    if ($retainDays < 1) { $retainDays = 30; }
+    $oldCutoff     = date('Y-m-d H:i:s', time() - ($retainDays * 86400));
+    $apiCutoff     = date('Y-m-d H:i:s', time() - 86400); // api_request_log: always 1 day
+    $db->table('api_request_log')->where('requested_at <', $apiCutoff)->delete();
+    $db->table('login_attempts')->where('attempted_at <', $oldCutoff)->delete();
+    echo "Log tables pruned: api_request_log < " . $apiCutoff . ", login_attempts < " . $oldCutoff . "\n";
 } catch (\Throwable $e) {
-    error_log('pview alert >> tat_monitor api_request_log prune failed: ' . $e->getMessage());
+    error_log('pview alert >> tat_monitor log prune failed: ' . $e->getMessage());
 }
 
-// Release the exclusive lock so the next cron tick can acquire it normally.
+try {
+    $cronDb          = \Config\Database::connect();
+    $cronDurationMs  = (int) round((microtime(true) - $cronStartTime) * 1000);
+    $cronSummaryText = 'Checked ' . $cronTicketsChecked . ' tickets; sent ' . $cronNotifsSent . ' notifs';
+    $cronDb->table('cron_runs')->insert([
+        'script'          => 'tat_monitor',
+        'started_at'      => $cronStartedAt,
+        'finished_at'     => date('Y-m-d H:i:s'),
+        'duration_ms'     => $cronDurationMs,
+        'status'          => $cronStatus,
+        'tickets_checked' => $cronTicketsChecked,
+        'notifs_sent'     => $cronNotifsSent,
+        'notifs_failed'   => $cronNotifsFailed,
+        'output_summary'  => $cronSummaryText,
+    ]);
+    $minKeep = $cronDb->table('cron_runs')
+        ->where('script', 'tat_monitor')
+        ->orderBy('id', 'desc')
+        ->limit(1)
+        ->offset(99)
+        ->get()->getRowArray();
+    if (!empty($minKeep)) {
+        $cronDb->table('cron_runs')
+            ->where('script', 'tat_monitor')
+            ->where('id <', (int) $minKeep['id'])
+            ->delete();
+    }
+} catch (\Throwable $e) {
+    error_log('pview alert >> tat_monitor cron_runs insert failed: ' . $e->getMessage());
+}
+
 flock($lockFp, LOCK_UN);
 fclose($lockFp);
 

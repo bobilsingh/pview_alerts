@@ -146,93 +146,34 @@ if (!function_exists('ticket_activity_icon')) {
   ?>
 
   <?php
-  // Saved filters fall through from the controller as a list of
-  // saved_filters rows. Build the URL once per entry so the dropdown
-  // is just a list of regular links the user can click.
   $savedFiltersList = [];
   if (isset($savedFilters) && is_array($savedFilters)) {
     $savedFiltersList = $savedFilters;
   }
+  $hasFilter = ($activeFilterCount > 0 || $cur !== '');
+
+  // Export URL is built server-side; JS re-builds it dynamically when
+  // filters change via AJAX (see #ticketsExportBtn handler in app.js).
+  $exportParams = [
+    'mode'       => $ticketMode,
+    'status'     => $cur,
+    'q'          => $search,
+    'project_id' => $projectSel,
+    'flow_id'    => $flowSel,
+    'alert_type' => $typeSel,
+    'priority'   => $prioSel,
+    'f_from'     => !empty($filters['f_from']) ? $filters['f_from'] : '',
+    'f_to'       => !empty($filters['f_to'])   ? $filters['f_to']   : '',
+  ];
+  $exportParams = array_filter($exportParams);
+  $exportUrl    = site_url('tickets/export') . '?' . http_build_query($exportParams);
+
+  $drInitFrom = !empty($filters['f_from']) ? $filters['f_from'] : date('Y-m-d');
+  $drInitTo   = !empty($filters['f_to'])   ? $filters['f_to']   : date('Y-m-d');
   ?>
 
-  <div class="d-flex flex-wrap align-items-center gap-2 mb-2">
-    <span class="filter-active-summary"
-      id="filterActiveSummary"
-      data-base-url="<?= esc($baseUrl); ?>"
-      <?php if ($activeFilterCount === 0) {
-        echo 'hidden';
-      } ?>>
-      <i class="bi bi-funnel-fill"></i>
-      <span id="filterActiveCount"><?= $activeFilterCount; ?></span>
-      <span id="filterActiveLabel"><?php if ($activeFilterCount === 1) {
-                                      echo 'filter';
-                                    } else {
-                                      echo 'filters';
-                                    } ?></span> active
-      <a class="clear-link tickets-filter-reset" href="<?= esc($baseUrl); ?>" title="Reset all filters">Clear all</a>
-    </span>
-
-    <div class="dropdown saved-filters-dropdown">
-      <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-toggle="dropdown" aria-expanded="false">
-        <i class="bi bi-bookmarks"></i> Saved filters
-        <?php if (!empty($savedFiltersList)) { ?>
-          <span class="badge bg-light text-dark"><?= count($savedFiltersList); ?></span>
-        <?php } ?>
-      </button>
-      <div class="dropdown-menu">
-        <?php if (empty($savedFiltersList)) { ?>
-          <span class="dropdown-item-text text-muted small no-saved-filters-msg">No saved filters yet.</span>
-        <?php } else { ?>
-          <?php foreach ($savedFiltersList as $sf) { ?>
-            <?php
-            $sfUrl = $baseUrl;
-            if (!empty($sf['query_params'])) {
-              $sfUrl .= '?' . $sf['query_params'];
-            }
-            ?>
-            <div class="saved-filter-row">
-              <a class="dropdown-item saved-filter-link" href="<?= esc($sfUrl); ?>">
-                <i class="bi bi-funnel"></i>
-                <?= esc($sf['name']); ?>
-              </a>
-              <button type="button" class="btn btn-sm btn-link text-danger saved-filter-delete"
-                title="Remove saved filter"
-                data-saved-id="<?= (int) $sf['id']; ?>"
-                data-saved-url="<?= site_url('tickets/saved/delete/' . (int) $sf['id']); ?>">
-                <i class="bi bi-trash"></i>
-              </button>
-            </div>
-          <?php } ?>
-        <?php } ?>
-        <div class="dropdown-divider"></div>
-        <?php
-        // Always render BOTH the Save button and the "Apply a filter" hint.
-        // JS toggles the `hidden` attribute on each as filters change
-        // client-side (without a page reload), so the dropdown always
-        // reflects the current state — server-side rendering alone would
-        // freeze the choice at page-load time.
-        $hasFilter = ($activeFilterCount > 0 || $cur !== '');
-        ?>
-        <button type="button" class="dropdown-item" id="savedFilterAddBtn"
-          data-save-url="<?= site_url('tickets/saved/save'); ?>"
-          data-current-qs="<?= esc(http_build_query(array_filter([
-                              'status'     => $cur,
-                              'q'          => $search,
-                              'project_id' => $projectSel,
-                              'flow_id'    => $flowSel,
-                              'alert_type' => $typeSel,
-                              'priority'   => $prioSel,
-                            ])), 'attr'); ?>"
-          <?php if (!$hasFilter) { echo 'hidden'; } ?>>
-          <i class="bi bi-plus-circle text-primary"></i> Save current filter…
-        </button>
-        <span class="dropdown-item-text text-muted small" id="savedFilterAddHint"
-          <?php if ($hasFilter) { echo 'hidden'; } ?>>Apply a filter to save it.</span>
-      </div>
-    </div>
-  </div>
-
-  <div class="d-flex gap-3 mb-3 flex-wrap align-items-center">
+  <!-- Status pills row -->
+  <div class="d-flex gap-3 mb-2 flex-wrap align-items-center">
     <div class="filter-pills">
       <?php foreach ($statuses as $key => $label) { ?>
         <?php
@@ -249,51 +190,139 @@ if (!function_exists('ticket_activity_icon')) {
         if (!empty($params)) {
           $url .= '?' . http_build_query($params);
         }
-        $isActive = '';
-        if ($cur === $key) {
-          $isActive = 'active';
-        }
         ?>
-        <a class="filter-pill <?= $isActive; ?>" href="<?= esc($url); ?>"><?= esc($label); ?></a>
+        <a class="filter-pill <?= $cur === $key ? 'active' : '' ?>" href="<?= esc($url); ?>"><?= esc($label); ?></a>
       <?php } ?>
     </div>
+
   </div>
 
+  <!-- Filter card -->
   <form class="card mb-3 tickets-filter-form" id="ticketsFilterForm" method="get" action="<?= esc($baseUrl); ?>">
-    <div class="card-body py-3">
-      <div class="row g-2 align-items-end">
-        <?php if ($cur !== '') { ?>
-          <input type="hidden" name="status" value="<?= esc($cur); ?>">
-        <?php } ?>
 
-        <div class="col-md-2">
-          <label class="form-label small mb-1">Search</label>
+    <!-- Common header: title + badge + saved filters + export + apply + reset -->
+    <div class="card-header filter-bar-header">
+      <span class="filter-bar-title">
+        <i class="bi bi-funnel"></i> Filters
+        <span class="badge rounded-pill bg-primary ms-1 filter-bar-badge"
+              id="ticketsFilterBadge"
+              <?= $activeFilterCount === 0 ? 'hidden' : '' ?>>
+          <?= $activeFilterCount ?>
+        </span>
+      </span>
+
+      <div class="filter-bar-actions">
+
+        <!-- Saved filters dropdown -->
+        <div class="dropdown saved-filters-dropdown">
+          <button type="button" class="btn btn-sm btn-light" data-bs-toggle="dropdown" aria-expanded="false">
+            <i class="bi bi-bookmarks"></i> Saved
+            <?php if (!empty($savedFiltersList)) { ?>
+              <span class="badge bg-secondary ms-1"><?= count($savedFiltersList); ?></span>
+            <?php } ?>
+          </button>
+          <div class="dropdown-menu dropdown-menu-end">
+            <?php if (empty($savedFiltersList)) { ?>
+              <span class="dropdown-item-text text-muted small no-saved-filters-msg">No saved filters yet.</span>
+            <?php } else { ?>
+              <?php foreach ($savedFiltersList as $sf) { ?>
+                <?php
+                $sfUrl = $baseUrl;
+                if (!empty($sf['query_params'])) {
+                  $sfUrl .= '?' . $sf['query_params'];
+                }
+                ?>
+                <div class="saved-filter-row">
+                  <a class="dropdown-item saved-filter-link" href="<?= esc($sfUrl); ?>">
+                    <i class="bi bi-funnel"></i> <?= esc($sf['name']); ?>
+                  </a>
+                  <button type="button" class="btn btn-sm btn-link text-danger saved-filter-delete"
+                    title="Remove saved filter"
+                    aria-label="Remove saved filter"
+                    data-saved-id="<?= (int) $sf['id']; ?>"
+                    data-saved-url="<?= site_url('tickets/saved/delete/' . (int) $sf['id']); ?>">
+                    <i class="bi bi-trash" aria-hidden="true"></i>
+                  </button>
+                </div>
+              <?php } ?>
+            <?php } ?>
+            <div class="dropdown-divider"></div>
+            <button type="button" class="dropdown-item" id="savedFilterAddBtn"
+              data-save-url="<?= site_url('tickets/saved/save'); ?>"
+              data-current-qs="<?= esc(http_build_query(array_filter([
+                                  'status'     => $cur,
+                                  'q'          => $search,
+                                  'project_id' => $projectSel,
+                                  'flow_id'    => $flowSel,
+                                  'alert_type' => $typeSel,
+                                  'priority'   => $prioSel,
+                                ])), 'attr'); ?>"
+              <?= !$hasFilter ? 'hidden' : '' ?>>
+              <i class="bi bi-plus-circle text-primary"></i> Save current filter…
+            </button>
+            <span class="dropdown-item-text text-muted small" id="savedFilterAddHint"
+              <?= $hasFilter ? 'hidden' : '' ?>>Apply a filter to save it.</span>
+          </div>
+        </div>
+
+        <!-- Date range — left of Apply -->
+        <span class="filter-bar-sep"></span>
+        <div class="filter-bar-date">
+          <?= view('filters/date_range_widget', [
+            'drFromName' => 'f_from',
+            'drToName'   => 'f_to',
+            'drFrom'     => $drInitFrom,
+            'drTo'       => $drInitTo,
+            'drDefault'  => 'today',
+            'drInline'   => true,
+          ]); ?>
+        </div>
+
+        <!-- Apply -->
+        <button type="submit" class="btn btn-sm btn-primary">
+          <i class="bi bi-check-lg"></i> Apply
+        </button>
+
+        <!-- Reset -->
+        <a href="<?= esc($baseUrl); ?>" class="btn btn-sm btn-light tickets-filter-reset">
+          <i class="bi bi-x-lg"></i> Reset
+        </a>
+
+      </div>
+    </div><!-- /card-header -->
+
+    <!-- Filter controls -->
+    <div class="filter-bar-body">
+      <?php if ($cur !== '') { ?>
+        <input type="hidden" name="status" value="<?= esc($cur); ?>">
+      <?php } ?>
+
+      <div class="filter-bar-controls">
+
+        <div class="filter-item filter-item--search">
+          <label class="filter-label">Search</label>
           <input type="text" name="q" class="form-control form-control-sm"
-            placeholder="Alarm ID or title..." value="<?= esc($search); ?>">
+            placeholder="Alarm ID or title…" value="<?= esc($search); ?>">
         </div>
 
         <?php if ($isAll && !empty($projects)) { ?>
-          <div class="col-md-2">
-            <label class="form-label small mb-1">Project</label>
+          <div class="filter-item filter-item--wide">
+            <label class="filter-label">Project</label>
             <select name="project_id" class="form-select form-select-sm">
               <option value="">All projects</option>
               <?php foreach ($projects as $p) { ?>
-                <option value="<?= (int) $p['id']; ?>" <?php if ($projectSel === (int) $p['id']) {
-                                                          echo 'selected';
-                                                        } ?>>
+                <option value="<?= (int) $p['id']; ?>" <?= $projectSel === (int) $p['id'] ? 'selected' : '' ?>>
                   <?= esc($p['name']); ?>
                 </option>
               <?php } ?>
             </select>
           </div>
-          <div class="col-md-auto">
-            <label class="form-label small mb-1">Flow</label>
+          <div class="filter-item">
+            <label class="filter-label">Flow</label>
             <select name="flow_id" class="form-select form-select-sm">
               <option value="">All flows</option>
               <?php foreach ($flows as $f) { ?>
-                <option value="<?= (int) $f['id']; ?>" <?php if ($flowSel === (int) $f['id']) {
-                                                          echo 'selected';
-                                                        } ?>>
+                <option value="<?= (int) $f['id']; ?>" <?= $flowSel === (int) $f['id'] ? 'selected' : '' ?>>
                   <?= esc($f['name']); ?>
                 </option>
               <?php } ?>
@@ -301,62 +330,29 @@ if (!function_exists('ticket_activity_icon')) {
           </div>
         <?php } ?>
 
-        <div class="col-md-auto">
-          <label class="form-label small mb-1">Severity</label>
+        <div class="filter-item">
+          <label class="filter-label">Severity</label>
           <select name="alert_type" class="form-select form-select-sm">
             <option value="">All</option>
             <?php foreach ($severityOptions as $key => $label) { ?>
-              <option value="<?= $key; ?>" <?php if ($typeSel === $key) {
-                                              echo 'selected';
-                                            } ?>>
-                <?= $label; ?>
-              </option>
+              <option value="<?= $key; ?>" <?= $typeSel === $key ? 'selected' : '' ?>><?= $label; ?></option>
             <?php } ?>
           </select>
         </div>
 
-        <div class="col-md-auto">
-          <label class="form-label small mb-1">Priority</label>
+        <div class="filter-item">
+          <label class="filter-label">Priority</label>
           <select name="priority" class="form-select form-select-sm">
             <option value="">All</option>
             <?php foreach ($priorityOptions as $key => $label) { ?>
-              <option value="<?= $key; ?>" <?php if ($prioSel === $key) {
-                                              echo 'selected';
-                                            } ?>>
-                <?= $label; ?>
-              </option>
+              <option value="<?= $key; ?>" <?= $prioSel === $key ? 'selected' : '' ?>><?= $label; ?></option>
             <?php } ?>
           </select>
         </div>
 
-        <div class="col-md-1">
-          <button class="btn btn-sm btn-primary w-100"><i class="bi bi-funnel"></i> Filter</button>
-        </div>
-        <div class="col-md-auto">
-          <a href="<?= esc($baseUrl); ?>" class="btn btn-sm btn-light tickets-filter-reset"><i class="bi bi-x-lg"></i> Reset</a>
-        </div>
-        <div class="col-md-auto">
-          <?php
-          // CSV export carries the same query-string the user is
-          // currently looking at, plus the mode (my / all).
-          $exportParams = [
-            'mode'       => $ticketMode,
-            'status'     => $cur,
-            'q'          => $search,
-            'project_id' => $projectSel,
-            'flow_id'    => $flowSel,
-            'alert_type' => $typeSel,
-            'priority'   => $prioSel,
-          ];
-          $exportParams = array_filter($exportParams);
-          $exportUrl    = site_url('tickets/export') . '?' . http_build_query($exportParams);
-          ?>
-          <a href="<?= esc($exportUrl); ?>" class="btn btn-sm btn-outline-primary" title="Download current view as CSV">
-            <i class="bi bi-download"></i> Export CSV
-          </a>
-        </div>
-      </div>
-    </div>
+      </div><!-- /filter-bar-controls -->
+    </div><!-- /filter-bar-body -->
+
   </form>
 
   <div id="bulkToolbar" class="bulk-toolbar" hidden>
@@ -384,7 +380,9 @@ if (!function_exists('ticket_activity_icon')) {
         data-filter-project-id="<?= (int) $projectSel; ?>"
         data-filter-flow-id="<?= (int) $flowSel; ?>"
         data-filter-alert-type="<?= esc($typeSel, 'attr'); ?>"
-        data-filter-priority="<?= esc($prioSel, 'attr'); ?>">
+        data-filter-priority="<?= esc($prioSel, 'attr'); ?>"
+        data-export-base="<?= esc(site_url('tickets/export'), 'attr'); ?>"
+        data-export-mode="<?= esc($ticketMode, 'attr'); ?>">
         <thead>
           <tr>
             <th class="ticket-bulk-cell text-center">
@@ -399,6 +397,7 @@ if (!function_exists('ticket_activity_icon')) {
             <th>Assignee</th>
             <th>TAT</th>
             <th>Created</th>
+            <th class="no-sort">Actions</th>
           </tr>
         </thead>
         <tbody></tbody>
@@ -418,7 +417,7 @@ if (!function_exists('ticket_activity_icon')) {
 
   <div class="card">
     <div class="card-body">
-      <form method="post" action="<?= site_url('tickets/save'); ?>" data-loading-form="1" data-dirty-guard="1">
+      <form method="post" action="<?= site_url('tickets/save'); ?>" data-loading-form="1" data-dirty-guard="1" enctype="multipart/form-data">
         <div class="row g-3">
           <div class="col-md-6">
             <label class="form-label">Project *</label>
@@ -441,7 +440,15 @@ if (!function_exists('ticket_activity_icon')) {
           </div>
           <div class="col-md-6">
             <label class="form-label">Flow *</label>
-            <select name="flow_id" id="flowSelect" class="form-select" required disabled>
+            <select name="flow_id" id="flowSelect" class="form-select" required disabled
+              data-load-target="#assigneeSelect"
+              data-load-url="<?= site_url('tickets/assignable_users'); ?>"
+              data-item-type="user"
+              data-empty-text="Select flow first"
+              data-default-text="Unassigned"
+              data-loading-text="Loading..."
+              data-no-data-text="No L1 users configured"
+              data-error-text="Failed to load users">
               <option value="">Select project first</option>
             </select>
           </div>
@@ -477,10 +484,32 @@ if (!function_exists('ticket_activity_icon')) {
               <option value="urgent">Urgent</option>
             </select>
           </div>
+
+          <div class="col-md-6">
+            <label class="form-label">Assign To</label>
+            <select name="assignee_user_id" id="assigneeSelect" class="form-select" disabled>
+              <option value="">Select flow first</option>
+            </select>
+            <small class="text-muted">Optional — leave blank to let an L1 operator pick it up.</small>
+          </div>
+          <div class="col-md-6">
+            <label class="form-label">Attachment <small class="text-muted">(optional)</small></label>
+            <input type="file" name="attachment" class="form-control"
+              accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.xlsx,.xls,.csv,.txt">
+            <small class="text-muted">Max <?= app_setting_int('upload_max_mb', 10); ?> MB &nbsp;·&nbsp; PDF, Word, Excel, image, CSV, TXT.</small>
+          </div>
+          <div class="col-md-6">
+            <label class="form-label">Start Date</label>
+            <input type="date" name="actual_start_date" class="form-control" value="<?= date('Y-m-d'); ?>">
+          </div>
+          <div class="col-md-6">
+            <label class="form-label">End Date</label>
+            <input type="date" name="actual_end_date" class="form-control" value="<?= date('Y-m-d'); ?>">
+          </div>
         </div>
-        <div class="mt-3">
-          <button class="btn btn-primary"><i class="bi bi-bell-fill"></i> Raise Ticket</button>
+        <div class="mt-3 d-flex justify-content-end gap-2">
           <a href="<?= site_url('tickets'); ?>" class="btn btn-light">Cancel</a>
+          <button class="btn btn-primary"><i class="bi bi-bell-fill"></i> Raise Ticket</button>
         </div>
       </form>
     </div>
@@ -529,6 +558,9 @@ if (!function_exists('ticket_activity_icon')) {
   if ($ticketStatus === 'resolved' || $ticketStatus === 'closed') {
     $isTerminal = true;
   }
+  $attachCount = isset($attachCount) ? (int) $attachCount : 0;
+  $attachMax   = isset($attachMax)   ? (int) $attachMax   : 5;
+  $attachFull  = $attachCount >= $attachMax;
   ?>
 
   <div class="page-head">
@@ -575,7 +607,7 @@ if (!function_exists('ticket_activity_icon')) {
 
           <?php helper('flow'); ?>
           <?= flow_widget_html(
-            flow_mermaid_ticket_source($allStates, (int) $currentStateId),
+            flow_vis_ticket_data($allStates, (int) $currentStateId, isset($allTransitions) ? $allTransitions : []),
             ['subtitle' => 'Ticket progress through this flow', 'variant' => 'ticket', 'legend' => false]
           ); ?>
 
@@ -674,7 +706,7 @@ if (!function_exists('ticket_activity_icon')) {
               <form id="assignForm" data-url="<?= site_url('tickets/assign/' . $alarmId); ?>">
                 <div class="d-flex align-items-end gap-2 flex-wrap">
                   <div class="flex-grow-1" style="min-width: 250px;">
-                    <label class="form-label">Assignee (current state's L<?= $currentLevel; ?> users)</label>
+                    <label class="form-label">Assignee <small class="text-muted">(all operators in current state)</small></label>
                     <select name="user_id" class="form-select" required <?php if ($isTerminal) {
                                                                           echo 'disabled';
                                                                         } ?>>
@@ -694,78 +726,138 @@ if (!function_exists('ticket_activity_icon')) {
             </div>
 
             <div class="tab-pane fade" id="tab-state">
-              <p class="text-muted small mb-3">Advance the ticket along the workflow, or close the loop.</p>
-              <?php $hasMultiNext = !empty($nextStates) && count($nextStates) > 1; ?>
+              <?php
+              $hasFwd = !empty($nextStates) && !$isTerminal && !$isFinal;
+              $hasBwd = !empty($previousStates) && !$isTerminal;
+              ?>
 
-              <div class="d-flex align-items-end gap-2 flex-wrap">
-                <?php if ($hasMultiNext) { ?>
-                  <form id="moveStateForm" class="d-flex align-items-end gap-2 flex-grow-1"
+              <!-- Move Forward: next state in sort_order sequence -->
+              <div class="mb-3">
+                <div class="d-flex align-items-center gap-2 mb-2">
+                  <i class="bi bi-arrow-right-circle text-success"></i>
+                  <span class="fw-semibold small">Move Forward</span>
+                </div>
+                <?php if ($hasFwd) { ?>
+                  <?php if (count($nextStates) === 1) { ?>
+                    <button id="moveStateBtn"
+                      data-url="<?= site_url('tickets/move_state/' . $alarmId); ?>"
+                      data-transition-type="forward"
+                      data-target-id="<?= (int) $nextStates[0]['id']; ?>"
+                      class="btn btn-success">
+                      <i class="bi bi-arrow-right-circle"></i>
+                      Move to <?= esc($nextStates[0]['name']); ?>
+                    </button>
+                  <?php } else { ?>
+                    <form class="move-state-typed-form d-flex align-items-end gap-2 flex-wrap"
+                      data-url="<?= site_url('tickets/move_state/' . $alarmId); ?>">
+                      <input type="hidden" name="transition_type" value="forward">
+                      <div class="flex-grow-1" style="min-width:220px;">
+                        <select name="target_state_id" class="form-select" required>
+                          <option value="">Select next state…</option>
+                          <?php foreach ($nextStates as $ns) { ?>
+                            <option value="<?= (int) $ns['id']; ?>"><?= esc($ns['name']); ?></option>
+                          <?php } ?>
+                        </select>
+                      </div>
+                      <div>
+                        <button type="submit" class="btn btn-success">
+                          <i class="bi bi-arrow-right-circle"></i> Move Forward
+                        </button>
+                      </div>
+                    </form>
+                  <?php } ?>
+                <?php } else { ?>
+                  <span class="text-muted small">
+                    <?php if ($isTerminal) { echo 'Ticket is ' . esc($ticketStatus) . '.'; }
+                    elseif ($isFinal)      { echo 'This is the closing state — resolve or close below.'; }
+                    else                   { echo 'No further states in this workflow.'; }
+                    ?>
+                  </span>
+                <?php } ?>
+              </div>
+
+              <?php if ($hasBwd) { ?>
+              <!-- Send Back: any earlier state, decided at runtime by the assignee -->
+                <div class="mb-3">
+                  <div class="d-flex align-items-center gap-2 mb-2">
+                    <i class="bi bi-arrow-left-circle text-danger"></i>
+                    <span class="fw-semibold small">Send Back</span>
+                    <small class="text-muted">Select an earlier state and provide a reason.</small>
+                  </div>
+                  <form class="move-state-typed-form d-flex align-items-end gap-2 flex-wrap"
                     data-url="<?= site_url('tickets/move_state/' . $alarmId); ?>">
-                    <div class="flex-grow-1" style="min-width: 250px;">
-                      <label class="form-label fw-semibold">Move to state</label>
-                      <select name="target_state_id" class="form-select" required <?php if ($isTerminal || $isFinal) {
-                                                                                    echo 'disabled';
-                                                                                  } ?>>
-                        <option value="">Select target state</option>
-                        <?php foreach ($nextStates as $ns) { ?>
-                          <option value="<?= (int) $ns['id']; ?>"><?= esc($ns['name']); ?></option>
+                    <input type="hidden" name="transition_type" value="backward">
+                    <div style="min-width:200px;">
+                      <select name="target_state_id" class="form-select" required>
+                        <option value="">Select state to send back to…</option>
+                        <?php foreach ($previousStates as $ps) { ?>
+                          <option value="<?= (int) $ps['id']; ?>"><?= esc($ps['name']); ?></option>
                         <?php } ?>
                       </select>
                     </div>
+                    <div class="flex-grow-1" style="min-width:200px;">
+                      <input type="text" name="reason" class="form-control"
+                        placeholder="Reason for sending back (required)" required>
+                    </div>
                     <div>
-                      <button type="submit" class="btn btn-primary" <?php if ($isTerminal || $isFinal) {
-                                                                      echo 'disabled';
-                                                                    } ?>>
-                        <i class="bi bi-arrow-right-circle"></i> Move State
+                      <button type="submit" class="btn btn-outline-danger">
+                        <i class="bi bi-arrow-left-circle"></i> Send Back
                       </button>
                     </div>
                   </form>
-                <?php } else { ?>
-                  <button id="moveStateBtn"
-                    data-url="<?= site_url('tickets/move_state/' . $alarmId); ?>"
-                    class="btn btn-primary"
-                    <?php if ($isTerminal || $isFinal) {
-                      echo 'disabled';
-                    } ?>>
-                    <i class="bi bi-arrow-right-circle"></i> Move to next state
-                  </button>
-                <?php } ?>
+                </div>
+              <?php } ?>
 
+              <hr class="my-3">
+
+              <!-- Resolve / Close / Reopen -->
+              <div class="d-flex gap-2 flex-wrap">
                 <button id="resolveBtn"
                   data-url="<?= site_url('tickets/resolve/' . $alarmId); ?>"
                   class="btn btn-outline-success"
-                  <?php if ($isTerminal) {
-                    echo 'disabled';
-                  } ?>>
+                  <?php if ($isTerminal) { echo 'disabled'; } ?>>
                   <i class="bi bi-check2-circle"></i> Resolve
                 </button>
                 <button id="closeBtn"
                   data-url="<?= site_url('tickets/close/' . $alarmId); ?>"
                   class="btn btn-outline-secondary"
-                  <?php if ($ticketStatus === 'closed') {
-                    echo 'disabled';
-                  } ?>>
+                  <?php if ($ticketStatus === 'closed') { echo 'disabled'; } ?>>
                   <i class="bi bi-x-circle"></i> Close
                 </button>
+                <?php if ($ticketStatus === 'resolved') { ?>
+                  <button id="reopenBtn"
+                    data-url="<?= site_url('tickets/reopen/' . $alarmId); ?>"
+                    class="btn btn-outline-warning">
+                    <i class="bi bi-arrow-counterclockwise"></i> Reopen
+                  </button>
+                <?php } ?>
               </div>
             </div>
 
             <div class="tab-pane fade" id="tab-attach">
-              <form id="attachForm" data-url="<?= site_url('tickets/attach/' . $alarmId); ?>"
-                enctype="multipart/form-data">
-                <label class="form-label">Attach evidence</label>
-                <input type="file" name="file" class="form-control"
-                  accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.xlsx,.xls,.csv,.txt" required
-                  <?php if ($isTerminal) {
-                    echo 'disabled';
-                  } ?>>
-                <small class="text-muted">Max 10 MB.</small>
-                <div class="d-flex justify-content-end mt-2">
-                  <button class="btn btn-primary" <?php if ($isTerminal) {
-                                                    echo 'disabled';
-                                                  } ?>><i class="bi bi-cloud-upload"></i> Upload</button>
+              <?php if ($attachFull): ?>
+                <div class="alert alert-warning mb-0">
+                  <i class="bi bi-paperclip"></i>
+                  Attachment limit reached (<?= $attachMax ?> of <?= $attachMax ?> files used).
                 </div>
-              </form>
+              <?php else: ?>
+                <form id="attachForm" data-url="<?= site_url('tickets/attach/' . $alarmId); ?>"
+                  enctype="multipart/form-data">
+                  <label class="form-label">
+                    Attach evidence
+                    <small class="text-muted">(<?= $attachCount ?>/<?= $attachMax ?>)</small>
+                  </label>
+                  <input type="file" name="file" class="form-control"
+                    accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.xlsx,.xls,.csv,.txt" required
+                    <?php if ($isTerminal) { echo 'disabled'; } ?>>
+                  <small class="text-muted">Max 10 MB.</small>
+                  <div class="d-flex justify-content-end mt-2">
+                    <button class="btn btn-primary" <?php if ($isTerminal) { echo 'disabled'; } ?>>
+                      <i class="bi bi-cloud-upload"></i> Upload
+                    </button>
+                  </div>
+                </form>
+              <?php endif; ?>
             </div>
           </div>
         </div>
@@ -823,8 +915,19 @@ if (!function_exists('ticket_activity_icon')) {
                         echo highlight_mentions($cmt);
                         break;
                       case 'state_changed':
+                        $transDir = isset($a['transition_type']) && $a['transition_type'] === 'backward' ? 'backward' : 'forward';
+                        if ($transDir === 'backward') {
+                          echo '<span class="badge text-bg-danger me-1"><i class="bi bi-arrow-left-circle"></i> Send back</span>';
+                        }
                         echo 'Moved state from <strong>' . esc(or_default($fromStateName, '?')) . '</strong>';
                         echo ' to <strong>' . esc(or_default($toStateName, '?')) . '</strong>';
+                        // Show user-supplied reason (stored after ": " in the comment).
+                        $stCommentStr = trim((string) ($a['comment'] ?? ''));
+                        $stReasonPos  = strpos($stCommentStr, ': ');
+                        $stReason     = $stReasonPos !== false ? trim(substr($stCommentStr, $stReasonPos + 2)) : '';
+                        if ($stReason !== '') {
+                          echo '<div class="small text-muted mt-1"><i class="bi bi-chat-quote me-1"></i>' . esc($stReason) . '</div>';
+                        }
                         break;
                       case 'level_escalated':
                         echo 'Escalated to <strong>L' . (int) $a['to_level'] . '</strong>';
@@ -851,6 +954,9 @@ if (!function_exists('ticket_activity_icon')) {
                         break;
                       case 'closed':
                         echo 'Closed the ticket';
+                        break;
+                      case 'reopened':
+                        echo 'Reopened the ticket';
                         break;
                       case 'api_update':
                         echo 'API update from <code>' . esc(or_default($performedBySystem, '?')) . '</code>';
@@ -936,6 +1042,32 @@ if (!function_exists('ticket_activity_icon')) {
             <tr>
               <td>Raised By</td>
               <td><?= esc(or_default(view_value($ticket, 'raised_by_name', null), '-')); ?></td>
+            </tr>
+            <tr>
+              <td>Actual Start</td>
+              <td class="small">
+                <?php
+                $asd = view_value($ticket, 'actual_start_date', '');
+                if ($asd !== '' && $asd !== null) {
+                    echo esc(date('d M Y', strtotime($asd)));
+                } else {
+                    echo '<span class="text-muted">—</span>';
+                }
+                ?>
+              </td>
+            </tr>
+            <tr>
+              <td>Actual End</td>
+              <td class="small">
+                <?php
+                $aed = view_value($ticket, 'actual_end_date', '');
+                if ($aed !== '' && $aed !== null) {
+                    echo esc(date('d M Y', strtotime($aed)));
+                } else {
+                    echo '<span class="text-muted">—</span>';
+                }
+                ?>
+              </td>
             </tr>
             <tr>
               <td>Created</td>

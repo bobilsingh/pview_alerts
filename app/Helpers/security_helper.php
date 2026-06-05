@@ -1,13 +1,10 @@
 <?php
 
-// Login & API rate-limiting and file-upload hardening.
-// All thresholds come from app_settings; functions no-op gracefully when
-// the backing tables (login_attempts, api_request_log) don't exist yet.
+// Login / API rate-limiting and file-upload security helpers.
 
 if (!function_exists('client_ip')) {
-    // Does NOT trust X-Forwarded-For — add proxy logic here if you put a
-    // reverse proxy in front of the app.
-    function client_ip(): string
+    // Returns REMOTE_ADDR only — does not trust X-Forwarded-For.
+    function client_ip()
     {
         $ip = isset($_SERVER['REMOTE_ADDR']) ? (string) $_SERVER['REMOTE_ADDR'] : '';
         if ($ip === '') {
@@ -19,7 +16,7 @@ if (!function_exists('client_ip')) {
 }
 
 if (!function_exists('security_table_exists')) {
-    function security_table_exists(string $table): bool
+    function security_table_exists($table)
     {
         try {
             $db = \Config\Database::connect();
@@ -31,15 +28,9 @@ if (!function_exists('security_table_exists')) {
 }
 
 if (!function_exists('login_is_locked')) {
-    // Per-user lockout: N failures against THIS login_identifier within the
-    // sliding window locks THIS user. The IP is recorded with each attempt
-    // for forensic logging but is not used to gate access — on a shared
-    // VPN / NAT the IP is everyone's, so an IP-wide lockout would punish
-    // real users for someone else's typo.
-    //
-    // Returns [locked, remaining_seconds, attempts]. ($ip is accepted for
-    // signature back-compat but only used in audit logs by the caller.)
-    function login_is_locked(string $ip, string $login): array
+    // Checks per-user (not per-IP) lockout to avoid punishing shared NAT users.
+    // Returns [locked, remaining_seconds, attempts].
+    function login_is_locked($ip, $login)
     {
         $maxAttempts = (int) app_setting('login_max_attempts', 3);
         $windowMin   = (int) app_setting('login_lockout_minutes', 10);
@@ -63,9 +54,7 @@ if (!function_exists('login_is_locked')) {
             return ['locked' => false, 'remaining_seconds' => 0, 'attempts' => $userFails];
         }
 
-        // Lockout expires windowMin minutes after the OLDEST failure in the
-        // window for this user — so a slow drip of fails doesn't get a
-        // perpetually-rolling lock.
+        // Expires after the oldest failure so a slow drip doesn't produce a perpetually-rolling lock.
         $oldest = $db->table('login_attempts')
             ->where('success', 0)
             ->where('attempted_at >=', $cutoff)
@@ -82,17 +71,21 @@ if (!function_exists('login_is_locked')) {
 }
 
 if (!function_exists('login_attempt_record')) {
-    function login_attempt_record(string $ip, string $login, bool $success): void
+    function login_attempt_record($ip, $login, $success)
     {
         if (!security_table_exists('login_attempts')) {
             return;
         }
         try {
             $db = \Config\Database::connect();
+            $successInt = 0;
+            if ($success) {
+                $successInt = 1;
+            }
             $db->table('login_attempts')->insert([
                 'ip'               => $ip,
                 'login_identifier' => substr($login, 0, 150),
-                'success'          => $success ? 1 : 0,
+                'success'          => $successInt,
                 'attempted_at'     => date('Y-m-d H:i:s'),
             ]);
             // Trim rows older than 7 days to keep the table bounded.
@@ -107,14 +100,8 @@ if (!function_exists('login_attempt_record')) {
 }
 
 if (!function_exists('login_attempts_clear')) {
-    // Reset the per-user failed-attempt counter after a successful login.
-    //
-    // Only THIS user's failures are wiped — failures recorded against OTHER
-    // usernames from the same IP are preserved on purpose. A real user proving
-    // themselves doesn't absolve an attacker who's been probing other accounts
-    // from the same outbound IP, so the credential-stuffing counter survives.
-    // ($ip is accepted for signature back-compat but no longer used.)
-    function login_attempts_clear(string $ip, string $login): void
+    // Clears per-user failed-attempt rows on successful login; leaves other usernames' rows intact.
+    function login_attempts_clear($ip, $login)
     {
         if (!security_table_exists('login_attempts')) {
             return;
@@ -132,9 +119,8 @@ if (!function_exists('login_attempts_clear')) {
 }
 
 if (!function_exists('api_rate_check')) {
-    // Returns [allowed, retry_after_seconds].
-    // Records the request as a side-effect when allowed.
-    function api_rate_check(int $apiKeyId, string $endpoint): array
+    // Returns [allowed, retry_after_seconds]; records the request as a side-effect when allowed.
+    function api_rate_check($apiKeyId, $endpoint)
     {
         $perMin  = (int) app_setting('api_rate_per_minute', 60);
         $perHour = (int) app_setting('api_rate_per_hour', 1000);
@@ -182,9 +168,8 @@ if (!function_exists('api_rate_check')) {
 }
 
 if (!function_exists('upload_blocked_extensions')) {
-    // Hard-coded denylist that applies even if an admin adds a dangerous ext
-    // to upload_allowed_ext by mistake.
-    function upload_blocked_extensions(): array
+    // Hard-coded extension denylist — overrides any admin-configured allowed list.
+    function upload_blocked_extensions()
     {
         $extra = app_setting_csv('upload_blocked_ext', []);
         $base = ['php', 'phtml', 'phar', 'php3', 'php4', 'php5', 'php7', 'pht', 'sh', 'bash', 'zsh', 'exe', 'bat', 'cmd', 'com', 'msi', 'scr', 'pif', 'js', 'mjs', 'vbs', 'wsf', 'ps1', 'jsp', 'asp', 'aspx', 'cgi', 'pl', 'py', 'rb', 'htaccess', 'htpasswd', 'ini', 'conf', 'htm', 'html', 'xhtml', 'svg'];
@@ -194,9 +179,8 @@ if (!function_exists('upload_blocked_extensions')) {
 }
 
 if (!function_exists('upload_filename_is_safe')) {
-    // Checks every dotted segment, not just the last — catches evil.php.jpg.
-    // Returns '' when safe, error message otherwise.
-    function upload_filename_is_safe(string $originalName): string
+    // Validates all dot segments to catch double-extension attacks (e.g. evil.php.jpg). Returns '' on success.
+    function upload_filename_is_safe($originalName)
     {
         $name = strtolower(basename($originalName));
         if ($name === '' || $name === '.' || $name === '..') {
@@ -223,9 +207,8 @@ if (!function_exists('upload_filename_is_safe')) {
 }
 
 if (!function_exists('upload_sniff_mime')) {
-    // Reads magic bytes via finfo — defeats "rename .php to .pdf" tricks.
-    // Returns '' on failure so the caller can fall back to the header MIME.
-    function upload_sniff_mime(string $absPath): string
+    // Reads magic bytes via finfo to detect renamed-extension files. Returns '' on finfo failure.
+    function upload_sniff_mime($absPath)
     {
         if (!function_exists('finfo_open')) {
             return '';
@@ -241,8 +224,8 @@ if (!function_exists('upload_sniff_mime')) {
 }
 
 if (!function_exists('upload_mime_matches_ext')) {
-    // Returns false when sniffed MIME contradicts the extension — likely a renamed file.
-    function upload_mime_matches_ext(string $ext, string $sniffedMime): bool
+    // Returns false when sniffed MIME contradicts the declared extension (likely a renamed file).
+    function upload_mime_matches_ext($ext, $sniffedMime)
     {
         $ext = strtolower(trim($ext, '.'));
         $mime = strtolower($sniffedMime);
