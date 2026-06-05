@@ -21,7 +21,7 @@ class App extends BaseConfig
     /**
      * App release version shown in the UI.
      */
-    public string $releaseVersion = 'v1.0.0';
+    public string $releaseVersion = 'v1.1.0';
 
     /**
      * Allowed Hostnames in the Site URL other than the hostname in the baseURL.
