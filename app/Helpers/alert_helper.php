@@ -187,7 +187,7 @@ if (!function_exists('assignable_role_keys')) {
             return [];
         }
 
-            static $cache = [];
+        static $cache = [];
         if (isset($cache[$actor_role])) {
             return $cache[$actor_role];
         }
@@ -1356,14 +1356,6 @@ if (!function_exists('has_module_access')) {
                 log_message('error', 'has_module_access() database query failed: ' . $e->getMessage());
             }
         }
-
-        // An explicit module_permissions row for (role, module_key) is
-        // authoritative — including a deny (value = 0). Without this short-
-        // circuit, a "0" in the DB would fall through to the registry
-        // defaults block below, which often defaults to 1 for admin and
-        // silently re-grants access the admin explicitly took away in the
-        // Module Control Panel. Registry defaults must only seed combos
-        // that have no DB row at all.
         if (isset($permissions_cache[$role][$module_key])) {
             $perms = $permissions_cache[$role][$module_key];
             if (isset($perms[$action])) {
@@ -1377,17 +1369,6 @@ if (!function_exists('has_module_access')) {
 }
 
 // Walks the sidebar in render order and returns the first module the
-// current user can actually open, as [url, label]. Used for:
-//   1. Post-login landing page (first_accessible_module_url)
-//   2. Access-denied fallback inside check_module_access
-//   3. Breadcrumb root in templates/sidebar.php (first_accessible_module_label)
-//
-// The candidate list MUST stay in sync with templates/sidebar.php — the
-// "first menu item the user sees" should be the same one they're routed
-// to on login and the same one the breadcrumb root points back to.
-//
-// Per-request static cache so the walk runs once even when both URL and
-// label are requested during the same render.
 if (!function_exists('_first_accessible_module')) {
     function _first_accessible_module()
     {
@@ -1407,8 +1388,6 @@ if (!function_exists('_first_accessible_module')) {
             ['tickets',       'view', 'tickets',        'My Tickets'],
             ['tickets',       'add',  'tickets/create', 'Raise Ticket'],
             ['tickets_all',   'view', 'tickets/all',    'All Tickets'],
-            // System group — order mirrors templates/sidebar.php exactly
-            // so login landing / breadcrumb root pick the same first item
             // the user sees in the menu.
             ['users',                'view', 'users',                'Users'],
             ['api_keys',             'view', 'api_keys',             'API Keys'],
@@ -1425,9 +1404,6 @@ if (!function_exists('_first_accessible_module')) {
                 return $cached;
             }
         }
-        // Nothing accessible — log out is the safe fallback so we never
-        // bounce inside an infinite access-denied redirect, and the
-        // breadcrumb degrades to a sensible "Logout" label.
         $cached = ['url' => site_url('logout'), 'label' => 'Logout'];
         return $cached;
     }
@@ -1462,10 +1438,6 @@ if (!function_exists('check_module_access')) {
 
             $session = \Config\Services::session();
             $session->setFlashdata('error', 'You do not have permission to access that module.');
-
-            // Bounce to whatever module the user CAN reach, walked in
-            // the same order as the sidebar. Falls back to /logout when
-            // nothing is accessible so we never infinite-loop on denials.
             redirect()->to(first_accessible_module_url())->send();
             exit;
         }
@@ -1473,20 +1445,11 @@ if (!function_exists('check_module_access')) {
 }
 
 // Centralized event/activity logger. Writes a single row to activity_logs.
-// Failures are swallowed (with an error_log fallback) so logging issues
-// never break the live request. Most callers pass override_user fields
-// because the session-helper accessors return blank for pre-auth events
-// (failed login) — in that case pass [] / null and we record an anonymous
-// row with whatever IP / URL we can capture.
 if (!function_exists('activity_log')) {
     function activity_log($module, $action, $entity_type = null, $entity_id = null, $summary = '', $meta = [], $overrides = [])
     {
         try {
             $db = \Config\Database::connect();
-
-            // Most rows pull performer from session; auth events (login,
-            // login_failed) pass an explicit override so we still capture
-            // the user_id they tried.
             $userId    = isset($overrides['user_id'])    ? (string) $overrides['user_id']    : (string) logged_user_id();
             $userName  = isset($overrides['user_name'])  ? (string) $overrides['user_name']  : (string) logged_user_name();
             $userRole  = isset($overrides['user_role'])  ? (string) $overrides['user_role']  : (string) logged_user_role();
@@ -1560,9 +1523,6 @@ if (!function_exists('activity_log')) {
 }
 
 // Build a {field: [old, new]} diff for "update" events. Pass the row as it
-// was before the update and the array that's about to be written; only
-// fields whose value actually changed are returned. Caller can hand the
-// diff straight into activity_log()'s $meta param.
 if (!function_exists('activity_diff')) {
     function activity_diff($before, $after, $fields = [])
     {

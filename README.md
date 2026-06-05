@@ -7,29 +7,31 @@ A self-hosted NOC (Network Operations Centre) alert and ticket management system
 ## Table of Contents
 
 1. [Overview](#overview)
-2. [Key Features](#key-features)
-3. [Technology Stack](#technology-stack)
-4. [Architecture](#architecture)
-5. [Folder Structure](#folder-structure)
-6. [Requirements](#requirements)
-7. [Installation](#installation)
-8. [Database Setup](#database-setup)
-9. [Configuration](#configuration)
-10. [Running the Application](#running-the-application)
-11. [Cron Job Setup](#cron-job-setup)
-12. [User Roles & Permissions](#user-roles--permissions)
-13. [Modules](#modules)
-14. [Workflow Engine](#workflow-engine)
-15. [Ticket Lifecycle](#ticket-lifecycle)
-16. [Notifications & Email Queue](#notifications--email-queue)
-17. [REST API](#rest-api)
-18. [Activity Logs](#activity-logs)
-19. [Settings Reference](#settings-reference)
-20. [File Uploads](#file-uploads)
-21. [Backup](#backup)
-22. [Deployment](#deployment)
-23. [Default Credentials](#default-credentials)
-24. [Database Tables Reference](#database-tables-reference)
+2. [How It Works](#how-it-works)
+3. [Quick Start](#quick-start)
+4. [Key Features](#key-features)
+5. [Technology Stack](#technology-stack)
+6. [Architecture](#architecture)
+7. [Folder Structure](#folder-structure)
+8. [Requirements](#requirements)
+9. [Installation](#installation)
+10. [Database Setup](#database-setup)
+11. [Configuration](#configuration)
+12. [Running the Application](#running-the-application)
+13. [Cron Job Setup](#cron-job-setup)
+14. [User Roles & Permissions](#user-roles--permissions)
+15. [Modules](#modules)
+16. [Workflow Engine](#workflow-engine)
+17. [Ticket Lifecycle](#ticket-lifecycle)
+18. [Notifications & Email Queue](#notifications--email-queue)
+19. [REST API](#rest-api)
+20. [Activity Logs](#activity-logs)
+21. [Settings Reference](#settings-reference)
+22. [File Uploads](#file-uploads)
+23. [Backup](#backup)
+24. [Deployment](#deployment)
+25. [Default Credentials](#default-credentials)
+26. [Database Tables Reference](#database-tables-reference)
 
 ---
 
@@ -47,6 +49,179 @@ The system is designed for use by NOC teams who need:
 
 ---
 
+## How It Works
+
+### System Flow
+
+The diagram below shows the complete lifecycle of an alert — from detection in an external monitoring system through to final closure in pView.
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│           EXTERNAL MONITORING SYSTEM                                │
+│         (Zabbix, Nagios, Prometheus, custom scripts)                │
+└───────────────────────────┬─────────────────────────────────────────┘
+                            │  POST /api/raise   (X-API-KEY header)
+                            ▼
+┌─────────────────────────────────────────────────────────────────────┐
+│                       pView  —  API Layer                           │
+│                                                                     │
+│  ① Authenticate API key  →  verify project scope                   │
+│  ② Rate-limit check  (per-minute and per-hour limits)               │
+│  ③ Generate unique alarm ID  →  ALM-YYYYMMDD-NNNNN                 │
+│  ④ Create ticket  —  status: open  |  level: L1  |  Initial state  │
+│  ⑤ Queue notification emails to Initial state L1 user pool         │
+└───────────────────────────┬─────────────────────────────────────────┘
+                            │
+            ┌───────────────┴────────────────────┐
+            │    cron fires within 1 minute       │
+            ▼                                     ▼
+┌──────────────────────┐            ┌─────────────────────────────────┐
+│   tat_monitor.php    │            │  L1 Operators                   │
+│   Sends queued       │──────────▶ │  receive email notification     │
+│   emails via SMTP    │            │  Bell badge updates in browser  │
+└──────────────────────┘            └─────────────────────────────────┘
+```
+
+```
+OPERATOR RESPONSE
+┌─────────────────────────────────────────────────────────────────────┐
+│                                                                     │
+│  Operator logs in  →  ticket appears in My Tickets                  │
+│               ↓                                                     │
+│  Assigns to self  →  status: in_progress  |  TAT clock starts      │
+│               ↓                                                     │
+│  Works the ticket:                                                  │
+│  ├── Adds comments  (@mention colleagues → direct notification)     │
+│  ├── Uploads evidence files  (log extracts, screenshots)            │
+│  └── Moves state forward                                            │
+│         Initial → Investigation → Fix Applied  (TAT resets each)   │
+│               ↓                                                     │
+│  IF TAT window is exceeded before action (cron detects):           │
+│  ├── L1 TAT elapsed  →  bump to L2,  notify L2 pool                │
+│  ├── L2 TAT elapsed  →  bump to L3,  notify L3 pool                │
+│  ├── L3 TAT elapsed  →  bump to L4,  notify L4 pool                │
+│  └── L4 TAT elapsed  →  status = escalated  (management alert)     │
+│               ↓                                                     │
+│  Operator resolves ticket  →  status: resolved                      │
+│  Manager reviews and closes  →  status: closed  (terminal)          │
+│  All further mutations rejected on closed tickets                   │
+│                                                                     │
+│  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━  │
+│  Every action throughout  →  activity_logs  (append-only audit)     │
+│  Every email triggered    →  notification_logs queue → cron → SMTP  │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+### Project Setup Flow
+
+The order in which an administrator configures a new project from scratch:
+
+```
+── ONE-TIME SYSTEM SETUP ────────────────────────────────────────────────
+  ①  Import scripts/schema.sql          creates 21 database tables
+  ②  php scripts/setup_defaults.php     seeds roles, modules, settings
+  ③  Configure SMTP in Settings page
+  ④  Schedule tat_monitor.php every minute  (cron / Task Scheduler)
+─────────────────────────────────────────────────────────────────────────
+
+── PER-PROJECT CONFIGURATION ────────────────────────────────────────────
+
+  Create Project
+       ↓
+  Create Flow  (choose TAT level count: 1 – 4)
+       ↓
+  Add States to the Flow
+  ┌───────────────────────────────────────────────────────────────────┐
+  │  Initial state   (e.g. Triage)                                    │
+  │    L1 pool: first-line operators   |   L1 TAT: 60 min             │
+  │                    ↓                                              │
+  │  Process states  (e.g. Investigation, Fix Applied)                │
+  │    L1 – L4 pools: operators and escalation contacts per level     │
+  │    L1 – L4 TAT:   time threshold in minutes before escalation    │
+  │                    ↓                                              │
+  │  Final state     (e.g. Resolved)                                  │
+  └───────────────────────────────────────────────────────────────────┘
+       ↓
+  Define Transitions
+  ├── Forward:   Triage → Investigation → Fix Applied → Resolved
+  └── Backward:  Investigation → Triage  (rework — reason required)
+       ↓
+  Add Escalation Matrix overrides  (optional)
+  Override TAT or notify list for any specific state + level
+       ↓
+  Create Alert Definitions
+  Links alert_type  (info / major / critical)  →  flow
+       ↓
+  Generate API Key  (scoped to this project)
+       ↓
+  Give the key to your monitoring system
+  ────────────────────────────────────────────────────────────────────
+  System is ready to receive alerts via  POST /api/raise
+─────────────────────────────────────────────────────────────────────────
+```
+
+### Component Relationships
+
+```
+projects
+   └── flows
+         └── states ──── escalation_matrix (TAT / notify overrides)
+               │
+               └── state_transitions (forward / backward paths)
+
+alert_definitions ──── project + flow  (routing for API-raised tickets)
+api_keys          ──── project         (one key per project)
+
+tickets ──── project + flow + state
+   └── ticket_actions  (comments, state changes, attachments, escalations)
+   └── notification_logs  (email queue: pending → sent / failed)
+
+activity_logs  (append-only audit trail for every user action)
+cron_runs      (execution history of tat_monitor.php)
+```
+
+---
+
+## Quick Start
+
+Get a fully working demo instance running locally in under 10 minutes.
+
+**Prerequisites:** PHP 8.1+, MySQL 8.0+ / MariaDB 10.4+, Composer 2.x
+
+```bash
+# 1. Install PHP dependencies
+composer install --no-dev --optimize-autoloader
+
+# 2. Create the database
+mysql -u root -p -e "CREATE DATABASE pview_alerts CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;"
+
+# 3. Import schema and seed baseline data
+mysql -u root -p pview_alerts < scripts/schema.sql
+php scripts/setup_defaults.php
+
+# 4. Load demo data (optional — creates projects, flows, users, tickets)
+php scripts/seed_demo_data.php
+
+# 5. Set up the environment file
+cp .env.example .env
+# Edit .env: set app.baseURL and database credentials
+
+# 6. Start the built-in development server
+php spark serve
+```
+
+Open `http://localhost:8080` and log in with **admin** / **Demo@1234**.
+
+To test TAT escalation and email delivery, run the monitor once manually:
+
+```bash
+php tat_monitor.php
+```
+
+Then configure it as a cron job for continuous operation — see [Cron Job Setup](#cron-job-setup).
+
+---
+
 ## Key Features
 
 - **Configurable workflow engine** — build multi-stage ticket flows with forward and backward transitions
@@ -54,7 +229,7 @@ The system is designed for use by NOC teams who need:
 - **Escalation matrix overrides** — per-state, per-level TAT and notify-user lists that override flow defaults
 - **REST API** — external monitoring systems raise and update tickets via `X-API-KEY` authentication
 - **Role-based access control** — granular per-module permissions (view / add / edit / delete) per role
-- **Custom roles** — create additional roles beyond the three built-ins with configurable admin scope
+- **Custom roles** — create roles beyond the built-in `super_admin` with configurable admin scope
 - **Async email notifications** — email events are queued to `notification_logs` and flushed by the cron job
 - **@mention in comments** — tag operators by `@user_id` in ticket comments to trigger direct notifications
 - **Per-user notification preferences** — operators opt in or out per project and per severity
@@ -294,10 +469,10 @@ php scripts/setup_defaults.php
 ```
 
 This populates:
-- Three built-in roles: `super_admin`, `admin`, `user`
-- All system modules with sensible default permissions per role
+- One built-in role: `super_admin`
+- All system modules with full permissions for `super_admin`
 - Forty-plus application settings with production-ready defaults
-- A default `admin` user account (see [Default Credentials](#default-credentials))
+- A default `admin` user account with role `super_admin` (see [Default Credentials](#default-credentials))
 
 ### Step 4 (optional): Load demo data
 
@@ -422,19 +597,21 @@ The script is locked to CLI execution. HTTP requests to `tat_monitor.php` receiv
 
 ## User Roles & Permissions
 
-### Built-in roles
+### Built-in role
 
-| Role key | Admin scope | Description |
-|---|---|---|
-| `super_admin` | Yes | Full unrestricted access; can manage Settings, Roles, and Module Control Panel |
-| `admin` | Yes | Sees all tickets across all projects; module access configured via permission grid |
-| `user` | No | Sees only tickets they raised, are assigned to, or are in a state's user pool |
+`setup_defaults.php` seeds one built-in role:
+
+| Role key | Admin scope | Seeded by setup | Description |
+|---|---|---|---|
+| `super_admin` | Yes | Yes | Full unrestricted access; manages Settings, Roles, and Module Control Panel |
+
+The `admin` and `user` roles are supported by the system but are **not created automatically**. After first login, the super_admin can create them at `/roles` and configure their permissions in the Module Control Panel.
 
 **Admin scope** determines ticket visibility. An admin-scope role sees every ticket in the system. A non-admin-scope role sees only tickets it is directly involved with.
 
 ### Custom roles
 
-Create additional roles at `/roles`. Each role gets a unique key (e.g., `vendor_lead`), a display label, and an optional admin-scope flag. After creation, configure its permissions at `/module_control_panel`.
+Create roles at `/roles`. Each role gets a unique key (e.g., `admin`, `user`, `vendor_lead`), a display label, and an optional admin-scope flag. After creation, configure its permissions at `/module_control_panel`.
 
 ### Module permissions
 
