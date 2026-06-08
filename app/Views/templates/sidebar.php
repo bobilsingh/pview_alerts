@@ -6,7 +6,7 @@
  */
 $role         = logged_user_role();
 $isAdmin      = role_has_admin_scope($role);
-$isSuperAdmin = ($role === 'super_admin');
+$isSuperAdmin = ($role === ROLE_SUPER_ADMIN);
 $userName = logged_user_name();
 $userUid  = logged_user_id();
 $userMail = session('user_email');

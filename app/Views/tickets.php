@@ -355,6 +355,7 @@ if (!function_exists('ticket_activity_icon')) {
 
   </form>
 
+  <?php /* DEMO: bulk toolbar hidden
   <div id="bulkToolbar" class="bulk-toolbar" hidden>
     <span class="bulk-summary">
       <span id="bulkSelectedCount">0</span> selected
@@ -369,6 +370,7 @@ if (!function_exists('ticket_activity_icon')) {
       <button type="button" class="btn btn-sm btn-light" id="bulkClearBtn">Clear</button>
     </div>
   </div>
+  */ ?>
 
   <div class="card">
     <div class="card-body p-0">
@@ -385,9 +387,11 @@ if (!function_exists('ticket_activity_icon')) {
         data-export-mode="<?= esc($ticketMode, 'attr'); ?>">
         <thead>
           <tr>
+            <?php /* DEMO: bulk select-all column hidden
             <th class="ticket-bulk-cell text-center">
               <input type="checkbox" class="form-check-input" id="bulkSelectAll" aria-label="Select all on this page">
             </th>
+            */ ?>
             <th>Alarm ID</th>
             <th>Title</th>
             <th>Severity</th>

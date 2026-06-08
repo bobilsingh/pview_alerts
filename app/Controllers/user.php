@@ -22,7 +22,7 @@ class User extends BaseController
         $session = \Config\Services::session();
         $session->start();
         $role         = (string) $session->get('user_role');
-        $isSuperAdmin = ($session->get('user_id') && $role === 'super_admin');
+        $isSuperAdmin = ($session->get('user_id') && $role === ROLE_SUPER_ADMIN);
         $isAdminScope = ($session->get('user_id') && role_has_admin_scope($role));
 
         // Non-super admins work normally; super_admin sees the maintenance page with a disable button.
@@ -44,7 +44,7 @@ class User extends BaseController
         $session = \Config\Services::session();
         $session->start();
         // Only super_admin can disable maintenance mode from this endpoint.
-        if (!$session->get('user_id') || (string) $session->get('user_role') !== 'super_admin') {
+        if (!$session->get('user_id') || (string) $session->get('user_role') !== ROLE_SUPER_ADMIN) {
             return redirect()->to(site_url('maintenance'));
         }
         $db = \Config\Database::connect();
@@ -144,7 +144,12 @@ class User extends BaseController
             'Login: ' . (isset($user['name']) ? $user['name'] : $login)
         );
 
-        // Land on the first module the role can access (mirrors the first sidebar link).
+        // Redirect to the originally requested page, or fall back to first accessible module.
+        $redirectUrl = $session->get('redirect_after_login');
+        $session->remove('redirect_after_login');
+        if (!empty($redirectUrl) && strpos($redirectUrl, site_url()) === 0) {
+            return redirect()->to($redirectUrl);
+        }
         return redirect()->to(first_accessible_module_url());
     }
 
@@ -451,8 +456,8 @@ class User extends BaseController
 
         $isActive = bool_int($this->request->getPost('is_active'));
 
-        if ($isSelfEdit && !empty($currentRow) && $currentRow['role'] === 'super_admin') {
-            if ($role !== 'super_admin') {
+        if ($isSelfEdit && !empty($currentRow) && $currentRow['role'] === ROLE_SUPER_ADMIN) {
+            if ($role !== ROLE_SUPER_ADMIN) {
                 $this->session->setFlashdata('error', 'You cannot demote your own super-admin role.');
                 return redirect()->to(site_url('users/edit/' . $id));
             }
@@ -463,7 +468,7 @@ class User extends BaseController
         }
 
         // Refuse if this would demote the last active super_admin.
-        if (!empty($currentRow) && $currentRow['role'] === 'super_admin' && $role !== 'super_admin') {
+        if (!empty($currentRow) && $currentRow['role'] === ROLE_SUPER_ADMIN && $role !== ROLE_SUPER_ADMIN) {
             $remaining = $this->user_model->countActiveSuperAdmins($id);
             if ($remaining < 1) {
                 $this->session->setFlashdata('error', 'Cannot demote — this is the last active super-admin.');
@@ -519,7 +524,7 @@ class User extends BaseController
         }
 
         // Refuse if this would remove the last active super_admin.
-        if (!empty($row) && $row['role'] === 'super_admin') {
+        if (!empty($row) && $row['role'] === ROLE_SUPER_ADMIN) {
             $remaining = $this->user_model->countActiveSuperAdmins((int) $id);
             if ($remaining < 1) {
                 $this->session->setFlashdata('error', 'Cannot delete — this is the last active super-admin.');
@@ -951,7 +956,7 @@ class User extends BaseController
             $isAdminScope = 1;
         }
         // super_admin is always admin-scope regardless of form value.
-        if ($role_key === 'super_admin') {
+        if ($role_key === ROLE_SUPER_ADMIN) {
             $isAdminScope = 1;
         }
 

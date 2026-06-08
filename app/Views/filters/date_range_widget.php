@@ -61,4 +61,5 @@ if (!isset($presetLabels[$drDefault])) {
       value="<?= esc($drTo) ?>"
       data-default="<?= esc($drTo) ?>">
   </div>
+  <span class="drw-error text-danger small" style="display:none;"></span>
 </div>

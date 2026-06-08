@@ -47,6 +47,7 @@ if ($sessionTheme) {
    }
    ?>
    <link rel="stylesheet" href="<?= base_url('assets/css/app.css'); ?>?v=<?= esc($assetVersion); ?>">
+   <link rel="stylesheet" href="<?= base_url('assets/css/theme-dark.css'); ?>?v=<?= esc($assetVersion); ?>">
    <script>
    (function(){
      var t = localStorage.getItem('noc-theme') || '<?= esc($theme); ?>';

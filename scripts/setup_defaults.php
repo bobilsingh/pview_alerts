@@ -59,6 +59,21 @@ function ts()
 
 // ---------- 1. Wipe all operational and config tables ----------
 
+say('==> Ensuring modules table exists...');
+$db->query("CREATE TABLE IF NOT EXISTS `modules` (
+    `id`          INT UNSIGNED NOT NULL AUTO_INCREMENT,
+    `module_key`  VARCHAR(50)  NOT NULL,
+    `name`        VARCHAR(100) NOT NULL,
+    `description` VARCHAR(255) NOT NULL DEFAULT '',
+    `is_builtin`  TINYINT(1)   NOT NULL DEFAULT 0,
+    `sort_order`  INT          NOT NULL DEFAULT 100,
+    `created_at`  DATETIME     NOT NULL,
+    `created_by`  VARCHAR(100)          DEFAULT NULL,
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `idx_module_key` (`module_key`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+say('  modules table ready');
+
 say('==> Wiping operational and config tables...');
 $db->query("SET FOREIGN_KEY_CHECKS=0");
 
@@ -106,27 +121,24 @@ $db->table('roles')->insert([
 ]);
 say('  role super_admin created');
 
-// ---------- 3. Seed modules table ----------
-// Format: [module_key, display_name, description, is_builtin (1=cannot remove), sort_order]
-// is_builtin = 1 : locked (settings + module_control_panel).
-// is_builtin = 0 : removable via the Module Control Panel UI.
+// ---------- 3. Seed modules ----------
 
 say('==> Seeding modules...');
 $allModules = [
-    ['settings',             'Settings',             'System settings — super_admin only, not configurable via role permissions.',  1,   5],
-    ['dashboard',            'Dashboard',            'Main system status and active ticket overview charts.',                        0,  10],
-    ['projects',             'Projects',             'Configure project namespaces and operational domains.',                        0,  20],
-    ['flows',                'Flows',                'Define ticket state transition flow structures.',                              0,  30],
-    ['alerts',               'Alert Defs',           'Map external telemetry thresholds to initial ticket states.',                 0,  40],
-    ['escalation',           'Escalation Matrix',    'Set up auto-escalation matrix levels and breached-TAT rules.',                0,  50],
-    ['tickets',              'Tickets (My & Raise)', 'Create tickets manually and view assigned actionable lists.',                  0,  60],
-    ['tickets_all',          'All Tickets',          'Comprehensive operational overview listing all ticket instances.',             0,  70],
-    ['users',                'Users',                'System operator accounts, passwords, and assigned user roles.',                0,  80],
-    ['api_keys',             'API Keys',             'Generate external telemetry system API keys for ticket injection.',            0,  90],
-    ['roles',                'Roles',                'Manage custom roles beyond the built-in super_admin / admin / user.',         0, 100],
-    ['activity_logs',        'Activity Log',         'Centralized audit + activity feed; read-only history of user events.',        0, 110],
-    ['cron_panel',           'Cron Panel',           'View scheduled cron job run history and status.',                             0, 120],
-    ['module_control_panel', 'Module Permissions',   'Control which roles can access each module and action.',                      1, 130],
+    ['settings',             'Settings',             'System settings — super_admin only.',                                        1,   5],
+    ['dashboard',            'Dashboard',            'Main system status and active ticket overview charts.',                       0,  10],
+    ['projects',             'Projects',             'Configure project namespaces and operational domains.',                       0,  20],
+    ['flows',                'Flows',                'Define ticket state transition flow structures.',                             0,  30],
+    ['alerts',               'Alert Defs',           'Map external telemetry thresholds to initial ticket states.',                0,  40],
+    ['escalation',           'Escalation Matrix',    'Set up auto-escalation matrix levels and breached-TAT rules.',               0,  50],
+    ['tickets',              'Tickets (My & Raise)', 'Create tickets manually and view assigned actionable lists.',                 0,  60],
+    ['tickets_all',          'All Tickets',          'Comprehensive operational overview listing all ticket instances.',            0,  70],
+    ['users',                'Users',                'System operator accounts, passwords, and assigned user roles.',               0,  80],
+    ['api_keys',             'API Keys',             'Generate external telemetry system API keys for ticket injection.',           0,  90],
+    ['roles',                'Roles',                'Manage custom roles beyond the built-in super_admin.',                       0, 100],
+    ['activity_logs',        'Activity Log',         'Centralized audit + activity feed; read-only history of user events.',       0, 110],
+    ['cron_panel',           'Cron Panel',           'View scheduled cron job run history and status.',                            0, 120],
+    ['module_control_panel', 'Module Permissions',   'Control which roles can access each module and action.',                     1, 130],
 ];
 
 foreach ($allModules as $m) {
@@ -137,6 +149,7 @@ foreach ($allModules as $m) {
         'is_builtin'  => $m[3],
         'sort_order'  => $m[4],
         'created_at'  => ts(),
+        'created_by'  => 'admin',
     ]);
     say("  module seeded: {$m[0]}");
 }

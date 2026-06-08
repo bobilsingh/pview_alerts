@@ -10,6 +10,34 @@ class App_model
         $this->db = \Config\Database::connect();
     }
 
+    // Fetches user names only for the given IDs; avoids loading the full users table.
+    private function userNameBatch(array $ids)
+    {
+        static $cache = [];
+        $ids     = array_unique(array_filter(array_map('strval', $ids)));
+        $missing = array_values(array_diff($ids, array_keys($cache)));
+        if (!empty($missing)) {
+            $rows = $this->db->table('users')
+                ->select('user_id, name')
+                ->whereIn('user_id', $missing)
+                ->get()->getResultArray();
+            foreach ($rows as $r) {
+                $cache[(string) $r['user_id']] = (string) $r['name'];
+            }
+            foreach ($missing as $id) {
+                if (!isset($cache[$id])) {
+                    $cache[$id] = '';
+                }
+            }
+        }
+        $out = [];
+        foreach ($ids as $id) {
+            $out[$id] = isset($cache[$id]) ? $cache[$id] : '';
+        }
+        return $out;
+    }
+
+    // Kept for callers that need the full map (activity log formatting, etc.).
     private function userNameMap()
     {
         static $cache = null;
@@ -82,13 +110,13 @@ class App_model
 
     public function projectGetAll()
     {
-        $rows = $this->db->table('projects')->where('deleted_at', null)->orderBy('created_at', 'desc')->get()->getResultArray();
-        $userMap = $this->userNameMap();
+        $rows    = $this->db->table('projects')->where('deleted_at', null)->orderBy('created_at', 'desc')->get()->getResultArray();
+        $nameMap = $this->userNameBatch(array_column($rows, 'created_by'));
         $out = [];
         foreach ($rows as $r) {
             $r['created_by_name'] = '';
-            if (isset($userMap[$r['created_by']])) {
-                $r['created_by_name'] = $userMap[$r['created_by']];
+            if (isset($nameMap[(string) $r['created_by']])) {
+                $r['created_by_name'] = $nameMap[(string) $r['created_by']];
             }
             $out[] = $r;
         }
@@ -164,9 +192,9 @@ class App_model
 
     public function flowGetAll()
     {
-        $rows = $this->db->table('flows')->where('deleted_at', null)->orderBy('created_at', 'desc')->get()->getResultArray();
+        $rows        = $this->db->table('flows')->where('deleted_at', null)->orderBy('created_at', 'desc')->get()->getResultArray();
         $projectMap  = $this->projectNameMap();
-        $userMap     = $this->userNameMap();
+        $nameMap     = $this->userNameBatch(array_column($rows, 'created_by'));
         $stateCounts = $this->flowStateCounts();
 
         $out = [];
@@ -176,8 +204,8 @@ class App_model
                 $r['project_name'] = $projectMap[(int) $r['project_id']];
             }
             $r['created_by_name'] = '';
-            if (isset($userMap[$r['created_by']])) {
-                $r['created_by_name'] = $userMap[$r['created_by']];
+            if (isset($nameMap[(string) $r['created_by']])) {
+                $r['created_by_name'] = $nameMap[(string) $r['created_by']];
             }
             $r['state_count'] = 0;
             if (isset($stateCounts[(int) $r['id']])) {
@@ -909,6 +937,32 @@ class App_model
         }
     }
 
+    // Uses FULLTEXT MATCH...AGAINST for terms >= 3 chars; falls back to LIKE for shorter terms.
+    // Returns true when FULLTEXT was applied so the caller can sort by relevance score.
+    private function applyTicketSearch($q, $search)
+    {
+        if (strlen($search) >= 3) {
+            $escaped = $this->db->escapeString($search);
+            $q->groupStart()
+                ->where("MATCH(t.alarm_id, t.title, t.description) AGAINST ('{$escaped}' IN BOOLEAN MODE)", null, false)
+                ->orLike('p.name',  $search)
+                ->orLike('f.name',  $search)
+                ->orLike('s.name',  $search)
+                ->orLike('ua.name', $search)
+                ->groupEnd();
+            return true;
+        }
+        $q->groupStart()
+            ->like('t.alarm_id', $search)
+            ->orLike('t.title',  $search)
+            ->orLike('p.name',   $search)
+            ->orLike('f.name',   $search)
+            ->orLike('s.name',   $search)
+            ->orLike('ua.name',  $search)
+            ->groupEnd();
+        return false;
+    }
+
     public function ticketGetAll($filters = [])
     {
         $q = $this->ticketSelect();
@@ -963,21 +1017,19 @@ class App_model
         $q = $this->ticketSelect();
         $this->ticketApplyFilters($q, $filters);
 
-        $search = '';
+        $search      = '';
+        $usedFulltext = false;
         if (!empty($args['search'])) {
             $search = (string) $args['search'];
         }
         if ($search !== '') {
-            $q->groupStart()
-                ->like('t.alarm_id',  $search)
-                ->orLike('t.title',   $search)
-                ->orLike('p.name',    $search)
-                ->orLike('f.name',    $search)
-                ->orLike('s.name',    $search)
-                ->orLike('ua.name',   $search)
-                ->groupEnd();
+            $usedFulltext = $this->applyTicketSearch($q, $search);
         }
 
+        if ($usedFulltext) {
+            $escapedSearch = $this->db->escapeString($search);
+            $q->orderBy("MATCH(t.alarm_id, t.title, t.description) AGAINST ('{$escapedSearch}' IN BOOLEAN MODE)", 'desc', false);
+        }
         $rows = $q->orderBy($orderCol, $orderDir)->limit($length, $start)->get()->getResultArray();
 
         $scopeUserPk = null;
@@ -1017,14 +1069,7 @@ class App_model
             ->join('users ua',   'ua.user_id = t.current_assignee', 'left');
         $this->ticketApplyFilters($q, $filters);
         if ($search !== '') {
-            $q->groupStart()
-                ->like('t.alarm_id',  $search)
-                ->orLike('t.title',   $search)
-                ->orLike('p.name',    $search)
-                ->orLike('f.name',    $search)
-                ->orLike('s.name',    $search)
-                ->orLike('ua.name',   $search)
-                ->groupEnd();
+            $this->applyTicketSearch($q, $search);
         }
         return (int) $q->countAllResults();
     }
@@ -1071,22 +1116,24 @@ class App_model
             $days = 365;
         }
 
-        $labels = [];
+        $labels  = [];
         $buckets = [];
+        $fmt     = $days <= 14 ? 'D' : 'd-M';
+        $today   = new \DateTime();
         for ($i = $days; $i >= 1; $i--) {
-            $day = date('Y-m-d', strtotime("-{$i} days"));
-            if ($days <= 14) {
-                $labels[] = date('D', strtotime($day));
-            } else {
-                $labels[] = date('d-M', strtotime($day));
-            }
-            $buckets[$day] = 0;
+            $date   = clone $today;
+            $date->modify("-{$i} days");
+            $dayKey    = $date->format('Y-m-d');
+            $labels[]  = $date->format($fmt);
+            $buckets[$dayKey] = 0;
         }
 
         $start = array_key_first($buckets) . ' 00:00:00';
+        $end   = $today->format('Y-m-d') . ' 23:59:59';
         $q = $this->db->table('tickets')
             ->select('DATE(tickets.created_at) AS day_key, COUNT(*) AS n', false)
-            ->where('tickets.created_at >=', $start);
+            ->where('tickets.created_at >=', $start)
+            ->where('tickets.created_at <=', $end);
         $this->applyUserScope($q, 'tickets', $userPk, $isAdmin);
         if ((int) $projectId > 0) {
             $q->where('tickets.project_id', (int) $projectId);

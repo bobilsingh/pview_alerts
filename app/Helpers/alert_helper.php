@@ -1,61 +1,61 @@
 <?php
 
-// App settings and alert system helpers. Two-layer cache (per-request static + 5-min file cache).
+// App settings helpers. Two-layer cache: per-request static + 5-min CI4 cache.
 if (!function_exists('app_settings_all')) {
     function app_settings_all()
     {
-        static $cache = null;
-        if ($cache !== null) {
-            return $cache;
+        static $reqCache = null;
+        if ($reqCache !== null) {
+            return $reqCache;
         }
 
-        // Try the cross-request file cache first.
-        $cacheFile = WRITEPATH . 'cache/app_settings.cache';
-        $cacheTtl  = 300; // 5 minutes
-        if (is_file($cacheFile) && (time() - filemtime($cacheFile)) < $cacheTtl) {
-            $payload = @file_get_contents($cacheFile);
-            if ($payload !== false) {
-                $decoded = json_decode($payload, true);
-                if (is_array($decoded)) {
-                    $cache = $decoded;
-                    return $cache;
-                }
-            }
-        }
-
-        // Cache miss / stale — re-fetch from DB and write the file.
-        $cache = [];
+        // Check the cross-request CI4 cache before hitting the DB.
+        $cacheKey = 'pview_app_settings';
+        $cached   = null;
         try {
-            $db = \Config\Database::connect();
+            $cached = cache($cacheKey);
+        } catch (\Throwable $e) {
+            log_message('warning', 'pview alert >> app_settings_all() cache read failed: ' . $e->getMessage());
+        }
+        if (is_array($cached)) {
+            $reqCache = $cached;
+            return $reqCache;
+        }
+
+        // Cache miss — re-fetch from DB and persist for 5 minutes.
+        $reqCache = [];
+        try {
+            $db   = \Config\Database::connect();
             $rows = $db->table('app_settings')->get()->getResultArray();
             foreach ($rows as $r) {
-                $cache[(string) $r['setting_key']] = (string) $r['setting_value'];
+                $reqCache[(string) $r['setting_key']] = (string) $r['setting_value'];
             }
-            @file_put_contents($cacheFile, json_encode($cache), LOCK_EX);
+            cache()->save($cacheKey, $reqCache, 300);
         } catch (\Throwable $e) {
             log_message('error', 'pview alert >> app_settings_all() failed: ' . $e->getMessage());
         }
-        return $cache;
+        return $reqCache;
     }
 }
 
 if (!function_exists('app_settings_clear_cache')) {
-    // Deletes the file cache so the next request re-reads settings from DB.
+    // Deletes the cache key so the next request re-reads settings from DB.
     function app_settings_clear_cache()
     {
-        $cacheFile = WRITEPATH . 'cache/app_settings.cache';
-        if (is_file($cacheFile)) {
-            @unlink($cacheFile);
-        }
+        cache()->delete('pview_app_settings');
     }
 }
 if (!function_exists('app_setting')) {
-    // Returns a single app setting by key with optional fallback.
+    // Returns a single app setting by key; checks AppDefaults before the caller-supplied fallback.
     function app_setting($key, $default = null)
     {
         $map = app_settings_all();
         if (array_key_exists((string) $key, $map)) {
             return $map[(string) $key];
+        }
+        $codeDefaults = \App\Config\AppDefaults::$defaults;
+        if (isset($codeDefaults[(string) $key])) {
+            return $codeDefaults[(string) $key];
         }
         return $default;
     }
@@ -119,7 +119,16 @@ if (!function_exists('check_isvalidated')) {
         $session = \Config\Services::session();
         $session->start();
         if (logged_user_id() === '') {
+            // Save the attempted URL on the new session so do_login() can redirect back after auth.
+            $path        = (string) service('request')->getUri()->getPath();
+            $redirectUrl = null;
+            if (strpos($path, 'login') === false && strpos($path, 'logout') === false) {
+                $redirectUrl = current_url();
+            }
             $session->destroy();
+            if ($redirectUrl !== null) {
+                $session->set('redirect_after_login', $redirectUrl);
+            }
             redirect()->to(site_url('login'))->with('error', 'Your session has expired. Please sign in again.')->send();
             exit;
         }
@@ -168,7 +177,7 @@ if (!function_exists('check_issuperadmin')) {
         $session = \Config\Services::session();
         $session->start();
         $role = $session->get('user_role');
-        if ($role !== 'super_admin') {
+        if ($role !== ROLE_SUPER_ADMIN) {
             redirect()->to(site_url('dashboard'))->send();
             exit;
         }
@@ -192,7 +201,7 @@ if (!function_exists('assignable_role_keys')) {
             return $cache[$actor_role];
         }
 
-        $actorIsSuper      = ($actor_role === 'super_admin');
+        $actorIsSuper      = ($actor_role === ROLE_SUPER_ADMIN);
         $actorIsAdminScope = role_has_admin_scope($actor_role);
 
         $allowed = [];
@@ -203,7 +212,7 @@ if (!function_exists('assignable_role_keys')) {
                 ->get()->getResultArray();
             foreach ($rows as $r) {
                 $key            = (string) $r['role_key'];
-                $isSuper        = ($key === 'super_admin');
+                $isSuper        = ($key === ROLE_SUPER_ADMIN);
                 $isAdminScope   = ((int) ($r['is_admin_scope'] ?? 0)) === 1;
 
                 if ($isSuper && !$actorIsSuper) {
@@ -233,7 +242,7 @@ if (!function_exists('role_has_admin_scope')) {
         if ($role === '') {
             return false;
         }
-        if ($role === 'super_admin') {
+        if ($role === ROLE_SUPER_ADMIN) {
             return true;
         }
         static $cache = null;
@@ -887,13 +896,16 @@ if (!function_exists('process_notification_queue')) {
         $sent    = 0;
         $failed  = 0;
         $retried = 0;
+
+        // Collect IDs by outcome so we can batch-update sent rows in one query.
+        $sentIds    = [];
+        $failedRows = []; // id => error_message
+        $retryRows  = []; // id => error_message
+
         foreach ($pending as $row) {
             $recipient = (string) $row['recipient_email'];
             if ($recipient === '') {
-                $db->table('notification_logs')->where('id', (int) $row['id'])->update([
-                    'status'        => 'failed',
-                    'error_message' => 'no recipient_email',
-                ]);
+                $failedRows[(int) $row['id']] = 'no recipient_email';
                 $failed++;
                 continue;
             }
@@ -904,11 +916,7 @@ if (!function_exists('process_notification_queue')) {
                 $ok = false;
             }
             if ($ok) {
-                $db->table('notification_logs')->where('id', (int) $row['id'])->update([
-                    'status'        => 'sent',
-                    'sent_at'       => date('Y-m-d H:i:s'),
-                    'error_message' => null,
-                ]);
+                $sentIds[] = (int) $row['id'];
                 $sent++;
                 log_message('debug', 'pview alert >> queue sent: id=[' . $row['id'] . '], to=[' . $recipient . ']');
                 continue;
@@ -920,18 +928,28 @@ if (!function_exists('process_notification_queue')) {
                 $attempts = (int) $m[1] + 1;
             }
             if ($attempts >= $maxAttempts) {
-                $db->table('notification_logs')->where('id', (int) $row['id'])->update([
-                    'status'        => 'failed',
-                    'error_message' => 'send failed after ' . $attempts . ' attempt(s)',
-                ]);
+                $failedRows[(int) $row['id']] = 'send failed after ' . $attempts . ' attempt(s)';
                 $failed++;
                 log_message('warning', 'pview alert >> queue give-up: id=[' . $row['id'] . '], to=[' . $recipient . '], attempts=[' . $attempts . ']');
             } else {
-                $db->table('notification_logs')->where('id', (int) $row['id'])->update([
-                    'error_message' => 'transient send failure /' . $attempts,
-                ]);
+                $retryRows[(int) $row['id']] = 'transient send failure /' . $attempts;
                 $retried++;
             }
+        }
+
+        // Batch UPDATE all successfully sent rows in a single query.
+        if (!empty($sentIds)) {
+            $db->table('notification_logs')
+                ->set(['status' => 'sent', 'sent_at' => date('Y-m-d H:i:s'), 'error_message' => null])
+                ->whereIn('id', $sentIds)
+                ->update();
+        }
+        // Failed and retry rows each carry a distinct error_message, so update individually.
+        foreach ($failedRows as $id => $msg) {
+            $db->table('notification_logs')->where('id', $id)->update(['status' => 'failed', 'error_message' => $msg]);
+        }
+        foreach ($retryRows as $id => $msg) {
+            $db->table('notification_logs')->where('id', $id)->update(['error_message' => $msg]);
         }
 
         return ['sent' => $sent, 'failed' => $failed, 'retried' => $retried];
@@ -1137,6 +1155,9 @@ if (!function_exists('validate_password')) {
     function validate_password($password)
     {
         $password    = (string) $password;
+        if (strlen($password) > 1024) {
+            return 'Password is too long.';
+        }
         $min         = app_setting_int('password_min_length', 8);
         if ($min < 1) {
             $min = 8;
@@ -1316,14 +1337,14 @@ if (!function_exists('has_module_access')) {
 
         // Settings is always super_admin only — excluded from role configuration by design.
         if ($module_key === 'settings') {
-            if ($role === 'super_admin') {
+            if ($role === ROLE_SUPER_ADMIN) {
                 return true;
             }
             return false;
         }
 
         // Always override for super_admin to prevent lockout
-        if ($role === 'super_admin') {
+        if ($role === ROLE_SUPER_ADMIN) {
             return true;
         }
 

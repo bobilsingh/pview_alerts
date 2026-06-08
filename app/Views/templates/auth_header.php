@@ -32,6 +32,7 @@ if (isset($_COOKIE['theme'])) {
   })();
   </script>
   <script src="<?= base_url('assets/vendor/jquery/jquery-3.7.1.min.js'); ?>"></script>
+  <script src="<?= base_url('assets/js/datatable.js'); ?>?v=20"></script>
   <script src="<?= base_url('assets/js/app.js'); ?>?v=20"></script>
 </head>
 

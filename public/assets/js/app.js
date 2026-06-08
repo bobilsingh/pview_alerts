@@ -225,7 +225,7 @@ $appDocument.ready(function () {
   initCopyButtons();
   initTicketCreatePage();
   initTicketDetailPage();
-  initBulkActions();
+  // DEMO: initBulkActions(); — hidden
   initListReopenButtons();
   initSavedFilters();
   initTrendRangePicker();
@@ -247,6 +247,7 @@ $appDocument.ready(function () {
   // --- Settings ---
   initSendTestEmail();
   initBumpAssetVersion();
+  initClearSettingsCache();
 
   // --- Activity Logs ---
   initAuditLogTable();
@@ -2244,7 +2245,7 @@ function initPasswordToggle() {
 
 // Shows a spinner on the submit button so the user knows the form is saving.
 function initLoadingForms() {
-  $appDocument.off("submit.loadingForms").on("submit.loadingForms", "form[data-loading-form]", function (event) {
+  $appDocument.off("submit.loadingForms").on("submit.loadingForms", "form[data-loading-form], .modal form", function (event) {
     var $form = $(this);
 
     if (!validateForm($form)) {
@@ -2260,6 +2261,7 @@ function initLoadingForms() {
       return;
     }
     if ($btn.data("loading")) {
+      event.preventDefault();
       return;
     }
 
@@ -2280,7 +2282,7 @@ function initLoadingForms() {
     var originalClass;
 
     if (event.originalEvent && event.originalEvent.persisted) {
-      $("form[data-loading-form] button[type=submit]").each(function () {
+      $("form[data-loading-form] button[type=submit], .modal form button[type=submit]").each(function () {
         var $btn = $(this);
 
         $btn.prop("disabled", false);
@@ -3608,6 +3610,36 @@ function initBumpAssetVersion() {
   });
 }
 
+function initClearSettingsCache() {
+  $appDocument.off("click.clearSettingsCache").on("click.clearSettingsCache", "#clearSettingsCacheBtn", function (e) {
+    e.preventDefault();
+    var $btn = $(this);
+    var url = $btn.attr("data-url");
+    if (!url) {
+      return;
+    }
+    $btn.attr("disabled", "disabled");
+    $.ajax({
+      url: url,
+      type: "POST",
+      dataType: "json",
+      success: function (response) {
+        if (response && response.success) {
+          showSuccess(response.message || "Settings cache cleared");
+        } else {
+          showError(extractErrorMessage(response, "Clear cache failed"));
+        }
+      },
+      error: function () {
+        showError("Network error clearing settings cache");
+      },
+      complete: function () {
+        $btn.removeAttr("disabled");
+      },
+    });
+  });
+}
+
 // ============================================================
 // 27. DATE RANGE WIDGET — global reusable date-range picker
 // ============================================================
@@ -3686,9 +3718,17 @@ function initDateRangeWidgets() {
       setDateRangePreset($widget, $(this).data("preset"));
     });
 
-    // Manual edit clears the active preset marker.
+    // Manual edit clears the active preset marker and validates the range.
     $widget.find("[data-date-range-from], [data-date-range-to]").on("change", function () {
       $widget.find(".drw-preset").removeClass("active");
+      var from = $widget.find("[data-date-range-from]").val();
+      var to   = $widget.find("[data-date-range-to]").val();
+      var $err = $widget.find(".drw-error");
+      if (from && to && from > to) {
+        $err.text("From date cannot be after To date.").show();
+      } else {
+        $err.hide();
+      }
     });
   });
 }

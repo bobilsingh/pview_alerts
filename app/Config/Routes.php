@@ -109,6 +109,7 @@ $routes->get('settings',                  'app::settings');
 $routes->post('settings/save',            'app::settings_save');
 $routes->post('settings/send_test_email', 'app::settings_send_test_email');
 $routes->post('settings/bump_asset_version', 'app::settings_bump_asset_version');
+$routes->post('settings/clear_cache',        'app::settings_clear_cache');
 
 // ===== Module Control Panel =====
 $routes->get('module_control_panel',                              'app::module_control_panel');
@@ -137,7 +138,7 @@ $routes->post('tickets/reopen/(:any)',                     'app::ticket_reopen/$
 $routes->get('tickets/flows_by_project/(:num)',            'app::ticket_flows_by_project/$1');
 $routes->get('tickets/assignable_users/(:num)',            'app::ticket_assignable_users/$1');
 $routes->get('tickets/export',                             'app::tickets_export');
-$routes->post('tickets/bulk',                              'app::tickets_bulk');
+// DEMO: bulk ticket route hidden — $routes->post('tickets/bulk', 'app::tickets_bulk');
 $routes->post('tickets/saved/save',                        'app::tickets_saved_save');
 $routes->post('tickets/saved/delete/(:num)',               'app::tickets_saved_delete/$1');
 

@@ -26,7 +26,7 @@ $groups = [
   'Notification queue' => ['notification_batch_size', 'notification_max_attempts'],
   // Bumping this number invalidates every browser's cached copy of
   // app.css / app.js — handy after a hot-fix edited on the server.
-  'Assets'             => ['asset_version'],
+  'Assets'             => ['asset_version', 'duplicate_detection_window_hours'],
 ];
 
 // Keys that must always render as a number input even when their current
@@ -51,6 +51,7 @@ $numericKeys = [
   'notification_batch_size',
   'notification_max_attempts',
   'asset_version',
+  'duplicate_detection_window_hours',
 ];
 
 // Keys to render as a password input (masked). These all live in app_settings
@@ -94,7 +95,8 @@ $descOverrides = [
   'email_from_name'         => 'Display name shown to recipients.',
   'notification_batch_size'   => 'Max notification_logs rows the cron worker processes per run (1-500).',
   'notification_max_attempts' => 'Give up on a pending notification after this many failed send attempts.',
-  'asset_version'             => 'Cache-buster appended to public/assets/css/app.css and public/assets/js/app.js URLs. Bump this number by 1 after editing those files directly on the server so every browser pulls the fresh copy on next page load.',
+  'asset_version'                      => 'Cache-buster appended to public/assets/css/app.css and public/assets/js/app.js URLs. Bump this number by 1 after editing those files directly on the server so every browser pulls the fresh copy on next page load.',
+  'duplicate_detection_window_hours'   => 'When raising a ticket, warn if another open ticket with the same alert type exists in the same project within this many hours. Set to 0 to disable the check.',
 ];
 
 // Index by key for fast lookup, and find any keys that don't fit
@@ -222,6 +224,17 @@ if (!empty($other)) {
                 <?php } else if ($isLong) { ?>
                   <textarea class="form-control" rows="2"
                     name="<?= esc($key); ?>" id="set_<?= esc($key); ?>"><?= esc($value); ?></textarea>
+                <?php } else if ($key === 'asset_version') { ?>
+                  <div class="input-group">
+                    <input type="text" class="form-control"
+                      name="<?= esc($key); ?>" id="set_<?= esc($key); ?>"
+                      value="<?= esc($value); ?>">
+                    <button type="button" id="bumpAssetVersionBtn"
+                      class="btn btn-outline-primary"
+                      data-url="<?= site_url('settings/bump_asset_version'); ?>">
+                      <i class="bi bi-arrow-up-circle"></i> Bump version
+                    </button>
+                  </div>
                 <?php } else { ?>
                   <input type="text" class="form-control"
                     name="<?= esc($key); ?>" id="set_<?= esc($key); ?>"
@@ -247,16 +260,6 @@ if (!empty($other)) {
           </div>
         <?php } ?>
 
-        <?php if ($groupName === 'Assets') { ?>
-          <div class="mt-3 d-flex align-items-center gap-2">
-            <button type="button" id="bumpAssetVersionBtn"
-              class="btn btn-outline-primary btn-sm"
-              data-url="<?= site_url('settings/bump_asset_version'); ?>">
-              <i class="bi bi-arrow-up-circle"></i> Bump version
-            </button>
-            <small class="text-muted">Quick way to invalidate every browser's cached CSS / JS after a server-side edit. Increments the value by 1 and saves immediately.</small>
-          </div>
-        <?php } ?>
       </div>
     </div>
   <?php } ?>
@@ -333,11 +336,18 @@ if (!empty($other)) {
     </div>
   </div>
 
-  <div class="d-flex justify-content-end gap-2 mb-4">
-    <a href="<?= site_url('dashboard'); ?>" class="btn btn-light">Cancel</a>
-    <button type="submit" class="btn btn-primary">
-      <i class="bi bi-check-lg"></i>
-      <span class="btn-label">Save Settings</span>
+  <div class="d-flex justify-content-between align-items-center mb-4">
+    <button type="button" id="clearSettingsCacheBtn"
+      class="btn btn-outline-secondary btn-sm"
+      data-url="<?= site_url('settings/clear_cache'); ?>">
+      <i class="bi bi-arrow-clockwise"></i> Clear Settings Cache
     </button>
+    <div class="d-flex gap-2">
+      <a href="<?= site_url('dashboard'); ?>" class="btn btn-light">Cancel</a>
+      <button type="submit" class="btn btn-primary">
+        <i class="bi bi-check-lg"></i>
+        <span class="btn-label">Save Settings</span>
+      </button>
+    </div>
   </div>
 </form>

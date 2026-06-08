@@ -1093,7 +1093,9 @@ class App extends BaseController
             return redirect()->to(site_url('tickets/create'));
         }
 
-        $alarmId   = generate_alarm_id();
+        $alarmId = generate_alarm_id();
+
+        $this->db->transStart();
         $ticket_id = $this->app_model->ticketSave([
             'alarm_id'          => $alarmId,
             'project_id'        => $project_id,
@@ -1121,6 +1123,13 @@ class App extends BaseController
             'to_state_id' => (int) $initial['id'],
             'to_level'    => 1,
         ]);
+        $this->db->transComplete();
+
+        if (!$this->db->transStatus()) {
+            log_message('error', 'pview alert >> ticket_save() transaction failed: alarm_id=[' . $alarmId . ']');
+            $this->session->setFlashdata('error', 'Failed to create ticket due to a database error. Please try again.');
+            return redirect()->to(site_url('tickets/create'));
+        }
 
         $file = $this->request->getFile('attachment');
         if (!empty($file) && $file->isValid() && $file->getSize() > 0) {
@@ -2121,7 +2130,8 @@ class App extends BaseController
                     $created = (string) $t['created_at'];
                 }
             }
-            $checkbox = '<input type="checkbox" class="form-check-input bulk-select" data-bulk-id="' . esc($t['alarm_id']) . '" aria-label="Select ticket">';
+            // DEMO: bulk checkbox hidden — $checkbox = '<input type="checkbox" class="form-check-input bulk-select" data-bulk-id="' . esc($t['alarm_id']) . '" aria-label="Select ticket">';
+            $checkbox = '';
             $actions = '';
             $canReopen = false;
             if (role_has_admin_scope(logged_user_role())) {
@@ -2210,6 +2220,8 @@ class App extends BaseController
     }
 
     /** POST /tickets/bulk — bulk resolve or close a set of tickets by ID. */
+    // DEMO: tickets_bulk() hidden — uncomment to restore
+    /*
     public function tickets_bulk()
     {
         check_module_access('tickets', 'edit');
@@ -2329,6 +2341,7 @@ class App extends BaseController
             'failed'    => $failed,
         ], $msg);
     }
+    */
 
     public function tickets_export()
     {
@@ -3458,6 +3471,19 @@ class App extends BaseController
         return json_ok(['value' => $next], 'Asset version bumped to ' . $next . '. Refresh once to pull the new files.');
     }
 
+    /** POST /settings/clear_cache — flushes the app_settings CI4 cache so the next request re-reads from the DB. */
+    public function settings_clear_cache()
+    {
+        check_isvalidated();
+        check_issuperadmin();
+
+        app_settings_clear_cache();
+
+        activity_log('settings', 'clear_cache', null, null, 'Cleared app settings cache', []);
+
+        return json_ok([], 'Settings cache cleared. Next page load will re-read all settings from the database.');
+    }
+
     /** GET /activity_logs — read-only centralized event/audit feed. */
     public function activity_logs()
     {
@@ -3470,7 +3496,7 @@ class App extends BaseController
         $statuses = ['success', 'fail'];
         $projects = $this->app_model->activityLogsProjectsForFilter();
 
-        $canAnalytics = (logged_user_role() === 'super_admin')
+        $canAnalytics = (logged_user_role() === ROLE_SUPER_ADMIN)
             || has_module_access('activity_logs', 'analytics');
 
         $data = [
@@ -3511,6 +3537,11 @@ class App extends BaseController
         $fProject = trim((string) $this->request->getGet('f_project'));
         $fFrom    = trim((string) $this->request->getGet('f_from'));
         $fTo      = trim((string) $this->request->getGet('f_to'));
+        if ($fFrom !== '' && $fTo !== '' && $fFrom > $fTo) {
+            $tmp   = $fFrom;
+            $fFrom = $fTo;
+            $fTo   = $tmp;
+        }
 
         $builder = $this->db->table('activity_logs');
         if ($fUser !== '') {
@@ -3541,17 +3572,31 @@ class App extends BaseController
             $builder->where('created_at <=', $fTo . ' 23:59:59');
         }
         if ($params['search'] !== '') {
-            $like = $params['search'];
-            $builder->groupStart()
-                ->like('user_name', $like)
-                ->orLike('user_id', $like)
-                ->orLike('module', $like)
-                ->orLike('action', $like)
-                ->orLike('entity_type', $like)
-                ->orLike('entity_id', $like)
-                ->orLike('summary', $like)
-                ->orLike('ip_address', $like)
-                ->groupEnd();
+            $term = $params['search'];
+            if (strlen($term) >= 3) {
+                $escaped = $this->db->escapeString($term);
+                $builder->groupStart()
+                    ->where("MATCH(summary) AGAINST ('{$escaped}' IN BOOLEAN MODE)", null, false)
+                    ->orLike('user_name',   $term)
+                    ->orLike('user_id',     $term)
+                    ->orLike('module',      $term)
+                    ->orLike('action',      $term)
+                    ->orLike('entity_type', $term)
+                    ->orLike('entity_id',   $term)
+                    ->orLike('ip_address',  $term)
+                    ->groupEnd();
+            } else {
+                $builder->groupStart()
+                    ->like('user_name',   $term)
+                    ->orLike('user_id',   $term)
+                    ->orLike('module',    $term)
+                    ->orLike('action',    $term)
+                    ->orLike('entity_type', $term)
+                    ->orLike('entity_id', $term)
+                    ->orLike('summary',   $term)
+                    ->orLike('ip_address', $term)
+                    ->groupEnd();
+            }
         }
 
         $total    = (int) $this->db->table('activity_logs')->countAllResults();
@@ -3703,6 +3748,11 @@ class App extends BaseController
         $fFrom    = trim((string) $this->request->getGet('f_from'));
         $fTo      = trim((string) $this->request->getGet('f_to'));
         $fSearch  = trim((string) $this->request->getGet('q'));
+        if ($fFrom !== '' && $fTo !== '' && $fFrom > $fTo) {
+            $tmp   = $fFrom;
+            $fFrom = $fTo;
+            $fTo   = $tmp;
+        }
 
         $builder = $this->db->table('activity_logs');
         if ($fUser !== '') {
@@ -3733,16 +3783,30 @@ class App extends BaseController
             $builder->where('created_at <=', $fTo . ' 23:59:59');
         }
         if ($fSearch !== '') {
-            $builder->groupStart()
-                ->like('user_name', $fSearch)
-                ->orLike('user_id', $fSearch)
-                ->orLike('module', $fSearch)
-                ->orLike('action', $fSearch)
-                ->orLike('entity_type', $fSearch)
-                ->orLike('entity_id', $fSearch)
-                ->orLike('summary', $fSearch)
-                ->orLike('ip_address', $fSearch)
-                ->groupEnd();
+            if (strlen($fSearch) >= 3) {
+                $escaped = $this->db->escapeString($fSearch);
+                $builder->groupStart()
+                    ->where("MATCH(summary) AGAINST ('{$escaped}' IN BOOLEAN MODE)", null, false)
+                    ->orLike('user_name',   $fSearch)
+                    ->orLike('user_id',     $fSearch)
+                    ->orLike('module',      $fSearch)
+                    ->orLike('action',      $fSearch)
+                    ->orLike('entity_type', $fSearch)
+                    ->orLike('entity_id',   $fSearch)
+                    ->orLike('ip_address',  $fSearch)
+                    ->groupEnd();
+            } else {
+                $builder->groupStart()
+                    ->like('user_name',   $fSearch)
+                    ->orLike('user_id',   $fSearch)
+                    ->orLike('module',    $fSearch)
+                    ->orLike('action',    $fSearch)
+                    ->orLike('entity_type', $fSearch)
+                    ->orLike('entity_id', $fSearch)
+                    ->orLike('summary',   $fSearch)
+                    ->orLike('ip_address', $fSearch)
+                    ->groupEnd();
+            }
         }
 
         $rows = $builder
@@ -3824,7 +3888,7 @@ class App extends BaseController
      *  action granted on activity_logs in the Module Control Panel. */
     public function activity_logs_analytics()
     {
-        if (logged_user_role() !== 'super_admin' && !has_module_access('activity_logs', 'analytics')) {
+        if (logged_user_role() !== ROLE_SUPER_ADMIN && !has_module_access('activity_logs', 'analytics')) {
             return json_fail('Access denied', 403);
         }
 
@@ -4008,7 +4072,7 @@ class App extends BaseController
      *  specific user, used by the drilldown modal in the Analytics tab. */
     public function activity_logs_user_events()
     {
-        if (logged_user_role() !== 'super_admin' && !has_module_access('activity_logs', 'analytics')) {
+        if (logged_user_role() !== ROLE_SUPER_ADMIN && !has_module_access('activity_logs', 'analytics')) {
             return json_fail('Access denied', 403);
         }
 

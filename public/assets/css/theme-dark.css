@@ -1,0 +1,1056 @@
+/* ============================================================
+   DARK THEME — theme-dark.css
+   Scoped to [data-theme="dark"] on the <html> element.
+   Loaded after app.css — do not add light-mode rules here.
+   ============================================================ */
+
+/* ============================================================
+   01. THEME VARIABLES
+   ============================================================ */
+[data-theme="dark"] {
+  /* --- Brand / primary --- */
+  --primary: #0792cd;
+  --primary-700: #0580b4;
+  --primary-300: #0099db;
+  --primary-50: #252153;
+
+  /* --- Page & surface hierarchy (darkest → lightest) --- */
+  --page-bg: #070a10;
+  --content-bg: #090d14;
+  --surface: #121720;
+  --surface-2: #1a2030;
+  --deep-surface: #111722; /* topbar-user, activity icon, level indicator */
+
+  /* --- Sidebar --- */
+  --sidebar: #0a0e17;
+  --sidebar-2: #0d121d;
+  --sidebar-hover: #161b2d;
+  --sidebar-text: #94a3b8;
+  --sidebar-text-2: #64748b;
+  --sidebar-border: #1b2030;
+  --nav-link-text: #9da9bc;
+  --nav-icon-color: #7f8ca4;
+  --nav-section-text: #6f7e99;
+  --nav-active-bg: #1b1d3f;
+
+  /* --- Topbar --- */
+  --topbar-bg: #131722;
+  --topbar-user-border: #263044;
+
+  /* --- Borders --- */
+  --border: #252b3a;
+  --border-2: #384055;
+  --border-3: #272e3d; /* meta-table, level-indicator, list-item */
+  --border-accent: #263044; /* topbar-user, activity-feed timeline line */
+
+  /* --- Text --- */
+  --text: #f4f7fb;
+  --text-2: #d0d6e3;
+  --text-3: #9ba7bc;
+  --text-muted: #718098;
+  --secondary-label: #98a4b8; /* kpi labels, meta-table keys, tat block labels */
+
+  /* --- Status colours --- */
+  --critical: #ff6b83;
+  --critical-bg: #3a1024;
+  --major: #ffc328;
+  --major-bg: #3a2810;
+  --info: #35b7ee;
+  --info-bg: #102c44;
+  --success: #2ed69d;
+  --success-bg: #103832;
+  --slate-bg: #1e293b;
+
+  /* --- Shadows --- */
+  --shadow-sm: none;
+  --shadow: none;
+  --shadow-lg: 0 18px 45px rgba(0, 0, 0, 0.3);
+  --polish-ring: 0 0 0 3px rgba(53, 183, 238, 0.32);
+  --polish-lift: 0 18px 45px rgba(0, 0, 0, 0.55), 0 6px 14px rgba(0, 0, 0, 0.35);
+
+  /* --- Theme toggle icons --- */
+  --theme-toggle-icon-on: none;
+  --theme-toggle-icon-off: block;
+
+  /* --- Forms --- */
+  --form-label: #c6ccd8;
+  --form-hint: #8f98ad;
+  --form-error: #f87171;
+  --form-switch-bg: #232a3a;
+  --form-switch-border: #313a52;
+  --form-switch-thumb: #e6ecf5;
+
+  /* --- Tables --- */
+  --table-head-text: #9faabe;
+
+  /* --- Badges --- */
+  --badge-danger-bg: #3d1025;
+  --badge-danger-text: #ff7189;
+  --badge-danger-border: #7a1c3c;
+  --badge-warning-bg: #3a260a;
+  --badge-warning-border: #7c5108;
+  --badge-info-bg: #082b46;
+  --badge-info-border: #135c86;
+
+  /* --- KPI cards --- */
+  --kpi-blue-bg: #28285b;
+  --kpi-blue-text: #b3b8ff;
+  --kpi-red-bg: #3b1227;
+  --kpi-red-text: #ff7b93;
+  --kpi-amber-bg: #3d2b12;
+  --kpi-amber-text: #ffc83d;
+  --kpi-green-bg: #0d3d37; /* reused as TAT healthy background */
+
+  /* --- Charts --- */
+  --chart-title: #f5f7fb;
+  --chart-meta: #9ca8bd;
+
+  /* --- Tickets / Alarm IDs --- */
+  --alarm-id-bg: #252751;
+  --alarm-id-text: #b9c1ff;
+  --alarm-id-border: #4d54a8;
+  --ticket-title: #d7dce7;
+  --ticket-desc: #c9d0de;
+  --ticket-meta: #aab5c8;
+  --priority-dot: #95a1b6;
+
+  /* --- TAT countdown pills --- */
+  --tat-healthy-text: #2ee0a3;
+  --tat-healthy-border: #0d6e61;
+  --tat-warning-bg: #3c270b;
+  --tat-breached-border: #9f2c43;
+
+  /* --- Escalation level indicator --- */
+  --level-item-bg: #101520;
+  --level-item-text: #748096;
+
+  /* --- Workflow / Flow diagram --- */
+  --flow-node-bg: #10151f;
+  --flow-node-border: #222938;
+  --flow-node-text: #cdd5e2;
+  --flow-node-meta: #9da8ba;
+  --flow-node-current-bg: #242158;
+  --flow-node-current-text: #cbd1ff;
+  --flow-node-current-meta: #8d96ff;
+  --flow-link: #2a3347;
+  --flow-passed-border: #0c765f;
+
+  /* --- Activity feed --- */
+  --activity-body-border: #2b3346;
+  --activity-text: #cfd6e4;
+
+  /* --- Navigation tabs --- */
+  --tab-border: #293143;
+  --tab-text: #96a2b7;
+
+  /* --- Lists & meta table --- */
+  --list-item-bg: #141923;
+  --list-item-text: #d3dae7;
+  --meta-value: #d8deea;
+
+  /* --- Status light tints (pills & transition badges on dark bg) --- */
+  --status-info-light: #7dd3fc;
+  --status-major-light: #fcd34d;
+  --status-critical-light: #fca5a5;
+  --status-critical-pill: #fda4af;
+
+  color-scheme: dark;
+  background: var(--page-bg);
+  overflow-x: hidden;
+}
+
+/* ============================================================
+   02. SCROLLBARS
+   ============================================================ */
+[data-theme="dark"] *::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+  background: transparent;
+}
+[data-theme="dark"] *::-webkit-scrollbar-thumb {
+  background: rgba(148, 163, 184, 0.5) transparent;
+  background-clip: padding-box;
+}
+
+[data-theme="dark"] *::-webkit-scrollbar-thumb:hover {
+  background: rgba(148, 163, 184, 0.8) transparent;
+  background-clip: padding-box;
+}
+
+/* ============================================================
+   03. COMMON ELEMENTS
+   ============================================================ */
+
+/* --- Text utilities --- */
+[data-theme="dark"] .text-dark {
+  color: var(--text) !important;
+}
+
+/* --- Breadcrumb (base) --- */
+[data-theme="dark"] :is(.breadcrumb, .breadcrumb-item.active) {
+  color: var(--text-3);
+}
+
+[data-theme="dark"] .breadcrumb a {
+  color: var(--text-2);
+}
+
+[data-theme="dark"] .breadcrumb-item + .breadcrumb-item::before {
+  content: "/";
+  color: var(--text-3);
+}
+
+/* --- Navigation tabs --- */
+[data-theme="dark"] .nav-tabs {
+  border-bottom-color: var(--tab-border);
+}
+
+[data-theme="dark"] .nav-tabs .nav-link {
+  color: var(--tab-text);
+}
+
+[data-theme="dark"] .nav-tabs .nav-link.active {
+  color: var(--primary);
+}
+
+/* --- List group --- */
+[data-theme="dark"] .list-group-item {
+  background: var(--list-item-bg);
+  border-color: var(--border-3);
+  color: var(--list-item-text);
+}
+
+/* ============================================================
+   04. LAYOUT — Topbar / Header
+   ============================================================ */
+[data-theme="dark"] .topbar {
+  background: var(--topbar-bg);
+  border-bottom-color: var(--border);
+  box-shadow: none;
+}
+
+[data-theme="dark"] .topbar .breadcrumb-item + .breadcrumb-item::before {
+  content: "/";
+  color: var(--text-3);
+}
+
+[data-theme="dark"] .topbar .breadcrumb-item a {
+  color: var(--primary);
+}
+
+[data-theme="dark"] .topbar .breadcrumb-item.active {
+  color: var(--text);
+}
+
+[data-theme="dark"] .topbar-user {
+  border-color: var(--topbar-user-border);
+  background: var(--deep-surface);
+}
+
+[data-theme="dark"] .topbar-user .avatar-sm {
+  background: var(--primary);
+}
+
+[data-theme="dark"] .topbar-user .name {
+  color: var(--text);
+}
+
+[data-theme="dark"] .topbar-bell .pulse-dot {
+  background: var(--critical);
+}
+
+[data-theme="dark"] .topbar-logout {
+  background: var(--surface-2);
+  color: var(--text-2);
+  border-color: var(--border-2);
+}
+
+[data-theme="dark"] .topbar-logout:hover {
+  color: var(--text);
+  background: rgba(239, 68, 68, 0.18);
+  border-color: rgba(239, 68, 68, 0.55);
+}
+
+[data-theme="dark"] .sidebar-toggle {
+  background: var(--surface-2);
+  color: var(--text-2);
+  border-color: var(--border);
+}
+
+[data-theme="dark"] .sidebar-toggle:hover {
+  background: rgba(7, 146, 205, 0.12);
+  color: var(--primary-300);
+  border-color: var(--primary);
+}
+
+/* ============================================================
+   05. LAYOUT — Sidebar
+   ============================================================ */
+[data-theme="dark"] .sidebar {
+  border-right-color: var(--sidebar-border);
+}
+
+[data-theme="dark"] .sidebar .brand {
+  border-bottom-color: var(--sidebar-border);
+}
+
+[data-theme="dark"] .sidebar .brand .brand-mark {
+  background: var(--primary);
+}
+
+[data-theme="dark"] .sidebar .nav-section {
+  color: var(--nav-section-text);
+}
+
+[data-theme="dark"] .sidebar .nav-link {
+  color: var(--nav-link-text);
+}
+
+[data-theme="dark"] .sidebar .nav-link i {
+  color: var(--nav-icon-color);
+}
+
+[data-theme="dark"] .sidebar .nav-link.active {
+  background: var(--nav-active-bg);
+  color: var(--text);
+}
+
+[data-theme="dark"] .sidebar .nav-link.active::before {
+  background: var(--primary);
+  box-shadow: none;
+}
+
+[data-theme="dark"] .sidebar .nav-link.active i {
+  color: var(--primary-300);
+}
+
+/* ============================================================
+   06. DASHBOARD — KPI Cards
+   ============================================================ */
+[data-theme="dark"] .kpi-card .kpi-label {
+  color: var(--secondary-label);
+}
+
+[data-theme="dark"] .kpi-card .kpi-value {
+  color: var(--text);
+}
+
+[data-theme="dark"] .kpi-card .kpi-trend {
+  color: var(--text-3);
+}
+
+[data-theme="dark"] .kpi-card.is-blue .kpi-icon {
+  background: var(--kpi-blue-bg);
+  color: var(--kpi-blue-text);
+}
+
+[data-theme="dark"] .kpi-card.is-red .kpi-icon {
+  background: var(--kpi-red-bg);
+  color: var(--kpi-red-text);
+}
+
+[data-theme="dark"] .kpi-card.is-amber .kpi-icon {
+  background: var(--kpi-amber-bg);
+  color: var(--kpi-amber-text);
+}
+
+[data-theme="dark"] .kpi-card.is-green .kpi-icon {
+  background: var(--kpi-green-bg);
+  color: var(--success);
+}
+
+/* ============================================================
+   07. DASHBOARD — Charts
+   ============================================================ */
+[data-theme="dark"] .chart-card .chart-title h6 {
+  color: var(--chart-title) !important;
+}
+
+[data-theme="dark"] .chart-card .chart-title .chart-meta {
+  color: var(--chart-meta) !important;
+}
+
+/* Invert the severity donut so slice colours read well on dark bg */
+[data-theme="dark"] canvas[data-chart="severity"] {
+  filter: invert(1) hue-rotate(180deg) saturate(1.16) brightness(1.08);
+}
+
+/* ============================================================
+   08. TICKETS
+   ============================================================ */
+
+/* --- Alarm ID pill --- */
+[data-theme="dark"] :is(.alarm-id, .alarm-id-big) {
+  background: var(--alarm-id-bg);
+  color: var(--alarm-id-text) !important;
+  border-color: var(--alarm-id-border);
+}
+
+/* --- Ticket list cells --- */
+[data-theme="dark"] .ticket-cell-title {
+  color: var(--ticket-title);
+}
+
+[data-theme="dark"] .ticket-desc {
+  color: var(--ticket-desc);
+}
+
+[data-theme="dark"] :is(.state-text, .created-time) {
+  color: var(--ticket-meta);
+}
+
+/* --- Priority pill --- */
+[data-theme="dark"] .priority-pill {
+  color: var(--text-2);
+}
+
+[data-theme="dark"] .priority-pill span {
+  background: var(--priority-dot);
+}
+
+[data-theme="dark"] :is(.priority-urgent, .priority-high) span {
+  background: var(--major);
+}
+
+[data-theme="dark"] .priority-medium span {
+  background: var(--info);
+}
+
+[data-theme="dark"] .priority-low span {
+  background: var(--priority-dot);
+}
+
+/* --- Escalation level indicator --- */
+[data-theme="dark"] .level-indicator {
+  background: var(--deep-surface);
+  border-color: var(--border-3);
+}
+
+[data-theme="dark"] .level-indicator .lvl {
+  background: var(--level-item-bg);
+  border-color: var(--flow-node-border);
+  color: var(--level-item-text);
+}
+
+[data-theme="dark"] .level-indicator .lvl.is-active {
+  background: var(--primary);
+  border-color: var(--primary);
+  color: var(--text);
+  box-shadow: 0 0 16px rgba(124, 131, 255, 0.55);
+}
+
+[data-theme="dark"] .level-indicator .lvl.is-passed {
+  background: var(--success);
+  border-color: var(--success);
+  color: var(--text);
+}
+
+/* --- TAT countdown pills --- */
+[data-theme="dark"] .tat-pill i {
+  color: currentColor;
+}
+
+[data-theme="dark"] .tat-pill.is-healthy {
+  background: var(--kpi-green-bg);
+  color: var(--tat-healthy-text);
+  border-color: var(--tat-healthy-border);
+}
+
+[data-theme="dark"] .tat-pill.is-warning {
+  background: var(--tat-warning-bg);
+  color: var(--major);
+  border-color: var(--badge-warning-border);
+}
+
+[data-theme="dark"] .tat-pill.is-breached {
+  background: var(--critical);
+  color: var(--text);
+  border-color: var(--tat-breached-border);
+}
+
+[data-theme="dark"] .tat-big .tat-pill {
+  background: transparent;
+  color: var(--text);
+  box-shadow: none;
+}
+
+[data-theme="dark"] .tat-block {
+  background: var(--surface-2);
+  border-color: #2c3548;
+}
+
+[data-theme="dark"] .tat-block .tat-label {
+  color: var(--flow-node-meta);
+}
+
+/* --- Ticket state transition badges --- */
+[data-theme="dark"] .transition-badge-forward {
+  color: var(--status-info-light);
+  background: rgba(14, 165, 233, 0.15);
+  border-color: rgba(14, 165, 233, 0.3);
+}
+
+[data-theme="dark"] .transition-badge-backward {
+  color: var(--status-critical-light);
+  background: rgba(239, 68, 68, 0.15);
+  border-color: rgba(239, 68, 68, 0.3);
+}
+
+[data-theme="dark"] .transition-badge-rework {
+  color: var(--status-major-light);
+  background: rgba(245, 158, 11, 0.15);
+  border-color: rgba(245, 158, 11, 0.3);
+}
+
+/* --- User ID chip --- */
+[data-theme="dark"] .user-id-chip {
+  background: rgba(255, 255, 255, 0.06);
+  border-color: rgba(255, 255, 255, 0.08);
+  color: var(--text-2);
+}
+
+/* ============================================================
+   09. FLOWS / WORKFLOW DIAGRAM
+   ============================================================ */
+[data-theme="dark"] .flow-graph {
+  background: var(--surface-2);
+  border-color: var(--flow-link);
+}
+
+[data-theme="dark"] .flow-graph .fg-node {
+  background: var(--flow-node-bg);
+  border-color: var(--flow-node-border);
+}
+
+[data-theme="dark"] .flow-graph .fg-node .fg-icon {
+  border-color: var(--flow-node-border);
+}
+
+[data-theme="dark"] .flow-graph .fg-node .fg-name {
+  color: var(--flow-node-text);
+}
+
+[data-theme="dark"] .flow-graph .fg-node .fg-meta {
+  color: var(--flow-node-meta);
+}
+
+[data-theme="dark"] .flow-graph .fg-node.is-passed {
+  background: linear-gradient(180deg, #123736 0%, #0e1e27 100%);
+  border-color: var(--flow-passed-border);
+}
+
+[data-theme="dark"] .flow-graph .fg-node.is-current {
+  background: var(--flow-node-current-bg);
+  border-color: var(--primary);
+  box-shadow:
+    0 0 0 5px rgba(124, 131, 255, 0.18),
+    0 0 28px rgba(124, 131, 255, 0.22);
+}
+
+[data-theme="dark"] .flow-graph .fg-node.is-current .fg-icon {
+  background: var(--primary);
+  box-shadow: 0 0 0 9px rgba(124, 131, 255, 0.2);
+}
+
+[data-theme="dark"] :is(.flow-graph .fg-node.is-current .fg-name, .flow-graph .fg-node.is-current .fg-meta) {
+  color: var(--flow-node-current-text);
+}
+
+[data-theme="dark"] .flow-graph .fg-node.is-current .fg-meta {
+  background: transparent;
+  border-color: var(--primary);
+  color: var(--flow-node-current-meta);
+}
+
+[data-theme="dark"] .flow-graph .fg-node.is-current::before {
+  background: var(--primary);
+}
+
+[data-theme="dark"] .flow-graph .fg-node.is-pending {
+  opacity: 0.72;
+  border-style: dotted;
+  border-color: var(--flow-node-border);
+}
+
+[data-theme="dark"] .flow-graph .fg-link::before {
+  background: var(--flow-link);
+}
+
+[data-theme="dark"] :is(.flow-graph .fg-link.is-done::before, .flow-graph .fg-link.is-done::after) {
+  background: var(--success);
+  border-left-color: var(--success);
+}
+
+[data-theme="dark"] :is(.flow-graph .fg-branch::before, .flow-graph .fg-branch .fg-branch-row::before) {
+  background: var(--success);
+}
+
+[data-theme="dark"] .flow-graph-legend {
+  color: var(--flow-node-meta);
+}
+
+/* ============================================================
+   10. ACTIVITY LOGS
+   ============================================================ */
+[data-theme="dark"] .activity-feed::before {
+  background: var(--border-accent);
+}
+
+[data-theme="dark"] .activity-feed .activity-icon {
+  background: var(--deep-surface);
+  border-color: var(--border-accent);
+}
+
+[data-theme="dark"] .activity-feed .activity-body {
+  background: var(--surface-2);
+  border-color: var(--activity-body-border);
+}
+
+[data-theme="dark"] .activity-feed .activity-text {
+  color: var(--activity-text);
+}
+
+[data-theme="dark"] .meta-table tr td {
+  border-bottom-color: var(--border-3);
+}
+
+[data-theme="dark"] .meta-table tr td:first-child {
+  color: var(--secondary-label);
+}
+
+[data-theme="dark"] .meta-table tr td:last-child {
+  color: var(--meta-value);
+}
+
+/* ============================================================
+   11. FORMS
+   ============================================================ */
+[data-theme="dark"] :is(.form-control, .form-select, .input-group-text) {
+  background: var(--surface-2);
+  color: var(--text);
+  border-color: var(--border-2);
+}
+
+[data-theme="dark"] :is(.form-control, .form-select):focus {
+  background: var(--surface-2);
+  color: var(--text);
+  border-color: var(--primary);
+  box-shadow: 0 0 0 0.2rem rgba(56, 189, 248, 0.18);
+}
+
+[data-theme="dark"] .form-control::placeholder {
+  color: var(--text-muted);
+}
+
+[data-theme="dark"] .form-label {
+  color: var(--form-label);
+}
+
+[data-theme="dark"] .form-text {
+  color: var(--form-hint);
+}
+
+/* --- Validation states --- */
+[data-theme="dark"] .form-control.is-invalid,
+[data-theme="dark"] .form-select.is-invalid {
+  border-color: var(--form-error);
+}
+
+[data-theme="dark"] .form-control.is-invalid:focus,
+[data-theme="dark"] .form-select.is-invalid:focus {
+  box-shadow: 0 0 0 3px rgba(248, 113, 113, 0.2);
+}
+
+[data-theme="dark"] .invalid-feedback {
+  color: var(--form-error);
+}
+
+/* --- Toggle switch --- */
+[data-theme="dark"] .form-switch .form-check-input {
+  background-color: var(--form-switch-bg);
+  border-color: var(--form-switch-border);
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.4);
+}
+
+[data-theme="dark"] .form-switch .form-check-input::before {
+  background: var(--form-switch-thumb);
+  box-shadow:
+    0 1px 2px rgba(0, 0, 0, 0.45),
+    0 1px 3px rgba(0, 0, 0, 0.3);
+}
+
+[data-theme="dark"] .form-switch .form-check-input:not(:disabled):hover {
+  border-color: #455070;
+}
+
+[data-theme="dark"] .form-switch .form-check-input:checked {
+  background-color: var(--primary);
+  border-color: var(--primary-300);
+  box-shadow:
+    inset 0 1px 2px rgba(0, 0, 0, 0.35),
+    0 0 0 0 rgba(0, 153, 219, 0);
+}
+
+[data-theme="dark"] .form-switch .form-check-input:focus,
+[data-theme="dark"] .form-switch .form-check-input:focus-visible {
+  box-shadow:
+    inset 0 1px 2px rgba(0, 0, 0, 0.4),
+    0 0 0 3px rgba(0, 153, 219, 0.3);
+}
+
+[data-theme="dark"] .form-switch .form-check-input:checked:focus,
+[data-theme="dark"] .form-switch .form-check-input:checked:focus-visible {
+  box-shadow:
+    inset 0 1px 2px rgba(0, 0, 0, 0.35),
+    0 0 0 3px rgba(0, 153, 219, 0.38);
+}
+
+/* ============================================================
+   12. TABLES / DATATABLES
+   ============================================================ */
+[data-theme="dark"] .table {
+  color: var(--text-2);
+  background: transparent;
+  --bs-table-bg: transparent;
+}
+
+[data-theme="dark"] .table > :not(caption) > * > * {
+  background: transparent;
+  color: inherit;
+  border-color: var(--border);
+}
+
+[data-theme="dark"] :is(.table thead, .table-light) {
+  background: var(--surface-2);
+}
+
+[data-theme="dark"] :is(.table thead th, .table-light th) {
+  color: var(--table-head-text) !important;
+  border-color: var(--border);
+}
+
+[data-theme="dark"] .table-hover tbody tr:hover {
+  background: var(--surface-2) !important;
+}
+
+[data-theme="dark"] .table tbody td {
+  border-color: var(--border) !important;
+}
+
+/* --- Escalated row highlight --- */
+[data-theme="dark"] .table tbody tr.row-escalated {
+  background-color: rgba(239, 68, 68, 0.15);
+}
+
+[data-theme="dark"] .table tbody tr.row-escalated td,
+[data-theme="dark"] .table tbody tr.row-escalated .fw-semibold,
+[data-theme="dark"] .table tbody tr.row-escalated .alarm-id {
+  color: var(--status-critical-light);
+}
+
+[data-theme="dark"] .table tbody tr.row-escalated .text-muted {
+  color: var(--form-error) !important;
+  opacity: 0.85;
+}
+
+[data-theme="dark"] .table tbody tr.row-escalated:hover {
+  background-color: rgba(239, 68, 68, 0.22);
+}
+
+/* ============================================================
+   13. BUTTONS
+   ============================================================ */
+[data-theme="dark"] .btn-light {
+  background: var(--surface-2);
+  color: var(--text);
+  border-color: var(--border-2);
+}
+
+[data-theme="dark"] .btn-light:hover {
+  background: var(--border-2);
+}
+
+[data-theme="dark"] .btn-primary {
+  background: var(--primary);
+  border-color: var(--primary);
+}
+
+[data-theme="dark"] .btn-close {
+  filter: invert(1) grayscale(100%) brightness(200%);
+}
+
+/* ============================================================
+   14. CARDS
+   ============================================================ */
+[data-theme="dark"] :is(.card, .modal-content, .dropdown-menu, .kpi-card) {
+  background: var(--surface);
+  color: var(--text);
+  border-color: var(--border);
+  box-shadow: none;
+}
+
+[data-theme="dark"] .card-header {
+  background: transparent;
+  border-bottom-color: var(--border);
+  color: var(--text-2);
+}
+
+[data-theme="dark"] .card-body {
+  color: var(--text-2);
+}
+
+/* ============================================================
+   15. MODALS & DROPDOWNS
+   ============================================================ */
+[data-theme="dark"] .dropdown-menu {
+  --bs-dropdown-color: var(--text);
+  --bs-dropdown-link-color: var(--text);
+  --bs-dropdown-link-hover-color: var(--text);
+  --bs-dropdown-link-hover-bg: var(--surface-2);
+  --bs-dropdown-link-active-color: var(--text);
+  --bs-dropdown-link-active-bg: var(--primary);
+  --bs-dropdown-divider-bg: var(--border);
+  --bs-dropdown-header-color: var(--text-3);
+}
+
+[data-theme="dark"] .dropdown-menu :is(.dropdown-item, .dropdown-item-text) {
+  color: var(--text);
+  font-size: 13px;
+}
+
+[data-theme="dark"] .dropdown-menu .dropdown-item-text.text-muted,
+[data-theme="dark"] .dropdown-menu .text-muted {
+  color: var(--text-3) !important;
+}
+
+[data-theme="dark"] .dropdown-menu .dropdown-item:hover,
+[data-theme="dark"] .dropdown-menu .dropdown-item:focus {
+  background: var(--surface-2);
+  color: var(--text);
+}
+
+/* ============================================================
+   16. BADGES & STATUS PILLS
+   ============================================================ */
+[data-theme="dark"] .badge.bg-light {
+  background: var(--surface-2) !important;
+  color: var(--text-2) !important;
+}
+
+[data-theme="dark"] .badge.bg-danger {
+  background: var(--badge-danger-bg) !important;
+  color: var(--badge-danger-text) !important;
+  border-color: var(--badge-danger-border);
+}
+
+[data-theme="dark"] .badge.bg-warning {
+  background: var(--badge-warning-bg) !important;
+  color: var(--major) !important;
+  border-color: var(--badge-warning-border);
+}
+
+[data-theme="dark"] :is(.badge.bg-info, .badge.bg-primary) {
+  background: var(--badge-info-bg) !important;
+  color: var(--info) !important;
+  border-color: var(--badge-info-border) !important;
+}
+
+/* ============================================================
+   17. ALERTS / FLASH MESSAGES
+   ============================================================ */
+[data-theme="dark"] .alert-success {
+  background: var(--success-bg);
+  border-color: rgba(46, 214, 157, 0.3);
+  color: var(--success);
+}
+
+[data-theme="dark"] .alert-danger {
+  background: var(--critical-bg);
+  border-color: rgba(255, 107, 131, 0.3);
+  color: var(--critical);
+}
+
+[data-theme="dark"] .alert-warning {
+  background: var(--major-bg);
+  border-color: rgba(255, 195, 40, 0.3);
+  color: var(--major);
+}
+
+[data-theme="dark"] .alert-info {
+  background: var(--info-bg);
+  border-color: rgba(53, 183, 238, 0.3);
+  color: var(--info);
+}
+
+[data-theme="dark"] .alert .btn-close {
+  filter: invert(1) grayscale(1);
+  opacity: 0.7;
+}
+
+[data-theme="dark"] .alert .btn-close:hover {
+  opacity: 1;
+}
+
+/* ============================================================
+   18. NOTIFICATIONS — Bell Dropdown
+   ============================================================ */
+[data-theme="dark"] .bell-badge {
+  border-color: var(--sidebar-2);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.5);
+}
+
+[data-theme="dark"] .bell-row-mention {
+  background: rgba(7, 146, 205, 0.08);
+}
+
+[data-theme="dark"] .bell-row-critical {
+  background: rgba(239, 68, 68, 0.08);
+}
+
+[data-theme="dark"] .bell-row-pill.is-escalated,
+[data-theme="dark"] .bell-row-pill.is-critical-open {
+  background: rgba(239, 68, 68, 0.16);
+  color: var(--status-critical-pill);
+  border-color: rgba(239, 68, 68, 0.4);
+}
+
+[data-theme="dark"] .bell-row-sev--info {
+  background: rgba(14, 165, 233, 0.12);
+  color: var(--status-info-light);
+  border-color: rgba(14, 165, 233, 0.3);
+}
+
+[data-theme="dark"] .bell-row-sev--major {
+  background: rgba(245, 158, 11, 0.14);
+  color: var(--status-major-light);
+  border-color: rgba(245, 158, 11, 0.35);
+}
+
+[data-theme="dark"] .bell-row-sev--critical {
+  background: rgba(239, 68, 68, 0.16);
+  color: var(--status-critical-pill);
+  border-color: rgba(239, 68, 68, 0.4);
+}
+
+/* ============================================================
+   19. THIRD-PARTY — Select2
+   ============================================================ */
+[data-theme="dark"] .select2-container--default .select2-selection {
+  background: var(--surface-2);
+  border-color: var(--border-2);
+  color: var(--text);
+}
+
+[data-theme="dark"] .select2-container--default .select2-selection--single .select2-selection__rendered {
+  color: var(--text);
+}
+
+[data-theme="dark"] .select2-container--default .select2-selection--multiple .select2-selection__choice {
+  background: none !important;
+}
+
+[data-theme="dark"] .select2-dropdown {
+  background: var(--surface);
+  border-color: var(--border-2);
+  color: var(--text);
+}
+
+[data-theme="dark"] .select2-results__option--highlighted {
+  background: var(--primary);
+  color: var(--text);
+}
+
+/* ============================================================
+   20. THIRD-PARTY — DataTables
+   ============================================================ */
+[data-theme="dark"] :is(.dataTables_wrapper, .dataTables_info, .dataTables_length label, .dataTables_filter label) {
+  color: var(--text-2);
+}
+
+[data-theme="dark"] :is(.dataTables_length select, .dataTables_filter input) {
+  background: var(--surface-2) !important;
+  color: var(--text) !important;
+  border-color: var(--border-2) !important;
+}
+
+[data-theme="dark"] :is(.pagination .page-link, .dataTables_paginate .paginate_button) {
+  background: var(--surface) !important;
+  color: var(--text-2) !important;
+  border-color: var(--border-2) !important;
+}
+
+[data-theme="dark"] :is(.pagination .page-link:hover, .dataTables_paginate .paginate_button:hover) {
+  background: var(--surface-2) !important;
+  color: var(--primary-300) !important;
+  border-color: var(--primary) !important;
+}
+
+[data-theme="dark"] :is(.pagination .page-item.active .page-link, .dataTables_paginate .paginate_button.current) {
+  background: var(--primary) !important;
+  color: var(--text) !important;
+  border-color: var(--primary) !important;
+}
+
+[data-theme="dark"] .dataTables_processing {
+  background-color: rgba(13, 18, 29, 0.92) !important;
+}
+
+[data-theme="dark"] .dataTables_processing .dt-dot {
+  box-shadow: 0 0 10px rgba(7, 146, 205, 0.55);
+}
+
+/* ============================================================
+   21. THIRD-PARTY — SweetAlert2
+   ============================================================ */
+[data-theme="dark"] .swal2-popup {
+  background: var(--surface);
+  color: var(--text);
+  border: 1px solid var(--border);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.7);
+}
+
+[data-theme="dark"] .swal2-title {
+  color: var(--text);
+}
+
+[data-theme="dark"] .swal2-html-container {
+  color: var(--text-3);
+}
+
+[data-theme="dark"] .swal2-icon.swal2-warning {
+  border-color: var(--major);
+  color: var(--major);
+}
+
+[data-theme="dark"] .swal2-cancel {
+  background: var(--surface-2) !important;
+  color: var(--text) !important;
+  border: 1px solid var(--border) !important;
+}
+
+[data-theme="dark"] .swal2-cancel:hover {
+  background: var(--border) !important;
+}
+
+/* ============================================================
+   22. THIRD-PARTY — Mention Autocomplete
+   ============================================================ */
+[data-theme="dark"] .mention-dropdown {
+  background: var(--surface);
+  border-color: var(--border);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.45);
+}
+
+[data-theme="dark"] .mention-chip {
+  color: #6bd0ff;
+  background: rgba(7, 146, 205, 0.18);
+}
+
+/* ============================================================
+   23. RESPONSIVE
+   ============================================================ */
+@media (max-width: 992px) {
+  [data-theme="dark"] {
+    --sidebar-w: 220px;
+  }
+}

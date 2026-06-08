@@ -198,6 +198,16 @@ samp {
 }
 
 /* ============================================================
+   03b. ROOT HEIGHT — lock html/body so the page scrollbar lives
+        on .content (below the topbar), not on the viewport edge.
+   ============================================================ */
+html,
+body {
+  height: 100%;
+  overflow: hidden;
+}
+
+/* ============================================================
    04. SCROLLBARS
    ============================================================ */
 *::-webkit-scrollbar {
@@ -234,7 +244,7 @@ samp {
    ============================================================ */
 .layout {
   display: flex;
-  min-height: 100vh;
+  height: 100%;
 }
 
 .main {
@@ -243,12 +253,15 @@ samp {
   margin-left: var(--sidebar-w);
   display: flex;
   flex-direction: column;
+  height: 100%;
+  overflow: hidden;
   transition: margin-left 0.25s var(--ease-smooth);
 }
 
 .content {
   padding: 24px 10px;
   flex: 1;
+  overflow-y: auto;
   animation: pv-fadeUp 0.28s var(--ease-smooth) both;
 }
 
@@ -522,9 +535,9 @@ samp {
    05c. TOPBAR — Top navigation bar
    ============================================================ */
 .topbar {
-  position: sticky;
-  top: 0;
+  position: relative;
   z-index: 50;
+  flex-shrink: 0;
   height: var(--topbar-h);
   background: var(--surface);
   border-bottom: 1px solid var(--border);
@@ -1170,20 +1183,6 @@ textarea.form-control {
   margin-top: 4px;
 }
 
-[data-theme="dark"] .form-control.is-invalid,
-[data-theme="dark"] .form-select.is-invalid {
-  border-color: #f87171;
-}
-
-[data-theme="dark"] .form-control.is-invalid:focus,
-[data-theme="dark"] .form-select.is-invalid:focus {
-  box-shadow: 0 0 0 3px rgba(248, 113, 113, 0.2);
-}
-
-[data-theme="dark"] .invalid-feedback {
-  color: #f87171;
-}
-
 /* ============================================================
    MODERN TOGGLE SWITCH
    Used by .form-check.form-switch (Bootstrap) — we keep the same
@@ -1286,39 +1285,6 @@ textarea.form-control {
 
 /* Dark-theme polish — thumb stays light against the colored track so the
    contrast reads well; OFF track tightens up since surface-2 is dark. */
-[data-theme="dark"] .form-switch .form-check-input {
-  background-color: #232a3a;
-  border-color: #313a52;
-  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.4);
-}
-[data-theme="dark"] .form-switch .form-check-input::before {
-  background: #e6ecf5;
-  box-shadow:
-    0 1px 2px rgba(0, 0, 0, 0.45),
-    0 1px 3px rgba(0, 0, 0, 0.3);
-}
-[data-theme="dark"] .form-switch .form-check-input:not(:disabled):hover {
-  border-color: #455070;
-}
-[data-theme="dark"] .form-switch .form-check-input:checked {
-  background-color: var(--primary);
-  border-color: var(--primary-300);
-  box-shadow:
-    inset 0 1px 2px rgba(0, 0, 0, 0.35),
-    0 0 0 0 rgba(0, 153, 219, 0);
-}
-[data-theme="dark"] .form-switch .form-check-input:focus,
-[data-theme="dark"] .form-switch .form-check-input:focus-visible {
-  box-shadow:
-    inset 0 1px 2px rgba(0, 0, 0, 0.4),
-    0 0 0 3px rgba(0, 153, 219, 0.3);
-}
-[data-theme="dark"] .form-switch .form-check-input:checked:focus,
-[data-theme="dark"] .form-switch .form-check-input:checked:focus-visible {
-  box-shadow:
-    inset 0 1px 2px rgba(0, 0, 0, 0.35),
-    0 0 0 3px rgba(0, 153, 219, 0.38);
-}
 
 /* Label spacing when the switch is followed by inline text. */
 .form-switch .form-check-label {
@@ -1493,41 +1459,11 @@ textarea.form-control {
 .table tbody tr.row-escalated:hover {
   background-color: rgba(239, 68, 68, 0.16);
 }
-[data-theme="dark"] .table tbody tr.row-escalated {
-  background-color: rgba(239, 68, 68, 0.15);
-}
-[data-theme="dark"] .table tbody tr.row-escalated td,
-[data-theme="dark"] .table tbody tr.row-escalated .fw-semibold,
-[data-theme="dark"] .table tbody tr.row-escalated .alarm-id {
-  color: #fca5a5;
-}
-[data-theme="dark"] .table tbody tr.row-escalated .text-muted {
-  color: #f87171 !important;
-  opacity: 0.85;
-}
-[data-theme="dark"] .table tbody tr.row-escalated:hover {
-  background-color: rgba(239, 68, 68, 0.22);
-}
 
 /* DataTables */
 .dataTables_wrapper {
   padding: 8px 14px 14px;
 }
-
-/* DataTables — keep the <table> as one element so head and body
-   cannot drift. The wrapper provides horizontal overflow when the
-   table is wider than its container.
-
-   For server-side tables we still use scrollX (sticky header for
-   long lists). For those, only the body scrolls — the outer
-   .dataTables_scroll must NOT introduce a second scroll context
-   or DT's internal head↔body sync stops working. */
-
-/* Wrap the dataTable row in a single horizontal scroll context.
-   Bootstrap 5 DataTables puts the table inside a .row > .col-sm-12
-   right below the length/filter row and above the info/paginate row.
-   Scrolling that col lets the head + body move together while keeping
-   filter and pagination fixed. */
 .dataTables_wrapper {
   width: 100%;
 }
@@ -1558,15 +1494,6 @@ textarea.form-control {
   vertical-align: middle;
   box-sizing: border-box;
 }
-
-/* ============================================================
-   DATATABLE PROCESSING LOADER
-   Single, minimal three-dot wave. Backdrop is frosted glass.
-   Works for every DataTable in the app — server-side, simple,
-   and inline-configured — by styling DataTables' own
-   .dataTables_processing overlay and the .dt-dots HTML that
-   we register globally via $.fn.dataTable.defaults.language.
-   ============================================================ */
 .dataTables_processing {
   position: absolute !important;
   top: 0 !important;
@@ -1585,12 +1512,6 @@ textarea.form-control {
   backdrop-filter: blur(3px);
   z-index: 11;
   box-shadow: none !important;
-  /* NOTE: `display` is intentionally NOT set here. DataTables toggles
-     the overlay by writing `style="display: none|block"` inline. Using
-     `display: flex !important` on this selector would override DT's
-     hide and pin the overlay open forever after the first request.
-     The dots inside are absolutely centered, so we don't need flex
-     on the container. */
   font-size: 0 !important;
   color: transparent !important;
   letter-spacing: normal !important;
@@ -1606,11 +1527,6 @@ textarea.form-control {
   }
 }
 
-/* Neutralise the vendor's built-in 4-dot loader. DataTables-bootstrap5
-   ships CSS that animates `.dataTables_processing > div:last-child > div`,
-   and on some pages DT still injects that nested-div structure even when
-   we override language.processing. Hiding any direct child of the overlay
-   that isn't our .dt-dots span guarantees we render exactly one loader. */
 .dataTables_processing > div {
   display: none !important;
 }
@@ -2450,9 +2366,6 @@ textarea.form-control {
   white-space: nowrap;
 }
 
-/* Analytics row — fixed-height cards so the user list never pushes the
-   chart or session cards taller. Bootstrap's .card is already flex-column;
-   we just cap the height and let each card-body fill + scroll. */
 .analytics-card {
   height: 380px;
 }
@@ -2878,9 +2791,6 @@ textarea.form-control {
   font-weight: 500;
 }
 
-/* 7d / 30d / 90d range picker inside the trend chart card.
-   Reuses the .filter-pill visual; .is-active applies the same
-   highlight as the ticket-list status pills. */
 .trend-range-picker {
   display: inline-flex;
   gap: 4px;
@@ -3165,12 +3075,6 @@ body,
   }
 }
 
-/* ============================================================
-   19f. UX HELPERS — char counter, caps-warn pill, clickable KPI link,
-   active-filter pill. All purely additive; no override of
-   existing rules.
-   ============================================================ */
-
 /* Live character counter pill rendered by initCharCounters(). */
 .char-counter {
   display: block;
@@ -3320,18 +3224,13 @@ body,
 .bell-row-mention {
   background: rgba(7, 146, 205, 0.04);
 }
-[data-theme="dark"] .bell-row-mention {
-  background: rgba(7, 146, 205, 0.08);
-}
+
 .bell-row-major {
   border-left-color: var(--major, #f59e0b);
 }
 .bell-row-critical {
   border-left-color: var(--critical, #ef4444);
   background: rgba(239, 68, 68, 0.04);
-}
-[data-theme="dark"] .bell-row-critical {
-  background: rgba(239, 68, 68, 0.08);
 }
 
 /* Alarm-ID line: severity dot + monospaced id. */
@@ -3431,30 +3330,7 @@ body,
   color: var(--critical);
   border: 1px solid rgba(239, 68, 68, 0.3);
 }
-[data-theme="dark"] .bell-row-pill.is-escalated,
-[data-theme="dark"] .bell-row-pill.is-critical-open {
-  background: rgba(239, 68, 68, 0.16);
-  color: #fda4af;
-  border-color: rgba(239, 68, 68, 0.4);
-}
-[data-theme="dark"] .bell-row-sev--info {
-  background: rgba(14, 165, 233, 0.12);
-  color: #7dd3fc;
-  border-color: rgba(14, 165, 233, 0.3);
-}
-[data-theme="dark"] .bell-row-sev--major {
-  background: rgba(245, 158, 11, 0.14);
-  color: #fcd34d;
-  border-color: rgba(245, 158, 11, 0.35);
-}
-[data-theme="dark"] .bell-row-sev--critical {
-  background: rgba(239, 68, 68, 0.16);
-  color: #fda4af;
-  border-color: rgba(239, 68, 68, 0.4);
-}
 
-/* Make the title line wrap to two lines on critical/escalated tickets so
-   the operator can read what they're about to click into. */
 .bell-row .bell-row-title {
   white-space: normal;
   display: -webkit-box;
@@ -3463,9 +3339,6 @@ body,
   overflow: hidden;
 }
 
-/* Bulk-action toolbar appears above the tickets table whenever
-   at least one checkbox is ticked. The [hidden] attribute hides
-   it by default; JS toggles it via .removeAttr/.attr. */
 .bulk-toolbar {
   display: flex;
   align-items: center;
@@ -3803,639 +3676,6 @@ body,
   box-shadow: inset 0 0 60px rgba(15, 23, 42, 0.06);
 }
 
-/* ============================================================
-   21. DARK THEME — [data-theme="dark"] overrides
-   ============================================================ */
-
-[data-theme="dark"] {
-  --primary: #0792cd;
-  --primary-700: #0580b4;
-  --primary-300: #0099db;
-  --primary-50: #252153;
-  --sidebar: #0a0e17;
-  --sidebar-2: #0d121d;
-  --sidebar-hover: #161b2d;
-  --sidebar-text: #94a3b8;
-  --sidebar-text-2: #64748b;
-  --content-bg: #090d14;
-  --surface: #121720;
-  --surface-2: #1a2030;
-  --border: #252b3a;
-  --border-2: #384055;
-  --text: #f4f7fb;
-  --text-2: #d0d6e3;
-  --text-3: #9ba7bc;
-  --text-muted: #718098;
-  --critical: #ff6b83;
-  --critical-bg: #3a1024;
-  --major: #ffc328;
-  --major-bg: #3a2810;
-  --info: #35b7ee;
-  --info-bg: #102c44;
-  --success: #2ed69d;
-  --success-bg: #103832;
-  --slate-bg: #1e293b;
-  --shadow-sm: none;
-  --shadow: none;
-  --shadow-lg: 0 18px 45px rgba(0, 0, 0, 0.3);
-  --theme-toggle-icon-on: none;
-  --theme-toggle-icon-off: block;
-  --polish-ring: 0 0 0 3px rgba(53, 183, 238, 0.32);
-  --polish-lift: 0 18px 45px rgba(0, 0, 0, 0.55), 0 6px 14px rgba(0, 0, 0, 0.35);
-  color-scheme: dark;
-  background: #070a10;
-  overflow-x: hidden;
-}
-
-/* --- Surface elements ------------------------------------- */
-[data-theme="dark"] :is(.card, .modal-content, .dropdown-menu, .kpi-card) {
-  background: var(--surface);
-  color: var(--text);
-  border-color: var(--border);
-  box-shadow: none;
-}
-
-/* --- Dropdowns -------------------------------------------- */
-[data-theme="dark"] .dropdown-menu {
-  --bs-dropdown-color: var(--text);
-  --bs-dropdown-link-color: var(--text);
-  --bs-dropdown-link-hover-color: var(--text);
-  --bs-dropdown-link-hover-bg: var(--surface-2);
-  --bs-dropdown-link-active-color: #ffffff;
-  --bs-dropdown-link-active-bg: var(--primary);
-  --bs-dropdown-divider-bg: var(--border);
-  --bs-dropdown-header-color: var(--text-3);
-}
-[data-theme="dark"] .dropdown-menu :is(.dropdown-item, .dropdown-item-text) {
-  color: var(--text);
-  font-size: 13px;
-}
-[data-theme="dark"] .dropdown-menu .dropdown-item-text.text-muted,
-[data-theme="dark"] .dropdown-menu .text-muted {
-  color: var(--text-3) !important;
-}
-[data-theme="dark"] .dropdown-menu .dropdown-item:hover,
-[data-theme="dark"] .dropdown-menu .dropdown-item:focus {
-  background: var(--surface-2);
-  color: var(--text);
-}
-[data-theme="dark"] .card-header {
-  background: transparent;
-  border-bottom-color: var(--border);
-  color: var(--text-2);
-}
-[data-theme="dark"] .card-body {
-  color: var(--text-2);
-}
-
-/* --- Tables ----------------------------------------------- */
-[data-theme="dark"] .table {
-  color: var(--text-2);
-  background: transparent;
-  --bs-table-bg: transparent;
-}
-[data-theme="dark"] .table > :not(caption) > * > * {
-  background: transparent;
-  color: inherit;
-  border-color: var(--border);
-}
-[data-theme="dark"] :is(.table thead, .table-light) {
-  background: var(--surface-2);
-}
-[data-theme="dark"] :is(.table thead th, .table-light th) {
-  color: #9faabe !important;
-  border-color: var(--border);
-}
-[data-theme="dark"] .table-hover tbody tr:hover {
-  background: var(--surface-2) !important;
-}
-[data-theme="dark"] .table tbody td {
-  border-color: #242b3a !important;
-}
-
-/* --- Form elements ---------------------------------------- */
-[data-theme="dark"] :is(.form-control, .form-select, .input-group-text) {
-  background: var(--surface-2);
-  color: var(--text);
-  border-color: var(--border-2);
-}
-[data-theme="dark"] :is(.form-control, .form-select):focus {
-  background: var(--surface-2);
-  color: var(--text);
-  border-color: var(--primary);
-  box-shadow: 0 0 0 0.2rem rgba(56, 189, 248, 0.18);
-}
-[data-theme="dark"] .form-control::placeholder {
-  color: var(--text-muted);
-}
-[data-theme="dark"] .form-label {
-  color: #c6ccd8;
-}
-[data-theme="dark"] .form-text {
-  color: #8f98ad;
-}
-[data-theme="dark"] .select2-container--default .select2-selection--single .select2-selection__rendered {
-  color: var(--text);
-}
-
-/* --- Buttons ---------------------------------------------- */
-[data-theme="light"] .btn-light {
-  background: var(--surface-2);
-  color: var(--text-2);
-  border-color: var(--border-2);
-  box-shadow:
-    0 1px 3px rgba(15, 23, 42, 0.08),
-    0 1px 1px rgba(15, 23, 42, 0.04);
-}
-[data-theme="light"] .btn-light:hover {
-  background: #e2e8f0;
-  color: var(--text);
-  border-color: #94a3b8;
-  box-shadow: 0 2px 6px rgba(15, 23, 42, 0.12);
-}
-[data-theme="dark"] .btn-light {
-  background: var(--surface-2);
-  color: var(--text);
-  border-color: var(--border-2);
-}
-[data-theme="dark"] .btn-light:hover {
-  background: var(--border-2);
-}
-[data-theme="dark"] .btn-primary {
-  background: var(--primary);
-  border-color: var(--primary);
-}
-
-/* --- Breadcrumb ------------------------------------------- */
-[data-theme="dark"] :is(.breadcrumb, .breadcrumb-item.active) {
-  color: var(--text-3);
-}
-[data-theme="dark"] .breadcrumb-item + .breadcrumb-item::before {
-  color: var(--text-3);
-}
-[data-theme="dark"] .breadcrumb a {
-  color: var(--text-2);
-}
-
-[data-theme="dark"] .text-dark {
-  color: var(--text) !important;
-}
-
-/* --- Topbar ----------------------------------------------- */
-[data-theme="dark"] .topbar {
-  background: #131722;
-  border-bottom-color: var(--border);
-  box-shadow: none;
-}
-[data-theme="dark"] .breadcrumb-item + .breadcrumb-item::before {
-  content: "/";
-  color: #8fa0bd;
-}
-[data-theme="dark"] .topbar .breadcrumb-item a {
-  color: var(--primary);
-}
-[data-theme="dark"] .topbar .breadcrumb-item.active {
-  color: #fff;
-}
-[data-theme="dark"] .topbar-user {
-  border-color: #263044;
-  background: #111722;
-}
-[data-theme="dark"] .topbar-user .avatar-sm {
-  background: var(--primary);
-}
-[data-theme="dark"] .topbar-user .name {
-  color: #fff;
-}
-[data-theme="dark"] .topbar-bell .pulse-dot {
-  background: #ff6b83;
-}
-[data-theme="dark"] .topbar-logout {
-  background: var(--surface-2);
-  color: var(--text-2);
-  border-color: var(--border-2);
-}
-[data-theme="dark"] .topbar-logout:hover {
-  color: #fff;
-  background: rgba(239, 68, 68, 0.18);
-  border-color: rgba(239, 68, 68, 0.55);
-}
-
-/* --- Sidebar ---------------------------------------------- */
-[data-theme="dark"] .sidebar {
-  border-right-color: #1b2030;
-}
-[data-theme="dark"] .sidebar .brand {
-  border-bottom-color: #1b2030;
-}
-[data-theme="dark"] .sidebar .brand .brand-mark {
-  background: var(--primary);
-}
-[data-theme="dark"] .sidebar .nav-section {
-  color: #6f7e99;
-}
-[data-theme="dark"] .sidebar .nav-link {
-  color: #9da9bc;
-}
-[data-theme="dark"] .sidebar .nav-link i {
-  color: #7f8ca4;
-}
-[data-theme="dark"] .sidebar .nav-link.active {
-  background: #1b1d3f;
-  color: #fff;
-}
-[data-theme="dark"] .sidebar .nav-link.active::before {
-  background: var(--primary);
-  box-shadow: none;
-}
-[data-theme="dark"] .sidebar .nav-link.active i {
-  color: var(--primary-300);
-}
-
-/* --- Badges ----------------------------------------------- */
-[data-theme="dark"] .badge.bg-light {
-  background: var(--surface-2) !important;
-  color: var(--text-2) !important;
-}
-[data-theme="dark"] .badge.bg-danger {
-  background: #3d1025 !important;
-  color: #ff7189 !important;
-  border-color: #7a1c3c;
-}
-[data-theme="dark"] .badge.bg-warning {
-  background: #3a260a !important;
-  color: #ffc328 !important;
-  border-color: #7c5108;
-}
-[data-theme="dark"] :is(.badge.bg-info, .badge.bg-primary) {
-  background: #082b46 !important;
-  color: #35b7ee !important;
-  border-color: #135c86 !important;
-}
-
-/* --- DataTables ------------------------------------------- */
-[data-theme="dark"] :is(.dataTables_wrapper, .dataTables_info, .dataTables_length label, .dataTables_filter label) {
-  color: var(--text-2);
-}
-[data-theme="dark"] :is(.dataTables_length select, .dataTables_filter input) {
-  background: var(--surface-2) !important;
-  color: var(--text) !important;
-  border-color: var(--border-2) !important;
-}
-[data-theme="dark"] :is(.pagination .page-link, .dataTables_paginate .paginate_button) {
-  background: var(--surface) !important;
-  color: var(--text-2) !important;
-  border-color: var(--border-2) !important;
-}
-[data-theme="dark"] :is(.pagination .page-link:hover, .dataTables_paginate .paginate_button:hover) {
-  background: var(--surface-2) !important;
-  color: var(--primary-300) !important;
-  border-color: var(--primary) !important;
-}
-[data-theme="dark"] :is(.pagination .page-item.active .page-link, .dataTables_paginate .paginate_button.current) {
-  background: var(--primary) !important;
-  color: #fff !important;
-  border-color: var(--primary) !important;
-}
-
-/* --- Select2 ---------------------------------------------- */
-[data-theme="dark"] .select2-container--default .select2-selection {
-  background: var(--surface-2);
-  border-color: var(--border-2);
-  color: var(--text);
-}
-[data-theme="dark"] .select2-container--default .select2-selection--multiple .select2-selection__choice {
-  background: none !important;
-}
-[data-theme="dark"] .select2-dropdown {
-  background: var(--surface);
-  border-color: var(--border-2);
-  color: var(--text);
-}
-[data-theme="dark"] .select2-results__option--highlighted {
-  background: var(--primary);
-  color: #fff;
-}
-
-/* --- KPI / Dashboard -------------------------------------- */
-[data-theme="dark"] .kpi-card .kpi-label {
-  color: #98a4b8;
-}
-[data-theme="dark"] .kpi-card .kpi-value {
-  color: #fff;
-}
-[data-theme="dark"] .kpi-card .kpi-trend {
-  color: #a7b1c5;
-}
-[data-theme="dark"] .kpi-card.is-blue .kpi-icon {
-  background: #28285b;
-  color: #b3b8ff;
-}
-[data-theme="dark"] .kpi-card.is-red .kpi-icon {
-  background: #3b1227;
-  color: #ff7b93;
-}
-[data-theme="dark"] .kpi-card.is-amber .kpi-icon {
-  background: #3d2b12;
-  color: #ffc83d;
-}
-[data-theme="dark"] .kpi-card.is-green .kpi-icon {
-  background: #0d3d37;
-  color: #2ed69d;
-}
-[data-theme="dark"] .chart-card .chart-title h6 {
-  color: #f5f7fb !important;
-}
-[data-theme="dark"] .chart-card .chart-title .chart-meta {
-  color: #9ca8bd !important;
-}
-[data-theme="dark"] canvas[data-chart="severity"] {
-  filter: invert(1) hue-rotate(180deg) saturate(1.16) brightness(1.08);
-}
-
-/* --- Alarms, Tickets, Levels, TAT ------------------------- */
-[data-theme="dark"] :is(.alarm-id, .alarm-id-big) {
-  background: #252751;
-  color: #b9c1ff !important;
-  border-color: #4d54a8;
-}
-[data-theme="dark"] .ticket-cell-title {
-  color: #d7dce7;
-}
-[data-theme="dark"] .ticket-desc {
-  color: #c9d0de;
-}
-[data-theme="dark"] :is(.state-text, .created-time) {
-  color: #aab5c8;
-}
-[data-theme="dark"] .priority-pill {
-  color: #d6dce8;
-}
-[data-theme="dark"] .priority-pill span {
-  background: #95a1b6;
-}
-[data-theme="dark"] :is(.priority-urgent, .priority-high) span {
-  background: #ffc328;
-}
-[data-theme="dark"] .priority-medium span {
-  background: #35b7ee;
-}
-[data-theme="dark"] .priority-low span {
-  background: #95a1b6;
-}
-[data-theme="dark"] .level-indicator {
-  background: #111722;
-  border-color: #272e3d;
-}
-[data-theme="dark"] .level-indicator .lvl {
-  background: #101520;
-  border-color: #222938;
-  color: #748096;
-}
-[data-theme="dark"] .level-indicator .lvl.is-active {
-  background: var(--primary);
-  border-color: var(--primary);
-  color: #fff;
-  box-shadow: 0 0 16px rgba(124, 131, 255, 0.55);
-}
-[data-theme="dark"] .level-indicator .lvl.is-passed {
-  background: #2ed69d;
-  border-color: #2ed69d;
-  color: #fff;
-}
-[data-theme="dark"] .tat-pill i {
-  color: currentColor;
-}
-[data-theme="dark"] .tat-pill.is-healthy {
-  background: #0d3d37;
-  color: #2ee0a3;
-  border-color: #0d6e61;
-}
-[data-theme="dark"] .tat-pill.is-warning {
-  background: #3c270b;
-  color: #ffc328;
-  border-color: #7c5108;
-}
-[data-theme="dark"] .tat-pill.is-breached {
-  background: #ff6b83;
-  color: #fff;
-  border-color: #9f2c43;
-}
-[data-theme="dark"] .tat-big .tat-pill {
-  background: transparent;
-  color: #f4f7fb;
-  box-shadow: none;
-}
-[data-theme="dark"] .tat-block {
-  background: #1a2030;
-  border-color: #2c3548;
-}
-[data-theme="dark"] .tat-block .tat-label {
-  color: #9da8ba;
-}
-
-/* --- Flow Graph ------------------------------------------- */
-[data-theme="dark"] .flow-graph {
-  background: #1a2030;
-  border-color: #2a3347;
-}
-[data-theme="dark"] .flow-graph .fg-node {
-  background: #10151f;
-  border-color: #222938;
-}
-[data-theme="dark"] .flow-graph .fg-node .fg-icon {
-  border-color: #222938;
-}
-[data-theme="dark"] .flow-graph .fg-node .fg-name {
-  color: #cdd5e2;
-}
-[data-theme="dark"] .flow-graph .fg-node .fg-meta {
-  color: #9da8ba;
-}
-[data-theme="dark"] .flow-graph .fg-node.is-passed {
-  background: linear-gradient(180deg, #123736 0%, #0e1e27 100%);
-  border-color: #0c765f;
-}
-[data-theme="dark"] .flow-graph .fg-node.is-current {
-  background: #242158;
-  border-color: var(--primary);
-  box-shadow:
-    0 0 0 5px rgba(124, 131, 255, 0.18),
-    0 0 28px rgba(124, 131, 255, 0.22);
-}
-[data-theme="dark"] .flow-graph .fg-node.is-current .fg-icon {
-  background: var(--primary);
-  box-shadow: 0 0 0 9px rgba(124, 131, 255, 0.2);
-}
-[data-theme="dark"] :is(.flow-graph .fg-node.is-current .fg-name, .flow-graph .fg-node.is-current .fg-meta) {
-  color: #cbd1ff;
-}
-[data-theme="dark"] .flow-graph .fg-node.is-current .fg-meta {
-  background: transparent;
-  border-color: var(--primary);
-  color: #8d96ff;
-}
-[data-theme="dark"] .flow-graph .fg-node.is-current::before {
-  background: var(--primary);
-}
-[data-theme="dark"] .flow-graph .fg-node.is-pending {
-  opacity: 0.72;
-  border-style: dotted;
-  border-color: #222938;
-}
-[data-theme="dark"] .flow-graph .fg-link::before {
-  background: #2a3347;
-}
-[data-theme="dark"] :is(.flow-graph .fg-link.is-done::before, .flow-graph .fg-link.is-done::after) {
-  background: #2ed69d;
-  border-left-color: #2ed69d;
-}
-[data-theme="dark"] :is(.flow-graph .fg-branch::before, .flow-graph .fg-branch .fg-branch-row::before) {
-  background: #2ed69d;
-}
-[data-theme="dark"] .flow-graph-legend {
-  color: #9da8ba;
-}
-
-/* --- Nav, Activity, Meta ---------------------------------- */
-[data-theme="dark"] .nav-tabs {
-  border-bottom-color: #293143;
-}
-[data-theme="dark"] .nav-tabs .nav-link {
-  color: #96a2b7;
-}
-[data-theme="dark"] .nav-tabs .nav-link.active {
-  color: var(--primary);
-}
-[data-theme="dark"] .activity-feed::before {
-  background: #263044;
-}
-[data-theme="dark"] .activity-feed .activity-icon {
-  background: #111722;
-  border-color: #273044;
-}
-[data-theme="dark"] .activity-feed .activity-body {
-  background: #1a2030;
-  border-color: #2b3346;
-}
-[data-theme="dark"] .activity-feed .activity-text {
-  color: #cfd6e4;
-}
-[data-theme="dark"] .meta-table tr td {
-  border-bottom-color: #272e3d;
-}
-[data-theme="dark"] .meta-table tr td:first-child {
-  color: #98a4b8;
-}
-[data-theme="dark"] .meta-table tr td:last-child {
-  color: #d8deea;
-}
-[data-theme="dark"] .list-group-item {
-  background: #141923;
-  border-color: #272e3d;
-  color: #d3dae7;
-}
-
-/* --- Alerts, SweetAlert2 ---------------------------------- */
-[data-theme="dark"] .alert-success {
-  background: var(--success-bg, #103832);
-  border-color: rgba(46, 214, 157, 0.3);
-  color: var(--success, #2ed69d);
-}
-[data-theme="dark"] .alert-danger {
-  background: var(--critical-bg, #3a1024);
-  border-color: rgba(255, 107, 131, 0.3);
-  color: var(--critical, #ff6b83);
-}
-[data-theme="dark"] .alert-warning {
-  background: var(--major-bg, #3a2810);
-  border-color: rgba(255, 195, 40, 0.3);
-  color: var(--major, #ffc328);
-}
-[data-theme="dark"] .alert-info {
-  background: var(--info-bg, #102c44);
-  border-color: rgba(53, 183, 238, 0.3);
-  color: var(--info, var(--primary));
-}
-[data-theme="dark"] .alert .btn-close {
-  filter: invert(1) grayscale(1);
-  opacity: 0.7;
-}
-[data-theme="dark"] .alert .btn-close:hover {
-  opacity: 1;
-}
-[data-theme="dark"] .swal2-popup {
-  background: var(--surface);
-  color: var(--text);
-  border: 1px solid var(--border);
-  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.7);
-}
-[data-theme="dark"] .swal2-title {
-  color: var(--text);
-}
-[data-theme="dark"] .swal2-html-container {
-  color: var(--text-3);
-}
-[data-theme="dark"] .swal2-icon.swal2-warning {
-  border-color: var(--major, #f59e0b);
-  color: var(--major, #f59e0b);
-}
-[data-theme="dark"] .swal2-cancel {
-  background: var(--surface-2) !important;
-  color: var(--text) !important;
-  border: 1px solid var(--border) !important;
-}
-[data-theme="dark"] .swal2-cancel:hover {
-  background: var(--border) !important;
-}
-
-/* --- Sidebar toggle, misc --------------------------------- */
-[data-theme="dark"] .sidebar-toggle {
-  background: var(--surface-2);
-  color: var(--text-2);
-  border-color: var(--border);
-}
-[data-theme="dark"] .sidebar-toggle:hover {
-  background: rgba(7, 146, 205, 0.12);
-  color: var(--primary-300);
-  border-color: var(--primary);
-}
-[data-theme="dark"] .user-id-chip {
-  background: rgba(255, 255, 255, 0.06);
-  border-color: rgba(255, 255, 255, 0.08);
-  color: #cbd5e1;
-}
-
-@media (max-width: 992px) {
-  [data-theme="dark"] {
-    --sidebar-w: 220px;
-  }
-}
-
-/* --- Scrollbars ------------------------------------------- */
-[data-theme="dark"] *::-webkit-scrollbar-thumb {
-  background: rgba(148, 163, 184, 0.25) transparent;
-  background-clip: padding-box;
-}
-[data-theme="dark"] *::-webkit-scrollbar-thumb:hover {
-  background: rgba(148, 163, 184, 0.6) transparent;
-  background-clip: padding-box;
-}
-
-/* --- Bell badge ------------------------------------------- */
-[data-theme="dark"] .bell-badge {
-  border-color: var(--sidebar-2, #0d121d);
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.5);
-}
-
-/* --- DataTables processing overlay ------------------------ */
-[data-theme="dark"] .dataTables_processing {
-  background-color: rgba(13, 18, 29, 0.92) !important;
-}
-[data-theme="dark"] .dataTables_processing .dt-dot {
-  box-shadow: 0 0 10px rgba(7, 146, 205, 0.55);
-}
-
 /* --- Premium Custom Tooltip ------------------------------ */
 .app-tooltip {
   position: absolute;
@@ -4502,16 +3742,7 @@ body,
   font-size: 12px;
   color: var(--primary-700);
 }
-[data-theme="dark"] .mention-dropdown {
-  background: var(--surface);
-  border-color: var(--border);
-  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.45);
-}
 
-/* @mention rendering inside a ticket comment timeline. Emitted by the
-   highlight_mentions() helper so reviewers can see at a glance who was
-   pinged on each comment. The pill colour follows the app primary so
-   it reads as a "user reference" not a generic link. */
 .mention-chip {
   display: inline-block;
   padding: 1px 6px;
@@ -4520,17 +3751,7 @@ body,
   color: var(--primary-700, #0792cd);
   background: rgba(7, 146, 205, 0.12);
 }
-[data-theme="dark"] .mention-chip {
-  color: #6bd0ff;
-  background: rgba(7, 146, 205, 0.18);
-}
 
-/* Bootstrap's default .btn-close uses a black SVG which is invisible on
-   the dark theme's modal headers. Invert it so the X is visible without
-   needing to add btn-close-white to every dialog. */
-[data-theme="dark"] .btn-close {
-  filter: invert(1) grayscale(100%) brightness(200%);
-}
 .modal-backdrop.show {
   opacity: 0;
   position: relative;
@@ -4566,22 +3787,6 @@ body,
   padding: 3px 8px;
   border-radius: 999px;
 }
-[data-theme="dark"] .transition-badge-forward {
-  color: #7dd3fc;
-  background: rgba(14, 165, 233, 0.15);
-  border-color: rgba(14, 165, 233, 0.3);
-}
-[data-theme="dark"] .transition-badge-backward {
-  color: #fca5a5;
-  background: rgba(239, 68, 68, 0.15);
-  border-color: rgba(239, 68, 68, 0.3);
-}
-[data-theme="dark"] .transition-badge-rework {
-  color: #fcd34d;
-  background: rgba(245, 158, 11, 0.15);
-  border-color: rgba(245, 158, 11, 0.3);
-}
-
 .btn-xs {
   padding: 2px 6px;
   font-size: 11px;

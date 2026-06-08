@@ -46,7 +46,10 @@ CREATE TABLE `activity_logs` (
   KEY `idx_activity_module` (`module`,`created_at`),
   KEY `idx_activity_entity` (`entity_type`,`entity_id`),
   KEY `idx_activity_action` (`action`),
-  KEY `idx_activity_created` (`created_at`)
+  KEY `idx_activity_created` (`created_at`),
+  KEY `idx_activity_module_action` (`module`,`action`),
+  KEY `idx_activity_created_at` (`created_at`),
+  FULLTEXT KEY `ft_activity_summary` (`summary`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
@@ -271,6 +274,27 @@ CREATE TABLE `migrations` (
   `time` int(11) NOT NULL,
   `batch` int(11) unsigned NOT NULL,
   PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Table structure for table `modules`
+--
+
+DROP TABLE IF EXISTS `modules`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!40101 SET character_set_client = utf8 */;
+CREATE TABLE `modules` (
+  `id`          int(10) unsigned NOT NULL AUTO_INCREMENT,
+  `module_key`  varchar(50)  NOT NULL,
+  `name`        varchar(100) NOT NULL,
+  `description` varchar(255) NOT NULL DEFAULT '',
+  `is_builtin`  tinyint(1)   NOT NULL DEFAULT 0,
+  `sort_order`  int(11)      NOT NULL DEFAULT 100,
+  `created_at`  datetime     NOT NULL,
+  `created_by`  varchar(100)          DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `idx_module_key` (`module_key`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
@@ -521,6 +545,7 @@ CREATE TABLE `tickets` (
   KEY `idx_tickets_alert_type` (`alert_type`),
   KEY `idx_tickets_status_alert_type` (`status`,`alert_type`),
   KEY `idx_state_entered_at` (`state_entered_at`),
+  FULLTEXT KEY `ft_tickets_search` (`alarm_id`,`title`,`description`),
   CONSTRAINT `tickets_current_assignee_foreign` FOREIGN KEY (`current_assignee`) REFERENCES `users` (`user_id`) ON DELETE SET NULL,
   CONSTRAINT `tickets_current_state_id_foreign` FOREIGN KEY (`current_state_id`) REFERENCES `states` (`id`) ON DELETE SET NULL,
   CONSTRAINT `tickets_flow_id_foreign` FOREIGN KEY (`flow_id`) REFERENCES `flows` (`id`),
@@ -586,4 +611,15 @@ CREATE TABLE `users` (
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
--- Dump completed on 2026-06-05  9:57:51
+--
+-- Seed migration history so CI4 does not re-apply migrations already
+-- reflected in this schema file.
+--
+
+INSERT INTO `migrations` (`version`, `class`, `group`, `namespace`, `time`, `batch`) VALUES
+('2026-06-03-000001', 'App\\Database\\Migrations\\AddPerformanceIndexes',   'default', 'App', 1748908800, 1),
+('2026-06-04-000001', 'App\\Database\\Migrations\\TicketLifecycleFeatures', 'default', 'App', 1748995200, 2),
+('2026-06-04-000002', 'App\\Database\\Migrations\\AddCronRuns',             'default', 'App', 1748995200, 2),
+('2026-06-08-000001', 'App\\Database\\Migrations\\AddSearchIndexes',        'default', 'App', 1749340800, 3);
+
+-- Dump completed on 2026-06-05  9:57:51 | schema updated 2026-06-08

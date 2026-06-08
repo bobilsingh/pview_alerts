@@ -426,7 +426,7 @@ function initTicketsTable() {
       },
     },
     columns: [
-      { data: "select", orderable: false, className: "ticket-bulk-cell text-center" },
+      // DEMO: bulk column hidden — { data: "select", orderable: false, className: "ticket-bulk-cell text-center" },
       { data: "alarm_id_html", orderable: true },
       { data: "title_html", orderable: true },
       { data: "severity", orderable: true },
@@ -461,8 +461,10 @@ function initTicketsTable() {
 
 // ============================================================
 // 08. BULK ACTIONS — multi-select resolve / close tickets from list
+// DEMO: entire section hidden — uncomment to restore
 // ============================================================
 
+/* DEMO HIDDEN
 var bulkSelected = {};
 
 function getSelectedIds() {
@@ -579,6 +581,7 @@ function postBulkAction($btn) {
     });
   });
 }
+*/ // END DEMO HIDDEN
 
 // Handles inline Reopen button clicks in the tickets list table.
 function initListReopenButtons() {
@@ -616,6 +619,7 @@ function initListReopenButtons() {
   });
 }
 
+/* DEMO HIDDEN
 function initBulkActions() {
   $appDocument.off("change.bulkSelect").on("change.bulkSelect", ".bulk-select", function () {
     var id = $(this).attr("data-bulk-id");
@@ -666,6 +670,7 @@ function initBulkActions() {
     });
   });
 }
+*/ // END DEMO HIDDEN
 
 // ============================================================
 // 09. SAVED FILTERS — named filter bookmarks for the tickets table

@@ -104,7 +104,7 @@ class User_model
     public function countActiveSuperAdmins($ignoreId = 0)
     {
         $q = $this->db->table('users')
-            ->where('role', 'super_admin')
+            ->where('role', ROLE_SUPER_ADMIN)
             ->where('is_active', 1)
             ->where('deleted_at', null);
         if ((int) $ignoreId > 0) {
