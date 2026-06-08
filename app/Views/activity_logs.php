@@ -131,7 +131,6 @@ $today        = date('Y-m-d');
         <table id="activityLogsTable" class="table align-middle mb-0" style="width:100%;"
           data-table-url="<?= esc(site_url('activity_logs/data_table')); ?>"
           data-analytics-url="<?= esc(site_url('activity_logs/analytics')); ?>"
-          data-user-events-url="<?= esc(site_url('activity_logs/user_events')); ?>"
           data-export-url="<?= esc(site_url('activity_logs/export')); ?>">
           <thead class="table-light">
             <tr>
@@ -221,7 +220,6 @@ $today        = date('Y-m-d');
           <div class="card analytics-card">
             <div class="card-header">
               <strong><i class="bi bi-people text-primary"></i> Top Active Users</strong>
-              <small class="text-muted ms-1">click row to drill down</small>
             </div>
             <div class="card-body p-0 analytics-card-body">
               <table class="table table-sm table-hover mb-0" id="analyticsTopUsersTable">
@@ -312,43 +310,6 @@ $today        = date('Y-m-d');
     </div><!-- /tab-analytics -->
   </div><!-- /tab-content -->
 
-  <!-- =========================================================
-     USER DRILLDOWN MODAL
-     ========================================================= -->
-  <div class="modal fade" id="userDrilldownModal" tabindex="-1" aria-labelledby="userDrilldownTitle" aria-hidden="true">
-    <div class="modal-dialog modal-xl modal-dialog-scrollable">
-      <div class="modal-content">
-        <div class="modal-header">
-          <h5 class="modal-title" id="userDrilldownTitle">User Activity</h5>
-          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-        </div>
-        <div class="modal-body p-0">
-          <!-- User summary strip -->
-          <div class="p-3 border-bottom d-flex flex-wrap gap-3" id="drilldownUserMeta"></div>
-          <!-- Events table -->
-          <div class="table-responsive">
-            <table class="table table-sm table-hover mb-0" id="drilldownEventsTable" style="width:100%">
-              <thead class="table-light">
-                <tr>
-                  <th>Time</th>
-                  <th>Module</th>
-                  <th>Action</th>
-                  <th>Entity</th>
-                  <th>Summary</th>
-                  <th>Status</th>
-                </tr>
-              </thead>
-              <tbody id="drilldownEventsBody">
-                <tr>
-                  <td colspan="6" class="text-center text-muted py-3">Loading…</td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-        </div>
-      </div>
-    </div>
-  </div>
 
 <?php } // end if canAnalytics 
 ?>

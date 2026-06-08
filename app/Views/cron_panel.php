@@ -196,49 +196,24 @@ $today = date('Y-m-d');
     ]); ?>
 
     <div class="card-body p-0">
-      <?php if (empty($runs)): ?>
-        <div class="text-center text-muted py-4">No runs recorded yet.</div>
-      <?php else: ?>
-        <div class="table-responsive">
-          <table class="table table-sm table-hover mb-0" id="cronRunsTable" style="width:100%" data-today="<?= esc($today); ?>">
-            <thead class="table-light">
-              <tr>
-                <th>Script</th>
-                <th>Started</th>
-                <th>Duration</th>
-                <th class="text-center">Tickets</th>
-                <th class="text-center">Sent</th>
-                <th class="text-center">Failed</th>
-                <th class="text-center">Status</th>
-                <th>Summary</th>
-              </tr>
-            </thead>
-            <tbody>
-              <?php foreach ($runs as $run): ?>
-                <?php
-                $isOk      = ($run['status'] ?? 'ok') === 'ok';
-                $statusCls = $isOk ? 'bg-success' : 'bg-danger';
-                $statusLbl = $isOk ? 'OK' : 'FAILED';
-                $durSec    = round((int)($run['duration_ms'] ?? 0) / 1000, 2);
-                $dateOnly  = substr($run['started_at'] ?? '', 0, 10);
-                ?>
-                <tr data-date="<?= esc($dateOnly); ?>">
-                  <td><code class="small"><?= esc($run['script']); ?></code></td>
-                  <td class="small text-muted"><?= esc(substr($run['started_at'] ?? '-', 0, 19)); ?></td>
-                  <td class="small"><?= esc($durSec); ?>s</td>
-                  <td class="text-center small"><?= (int)($run['tickets_checked'] ?? 0); ?></td>
-                  <td class="text-center small text-success"><?= (int)($run['notifs_sent'] ?? 0); ?></td>
-                  <td class="text-center small <?= (int)($run['notifs_failed'] ?? 0) > 0 ? 'text-danger fw-bold' : ''; ?>">
-                    <?= (int)($run['notifs_failed'] ?? 0); ?>
-                  </td>
-                  <td class="text-center"><span class="badge <?= $statusCls; ?>"><?= $statusLbl; ?></span></td>
-                  <td class="small text-muted"><?= esc($run['output_summary'] ?? '-'); ?></td>
-                </tr>
-              <?php endforeach; ?>
-            </tbody>
-          </table>
-        </div>
-      <?php endif; ?>
+      <div class="table-responsive">
+        <table class="table table-sm table-hover mb-0" id="cronRunsTable" style="width:100%"
+          data-table-url="<?= site_url('cron_panel/data_table'); ?>">
+          <thead class="table-light">
+            <tr>
+              <th>Script</th>
+              <th>Started</th>
+              <th>Duration</th>
+              <th class="text-center">Tickets</th>
+              <th class="text-center">Sent</th>
+              <th class="text-center">Failed</th>
+              <th class="text-center">Status</th>
+              <th>Summary</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
     </div>
   </div>
 

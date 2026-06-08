@@ -119,6 +119,7 @@ $routes->post('module_control_panel/module/delete/(:segment)',    'app::module_d
 
 // ===== Cron Management Panel =====
 $routes->get('cron_panel',                            'app::cron_panel');
+$routes->get('cron_panel/data_table',                 'app::cron_panel_data_table');
 
 // ===== Tickets (UI) =====
 $routes->get('tickets',                                    'app::tickets_my');
@@ -147,7 +148,6 @@ $routes->get('activity_logs',              'app::activity_logs');
 $routes->get('activity_logs/data_table',   'app::activity_logs_data_table');
 $routes->get('activity_logs/export',       'app::activity_logs_export');
 $routes->get('activity_logs/analytics',    'app::activity_logs_analytics');
-$routes->get('activity_logs/user_events',  'app::activity_logs_user_events');
 
 // ===== REST API (external systems, X-API-KEY auth) =====
 $routes->post('api/raise',               'app::api_raise');

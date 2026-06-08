@@ -250,6 +250,9 @@ $appDocument.ready(function () {
   initBumpAssetVersion();
   initClearSettingsCache();
 
+  // --- Cron Panel ---
+  initCronRunsTable();
+
   // --- Activity Logs ---
   initAuditLogTable();
   initAnalyticsTab();
@@ -3852,53 +3855,14 @@ function initAutoLogout() {
     logoutTimer = setTimeout(doLogout, timeoutMs);
   }
 
-  var LS_KEY = "pview-last-activity";
-
-  function stampActivity() {
-    try {
-      localStorage.setItem(LS_KEY, Date.now().toString());
-    } catch (e) {}
-  }
-
-  function elapsedSinceActivity() {
-    try {
-      var ts = parseInt(localStorage.getItem(LS_KEY) || "0", 10);
-      if (ts > 0) {
-        return Date.now() - ts;
-      }
-    } catch (e) {}
-    return 0;
-  }
-
-  function checkElapsed() {
-    if (elapsedSinceActivity() >= timeoutMs) {
-      doLogout();
-    }
-  }
-
   // Treat any user interaction as activity.
   $(document).on("mousemove keydown mousedown touchstart scroll click", function () {
-    stampActivity();
     if (!warnOpen) {
       resetTimers();
     }
   });
 
-  // When the tab becomes visible again (returning from lock screen, switching
-  // tabs, waking the machine), JS timers may have been paused — check wall-clock
-  // elapsed time against the stored timestamp instead.
-  document.addEventListener("visibilitychange", function () {
-    if (document.visibilityState === "visible") {
-      checkElapsed();
-    }
-  });
-
-  // On page load: if the user was away long enough before navigating here,
-  // log out immediately without waiting for timers to fire.
-  checkElapsed();
-
-  // Start the timers and stamp the initial activity.
-  stampActivity();
+  // Start the timers.
   resetTimers();
 }
 

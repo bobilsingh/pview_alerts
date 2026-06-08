@@ -2392,18 +2392,6 @@ textarea.form-control {
   white-space: nowrap;
 }
 
-#userDrilldownModal .modal-dialog {
-  margin-top: calc(var(--topbar-h) + 0.75rem);
-  max-height: calc(100vh - var(--topbar-h) - 3rem);
-}
-.drilldown-modal-body {
-  overflow-y: auto;
-  max-height: calc(100vh - 200px);
-}
-#userDrilldownModal td,
-#userDrilldownModal th {
-  white-space: nowrap;
-}
 
 .activity-feed .activity-meta {
   display: flex;

@@ -1241,7 +1241,82 @@ function initAuditLogTable() {
 }
 
 // ============================================================
-// 12. ANALYTICS — fetch, render charts/tables, drilldown modal
+// 12. CRON RUNS TABLE — server-side with date + status filters
+// ============================================================
+
+function initCronRunsTable() {
+  var $table = $("#cronRunsTable");
+  if (!$table.length || typeof $.fn.DataTable === "undefined") {
+    return;
+  }
+  if ($.fn.DataTable.isDataTable($table[0])) {
+    return;
+  }
+
+  var ajaxUrl = $table.attr("data-table-url");
+  if (!ajaxUrl) {
+    return;
+  }
+
+  var dt = $table.DataTable({
+    processing: true,
+    serverSide: true,
+    autoWidth: false,
+    pageLength: getTablePageLength(),
+    lengthMenu: [10, 25, 50, 100],
+    order: [[1, "desc"]],
+    columns: [
+      { data: "script",   orderable: true },
+      { data: "started",  orderable: true },
+      { data: "duration", orderable: true },
+      { data: "tickets",  orderable: true,  className: "text-center" },
+      { data: "sent",     orderable: true,  className: "text-center" },
+      { data: "failed",   orderable: true,  className: "text-center" },
+      { data: "status",   orderable: true,  className: "text-center" },
+      { data: "summary",  orderable: false },
+    ],
+    ajax: {
+      url: ajaxUrl,
+      type: "GET",
+      dataSrc: "data",
+      data: function (d) {
+        d.f_from   = $("#cronFrom").val()    || "";
+        d.f_to     = $("#cronTo").val()      || "";
+        d.f_script = $("#cronScript").val()  || "";
+        d.f_status = $("#cronStatus").val()  || "";
+      },
+      error: function (xhr) {
+        var msg = "Failed to load cron run history.";
+        if (xhr && xhr.responseJSON && xhr.responseJSON.message) {
+          msg = xhr.responseJSON.message;
+        }
+        showError(msg);
+      },
+    },
+    language: {
+      emptyTable:   "No cron runs recorded yet.",
+      zeroRecords:  "No runs match the selected filters.",
+      info:         "Showing _START_ to _END_ of _TOTAL_ runs",
+      infoEmpty:    "No runs",
+      infoFiltered: "(filtered from _MAX_ total)",
+      search:       "",
+      searchPlaceholder: "Search…",
+    },
+    drawCallback: function () {
+      var api = this.api && this.api();
+      if (api && typeof api.columns === "function") {
+        api.columns.adjust();
+      }
+    },
+  });
+
+  $("#cronApplyBtn").on("click", function () {
+    dt.ajax.reload();
+  });
+}
+
+// ============================================================
+// 13. ANALYTICS — fetch, render charts/tables, drilldown modal
 // ============================================================
 
 var analyticsModuleChart = null;
@@ -1309,7 +1384,7 @@ function renderAnalytics(data) {
   } else {
     for (i = 0; i < topUsers.length; i++) {
       u = topUsers[i];
-      topHtml += '<tr class="analytics-user-row" style="cursor:pointer;" ' + 'data-user-id="' + escapeHtml(u.user_id) + '" ' + 'data-user-name="' + escapeHtml(u.user_name || u.user_id) + '">' + "<td><strong>" + escapeHtml(u.user_name || u.user_id) + "</strong>" + '<br><small class="text-muted">@' + escapeHtml(u.user_id) + "</small></td>" + '<td><span class="badge bg-secondary">' + escapeHtml(u.user_role || "-") + "</span></td>" + '<td class="text-end fw-bold">' + parseInt(u.event_count, 10) + "</td>" + '<td class="small text-muted">' + escapeHtml((u.last_seen || "").substring(0, 16)) + "</td>" + "</tr>";
+      topHtml += "<tr>" + "<td><strong>" + escapeHtml(u.user_name || u.user_id) + "</strong>" + '<br><small class="text-muted">@' + escapeHtml(u.user_id) + "</small></td>" + '<td><span class="badge bg-secondary">' + escapeHtml(u.user_role || "-") + "</span></td>" + '<td class="text-end fw-bold">' + parseInt(u.event_count, 10) + "</td>" + '<td class="small text-muted">' + escapeHtml((u.last_seen || "").substring(0, 16)) + "</td>" + "</tr>";
     }
   }
   $("#analyticsTopUsersBody").html(topHtml);
@@ -1392,71 +1467,7 @@ function renderAnalytics(data) {
   $("#analyticsFailedBody").html(failedHtml);
 }
 
-// Loads a user's full event history into the drilldown modal.
-function openUserDrilldown(userId, userName) {
-  var $table = $("#activityLogsTable");
-  var eventsUrl = $table.attr("data-user-events-url");
-  if (!eventsUrl) {
-    return;
-  }
-
-  $("#userDrilldownTitle").text("Activity: " + userName);
-  $("#drilldownUserMeta").html('<span class="spinner-border spinner-border-sm text-muted"></span> Loading…');
-
-  if ($.fn.DataTable.isDataTable("#drilldownEventsTable")) {
-    $("#drilldownEventsTable").DataTable().destroy();
-  }
-  $("#drilldownEventsBody").html('<tr><td colspan="6" class="text-center text-muted py-3">Loading…</td></tr>');
-
-  var modal = bootstrap.Modal.getOrCreateInstance(document.getElementById("userDrilldownModal"));
-  modal.show();
-
-  $.ajax({
-    url: eventsUrl,
-    type: "GET",
-    data: { user_id: userId },
-    dataType: "json",
-    success: function (res) {
-      if (!res || !res.success || !res.data) {
-        $("#drilldownEventsBody").html('<tr><td colspan="6" class="text-center text-danger py-3">Failed to load events.</td></tr>');
-        return;
-      }
-      var d = res.data;
-      $("#drilldownUserMeta").html("<div><strong>" + escapeHtml(d.user_name || d.user_id) + "</strong>" + ' <small class="text-muted">@' + escapeHtml(d.user_id) + "</small>" + ' <span class="badge bg-secondary ms-1">' + escapeHtml(d.user_role || "-") + "</span></div>" + '<div class="text-muted small"><i class="bi bi-activity"></i> ' + parseInt(d.total_events, 10) + " total events</div>" + '<div class="text-muted small"><i class="bi bi-clock"></i> Last seen: ' + escapeHtml((d.last_seen || "-").substring(0, 16)) + "</div>");
-
-      var events = d.events || [];
-      var html = "";
-      var i, e, statusBadge;
-      if (events.length === 0) {
-        html = '<tr><td colspan="6" class="text-center text-muted py-3">No events found.</td></tr>';
-        $("#drilldownEventsBody").html(html);
-        return;
-      }
-      for (i = 0; i < events.length; i++) {
-        e = events[i];
-        statusBadge = e.status === "fail" ? '<span class="badge bg-danger">FAIL</span>' : '<span class="badge bg-success">OK</span>';
-        html += "<tr>" + '<td class="small text-muted">' + escapeHtml((e.created_at || "").substring(0, 16)) + "</td>" + '<td><span class="badge bg-secondary">' + escapeHtml(e.module) + "</span></td>" + '<td><span class="badge bg-info text-dark">' + escapeHtml(e.action) + "</span></td>" + '<td class="small">' + escapeHtml((e.entity_type || "") + (e.entity_id ? " #" + e.entity_id : "")) + "</td>" + '<td class="small">' + escapeHtml(e.summary || "-") + "</td>" + "<td>" + statusBadge + "</td>" + "</tr>";
-      }
-      $("#drilldownEventsBody").html(html);
-      $("#drilldownEventsTable").DataTable({
-        pageLength: 10,
-        order: [[0, "desc"]],
-        searching: false,
-        lengthChange: false,
-        info: true,
-        language: {
-          paginate: { previous: "‹", next: "›" },
-          info: "Showing _START_–_END_ of _TOTAL_ events",
-        },
-      });
-    },
-    error: function () {
-      $("#drilldownEventsBody").html('<tr><td colspan="6" class="text-center text-danger py-3">Network error.</td></tr>');
-    },
-  });
-}
-
-// Wires the Analytics tab: initial load, apply button, 30s auto-refresh, drilldown, visibility.
+// Wires the Analytics tab: initial load, apply button, 30s auto-refresh, visibility.
 function initAnalyticsTab() {
   if (!$("#tab-analytics").length) {
     return;
@@ -1466,14 +1477,6 @@ function initAnalyticsTab() {
 
   $("#analyticsApplyBtn").on("click", function () {
     loadAnalytics();
-  });
-
-  $appDocument.on("click", ".analytics-user-row", function () {
-    var uid = $(this).attr("data-user-id") || "";
-    var name = $(this).attr("data-user-name") || uid;
-    if (uid) {
-      openUserDrilldown(uid, name);
-    }
   });
 
   var analyticsRefreshMs = parseInt($('meta[name="app-setting-analytics_refresh_seconds"]').attr("content") || "30", 10) * 1000;

@@ -3303,6 +3303,94 @@ class App extends BaseController
         echo view('templates/footer');
     }
 
+    public function cron_panel_data_table()
+    {
+        check_module_access('cron_panel', 'view');
+
+        $colMap = [
+            0 => 'script',
+            1 => 'started_at',
+            2 => 'duration_ms',
+            3 => 'tickets_checked',
+            4 => 'notifs_sent',
+            5 => 'notifs_failed',
+            6 => 'status',
+            7 => 'output_summary',
+        ];
+        $params = dt_parse_request($this->request, $colMap);
+
+        $fFrom   = trim((string) $this->request->getGet('f_from'));
+        $fTo     = trim((string) $this->request->getGet('f_to'));
+        $fScript = trim((string) $this->request->getGet('f_script'));
+        $fStatus = trim((string) $this->request->getGet('f_status'));
+
+        if ($fFrom !== '' && $fTo !== '' && $fFrom > $fTo) {
+            $tmp   = $fFrom;
+            $fFrom = $fTo;
+            $fTo   = $tmp;
+        }
+
+        $builder = $this->db->table('cron_runs');
+
+        if ($fFrom !== '') {
+            $builder->where('started_at >=', $fFrom . ' 00:00:00');
+        }
+        if ($fTo !== '') {
+            $builder->where('started_at <=', $fTo . ' 23:59:59');
+        }
+        if ($fScript !== '') {
+            $builder->where('script', $fScript);
+        }
+        if ($fStatus !== '') {
+            $builder->where('status', $fStatus);
+        }
+        if ($params['search'] !== '') {
+            $term = $params['search'];
+            $builder->groupStart()
+                ->like('script', $term)
+                ->orLike('output_summary', $term)
+                ->orLike('status', $term)
+                ->groupEnd();
+        }
+
+        $total    = (int) $this->db->table('cron_runs')->countAllResults();
+        $filtered = (int) $builder->countAllResults(false);
+
+        $rows = $builder
+            ->orderBy($params['order_col'], $params['order_dir'])
+            ->limit($params['length'], $params['start'])
+            ->get()->getResultArray();
+
+        $out = [];
+        foreach ($rows as $r) {
+            $isOk   = ($r['status'] ?? 'ok') === 'ok';
+            $durSec = round((int) ($r['duration_ms'] ?? 0) / 1000, 2);
+            $failed = (int) ($r['notifs_failed'] ?? 0);
+
+            $tmp = [];
+            $tmp['script']   = '<code class="small">' . esc($r['script']) . '</code>';
+            $tmp['started']  = esc(substr($r['started_at'] ?? '-', 0, 19));
+            $tmp['duration'] = esc($durSec) . 's';
+            $tmp['tickets']  = (int) ($r['tickets_checked'] ?? 0);
+            $tmp['sent']     = (int) ($r['notifs_sent'] ?? 0);
+            $tmp['failed']   = $failed > 0
+                ? '<span class="text-danger fw-bold">' . $failed . '</span>'
+                : '0';
+            $tmp['status']   = $isOk
+                ? '<span class="badge bg-success">OK</span>'
+                : '<span class="badge bg-danger">FAILED</span>';
+            $tmp['summary']  = esc($r['output_summary'] ?? '-');
+            $out[] = $tmp;
+        }
+
+        return $this->response->setJSON([
+            'draw'            => $params['draw'],
+            'recordsTotal'    => $total,
+            'recordsFiltered' => $filtered,
+            'data'            => $out,
+        ]);
+    }
+
     public function settings()
     {
         check_isvalidated();
@@ -4065,40 +4153,6 @@ class App extends BaseController
             'actions'         => array_values($actionBreakdown),
             'failed'          => array_values($failedEvents),
             'session_avg'     => array_slice($sessionAvg, 0, 10),
-        ]);
-    }
-
-    /** GET /activity_logs/user_events?user_id=X — all events for a
-     *  specific user, used by the drilldown modal in the Analytics tab. */
-    public function activity_logs_user_events()
-    {
-        if (logged_user_role() !== ROLE_SUPER_ADMIN && !has_module_access('activity_logs', 'analytics')) {
-            return json_fail('Access denied', 403);
-        }
-
-        $userId = trim((string) $this->request->getGet('user_id'));
-        if ($userId === '') {
-            return json_fail('user_id required');
-        }
-
-        $rows = $this->db->table('activity_logs')
-            ->select('created_at, module, action, entity_type, entity_id, summary, status')
-            ->where('user_id', $userId)
-            ->orderBy('created_at', 'desc')
-            ->get()->getResultArray();
-
-        $stats = $this->db->table('activity_logs')
-            ->select('COUNT(*) as total, MAX(created_at) as last_seen, user_name, user_role')
-            ->where('user_id', $userId)
-            ->get()->getRowArray();
-
-        return json_ok([
-            'user_id' => $userId,
-            'user_name' => $stats['user_name'] ?? $userId,
-            'user_role' => $stats['user_role'] ?? '',
-            'total_events' => (int) ($stats['total'] ?? 0),
-            'last_seen' => $stats['last_seen'] ?? '',
-            'events' => array_values($rows),
         ]);
     }
 
