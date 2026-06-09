@@ -17,6 +17,7 @@ class AppDefaults
         'login_max_attempts'           => '3',
         'login_lockout_minutes'        => '10',
         'session_idle_timeout_minutes' => '30',
+        'session_timeout_minutes'      => '30',
         'api_rate_per_minute'          => '60',
         'api_rate_per_hour'            => '1000',
         'upload_max_mb'                => '10',

@@ -209,6 +209,14 @@ class App extends BaseController
     public function project_delete($id)
     {
         check_module_access('projects', 'delete');
+        $activeCount = $this->db->table('tickets')
+            ->whereIn('status', ['open', 'in_progress', 'escalated'])
+            ->where('project_id', (int) $id)
+            ->countAllResults();
+        if ($activeCount > 0) {
+            $this->session->setFlashdata('error', 'Cannot delete: ' . $activeCount . ' active ticket(s) are linked to this project.');
+            return redirect()->to(site_url('projects'));
+        }
         $before = $this->app_model->projectGetById($id);
         $this->app_model->projectSoftDelete($id);
         $name = isset($before['name']) ? (string) $before['name'] : '';
@@ -360,6 +368,14 @@ class App extends BaseController
     public function flow_delete($id)
     {
         check_module_access('flows', 'delete');
+        $activeCount = $this->db->table('tickets')
+            ->whereIn('status', ['open', 'in_progress', 'escalated'])
+            ->where('flow_id', (int) $id)
+            ->countAllResults();
+        if ($activeCount > 0) {
+            $this->session->setFlashdata('error', 'Cannot delete: ' . $activeCount . ' active ticket(s) are linked to this flow.');
+            return redirect()->to(site_url('flows'));
+        }
         $before = $this->app_model->flowGetById($id);
         $this->app_model->flowSoftDelete($id);
         $name = isset($before['name']) ? (string) $before['name'] : '';
@@ -1431,6 +1447,13 @@ class App extends BaseController
             return json_ok([], 'Comment added');
         }
 
+        $editableTypes = ['title', 'description', 'priority'];
+        if (in_array($type, $editableTypes, true)) {
+            if (!role_has_admin_scope(logged_user_role()) && (string) $ticket['current_assignee'] !== (string) logged_user_id()) {
+                return json_fail('Only the assigned operator or an admin can edit ticket fields.');
+            }
+        }
+
         if ($type === 'title') {
             $newTitle = trim((string) $this->request->getPost('title'));
             if ($newTitle === '') {
@@ -1598,9 +1621,13 @@ class App extends BaseController
         if ($currentAssignee !== '') {
             $newPool = $this->app_model->stateLevelUsers($next, 1);
             if (!in_array($currentAssignee, $newPool, true)) {
+                $clearStatus = 'open';
+                if ((string) $ticket['status'] === 'escalated') {
+                    $clearStatus = 'escalated';
+                }
                 $this->app_model->ticketUpdate($ticket['id'], [
                     'current_assignee' => null,
-                    'status'           => 'open',
+                    'status'           => $clearStatus,
                 ]);
                 $this->app_model->ticketLogAction($ticket['id'], 'unassigned', [
                     'comment' => 'Assignee cleared — not in ' . $next['name'] . ' L1 pool',
@@ -1946,7 +1973,7 @@ class App extends BaseController
 
     public function ticket_download($alarm_id, $action_id)
     {
-        check_isvalidated();
+        check_module_access('tickets', 'view');
         $r = $this->ticketLoad($alarm_id, false);
         if ($r instanceof \CodeIgniter\HTTP\RedirectResponse) {
             return $r;
@@ -2710,11 +2737,23 @@ class App extends BaseController
         $comment = (string) (isset($body['comment']) ? $body['comment'] : '');
         $sys     = (string) (isset($body['performed_by_system']) ? $body['performed_by_system'] : '');
 
+        if ($this->ticketIsTerminal($t)) {
+            return service('response')->setStatusCode(400)->setJSON(['success' => false, 'message' => 'Ticket is already ' . $t['status']]);
+        }
+
         if ($action === 'resolved') {
-            $this->app_model->ticketUpdate((int) $t['id'], ['status' => 'resolved', 'resolved_at' => date('Y-m-d H:i:s')]);
+            $resolveData = ['status' => 'resolved', 'resolved_at' => date('Y-m-d H:i:s')];
+            if (empty($t['actual_end_date'])) {
+                $resolveData['actual_end_date'] = date('Y-m-d');
+            }
+            $this->app_model->ticketUpdate((int) $t['id'], $resolveData);
             $this->app_model->ticketLogAction((int) $t['id'], 'resolved', ['comment' => $comment, 'performed_by_system' => $sys]);
         } elseif ($action === 'closed') {
-            $this->app_model->ticketUpdate((int) $t['id'], ['status' => 'closed', 'closed_at' => date('Y-m-d H:i:s')]);
+            $closeData = ['status' => 'closed', 'closed_at' => date('Y-m-d H:i:s')];
+            if (empty($t['actual_end_date'])) {
+                $closeData['actual_end_date'] = date('Y-m-d');
+            }
+            $this->app_model->ticketUpdate((int) $t['id'], $closeData);
             $this->app_model->ticketLogAction((int) $t['id'], 'closed', ['comment' => $comment, 'performed_by_system' => $sys]);
         } elseif ($action === 'comment') {
             $this->app_model->ticketLogAction((int) $t['id'], 'api_update', ['comment' => $comment, 'performed_by_system' => $sys]);
@@ -2848,9 +2887,7 @@ class App extends BaseController
 
     public function actionable_count()
     {
-        if (!session('logged_in') || !session('user_id')) {
-            return json_fail('Not authenticated', 401);
-        }
+        check_isvalidated();
         $userId  = (string) session('user_id');
         $role    = (string) session('user_role');
         $isAdmin = role_has_admin_scope($role);
@@ -2862,9 +2899,7 @@ class App extends BaseController
     /** GET /notifications/recent — actionable tickets for the bell-icon dropdown. */
     public function notifications_recent()
     {
-        if (!session('logged_in') || !session('user_id')) {
-            return json_fail('Not authenticated', 401);
-        }
+        check_isvalidated();
         $userId  = (string) session('user_id');
         $role    = (string) session('user_role');
         $isAdmin = role_has_admin_scope($role);
@@ -3030,7 +3065,13 @@ class App extends BaseController
             $rows = $this->app_model->modulePermissionsGetAll();
         }
 
-        $rolesAll = $this->user_model->getAllRoles();
+        $rolesAllRaw = $this->user_model->getAllRoles();
+        $rolesAll = [];
+        foreach ($rolesAllRaw as $r) {
+            if ((string) $r['role_key'] !== ROLE_SUPER_ADMIN) {
+                $rolesAll[] = $r;
+            }
+        }
 
         $data = [
             'title'       => 'Module Control Panel',
@@ -3078,8 +3119,14 @@ class App extends BaseController
 
         $newPermsAll = [];
         foreach ($roles as $role) {
+            if ($role === ROLE_SUPER_ADMIN) {
+                continue;
+            }
             $rolePerms = [];
             foreach ($modules as $module) {
+                if ($module === 'settings') {
+                    continue;
+                }
                 $rolePerms[$module] = [
                     'view'   => 0,
                     'add'    => 0,
@@ -3425,23 +3472,16 @@ class App extends BaseController
         $rows    = $this->app_model->settingGetAll();
         foreach ($rows as $row) {
             $key = (string) $row['setting_key'];
-            // These are numeric inputs, not checkboxes — never coerce to bool.
-            static $numericKeys = [
-                'password_min_length',
-                'password_rotate_days',
-                'login_max_attempts',
-                'login_lockout_minutes',
-                'api_rate_per_minute',
-                'api_rate_per_hour',
-                'upload_max_mb',
-                'default_tat_l1_minutes',
-                'default_tat_l2_minutes',
-                'default_tat_l3_minutes',
-                'default_tat_l4_minutes',
-                'datatable_page_length',
+            // Authoritative list of keys that are checkboxes (on/off toggles).
+            static $booleanKeys = [
+                'maintenance_mode',
+                'login_show_demo_creds',
+                'password_require_letter',
+                'password_require_digit',
+                'live_audio_enabled',
+                'live_browser_notify',
             ];
-            $isBool = in_array((string) $row['setting_value'], ['0', '1'], true)
-                && !in_array($key, $numericKeys, true);
+            $isBool = in_array($key, $booleanKeys, true);
 
             if ($isBool) {
                 $val = '0';
@@ -3631,7 +3671,12 @@ class App extends BaseController
             $fTo   = $tmp;
         }
 
+        $isAdminScope = role_has_admin_scope(logged_user_role());
+
         $builder = $this->db->table('activity_logs');
+        if (!$isAdminScope) {
+            $builder->where('user_id', (string) logged_user_id());
+        }
         if ($fUser !== '') {
             $builder->groupStart()
                 ->like('user_id', $fUser)
@@ -3687,7 +3732,11 @@ class App extends BaseController
             }
         }
 
-        $total    = (int) $this->db->table('activity_logs')->countAllResults();
+        if ($isAdminScope) {
+            $total = (int) $this->db->table('activity_logs')->countAllResults();
+        } else {
+            $total = (int) $this->db->table('activity_logs')->where('user_id', (string) logged_user_id())->countAllResults();
+        }
         $filtered = (int) $builder->countAllResults(false);
 
         $rows = $builder
@@ -3842,7 +3891,12 @@ class App extends BaseController
             $fTo   = $tmp;
         }
 
+        $isAdminScope = role_has_admin_scope(logged_user_role());
+
         $builder = $this->db->table('activity_logs');
+        if (!$isAdminScope) {
+            $builder->where('user_id', (string) logged_user_id());
+        }
         if ($fUser !== '') {
             $builder->groupStart()
                 ->like('user_id', $fUser)
@@ -3976,6 +4030,7 @@ class App extends BaseController
      *  action granted on activity_logs in the Module Control Panel. */
     public function activity_logs_analytics()
     {
+        check_isvalidated();
         if (logged_user_role() !== ROLE_SUPER_ADMIN && !has_module_access('activity_logs', 'analytics')) {
             return json_fail('Access denied', 403);
         }
@@ -4174,8 +4229,10 @@ class App extends BaseController
             4 => 'p.created_at',
             5 => 'p.name',         // Actions — fallback
         ];
-        $params = dt_parse_request($this->request, $colMap);
-        $result = $this->app_model->projectsForDT($params);
+        $params    = dt_parse_request($this->request, $colMap);
+        $result    = $this->app_model->projectsForDT($params);
+        $canEdit   = has_module_access('projects', 'edit')   === true;
+        $canDelete = has_module_access('projects', 'delete') === true;
 
         $data = [];
         foreach ($result['rows'] as $p) {
@@ -4186,14 +4243,24 @@ class App extends BaseController
             $desc    = isset($p['description']) ? (string) $p['description'] : '';
             $creator = isset($p['created_by_name']) ? (string) $p['created_by_name'] : '-';
 
+            $actionsHtml = '';
+            if ($canEdit) {
+                $actionsHtml .= '<a class="btn btn-sm btn-light" href="' . site_url('projects/edit/' . $p['id']) . '"><i class="bi bi-pencil"></i></a> ';
+            }
+            if ($canDelete) {
+                $actionsHtml .= '<a class="btn btn-sm btn-outline-danger" href="' . site_url('projects/delete/' . $p['id']) . '" data-method="post" data-confirm-message="Remove this project?"><i class="bi bi-trash"></i></a>';
+            }
+            if ($actionsHtml === '') {
+                $actionsHtml = '<span class="text-muted small">—</span>';
+            }
+
             $data[] = [
                 'name'        => '<strong>' . esc($p['name']) . '</strong>',
                 'description' => esc($desc !== '' ? $desc : '-'),
                 'status'      => $statusBadge,
                 'created_by'  => esc($creator !== '' ? $creator : '-'),
                 'created_at'  => '<span class="text-muted small">' . esc($p['created_at']) . '</span>',
-                'actions'     => '<a class="btn btn-sm btn-light" href="' . site_url('projects/edit/' . $p['id']) . '"><i class="bi bi-pencil"></i></a> '
-                    . '<a class="btn btn-sm btn-outline-danger" href="' . site_url('projects/delete/' . $p['id']) . '" data-method="post" data-confirm-message="Remove this project?"><i class="bi bi-trash"></i></a>',
+                'actions'     => $actionsHtml,
             ];
         }
 
@@ -4214,8 +4281,10 @@ class App extends BaseController
             5 => 'f.created_at',
             6 => 'f.name',
         ];
-        $params = dt_parse_request($this->request, $colMap);
-        $result = $this->app_model->flowsForDT($params);
+        $params    = dt_parse_request($this->request, $colMap);
+        $result    = $this->app_model->flowsForDT($params);
+        $canEdit   = has_module_access('flows', 'edit')   === true;
+        $canDelete = has_module_access('flows', 'delete') === true;
 
         $data = [];
         foreach ($result['rows'] as $f) {
@@ -4227,6 +4296,14 @@ class App extends BaseController
             $projectName = isset($f['project_name']) ? (string) $f['project_name'] : '-';
             $creator     = isset($f['created_by_name']) ? (string) $f['created_by_name'] : '-';
 
+            $actionsHtml = '<a class="btn btn-sm btn-primary" href="' . site_url('flows/states/' . $f['id']) . '" title="States"><i class="bi bi-diagram-3"></i></a> ';
+            if ($canEdit) {
+                $actionsHtml .= '<a class="btn btn-sm btn-light" href="' . site_url('flows/edit/' . $f['id']) . '"><i class="bi bi-pencil"></i></a> ';
+            }
+            if ($canDelete) {
+                $actionsHtml .= '<a class="btn btn-sm btn-outline-danger" href="' . site_url('flows/delete/' . $f['id']) . '" data-method="post" data-confirm-message="Remove this flow?"><i class="bi bi-trash"></i></a>';
+            }
+
             $data[] = [
                 'name'        => '<strong>' . esc($f['name']) . '</strong>',
                 'project'     => esc($projectName !== '' ? $projectName : '-'),
@@ -4234,9 +4311,7 @@ class App extends BaseController
                 'status'      => $statusBadge,
                 'created_by'  => esc($creator !== '' ? $creator : '-'),
                 'created_at'  => '<span class="text-muted small">' . esc($f['created_at']) . '</span>',
-                'actions'     => '<a class="btn btn-sm btn-primary" href="' . site_url('flows/states/' . $f['id']) . '" title="States"><i class="bi bi-diagram-3"></i></a> '
-                    . '<a class="btn btn-sm btn-light" href="' . site_url('flows/edit/' . $f['id']) . '"><i class="bi bi-pencil"></i></a> '
-                    . '<a class="btn btn-sm btn-outline-danger" href="' . site_url('flows/delete/' . $f['id']) . '" data-method="post" data-confirm-message="Remove this flow?"><i class="bi bi-trash"></i></a>',
+                'actions'     => $actionsHtml,
             ];
         }
 
@@ -4257,8 +4332,10 @@ class App extends BaseController
             5 => 'a.is_active',
             6 => 'a.name',
         ];
-        $params = dt_parse_request($this->request, $colMap);
-        $result = $this->app_model->alertsForDT($params);
+        $params    = dt_parse_request($this->request, $colMap);
+        $result    = $this->app_model->alertsForDT($params);
+        $canEdit   = has_module_access('alerts', 'edit')   === true;
+        $canDelete = has_module_access('alerts', 'delete') === true;
 
         $data = [];
         foreach ($result['rows'] as $a) {
@@ -4277,6 +4354,17 @@ class App extends BaseController
                 $threshold .= ' <small class="text-muted">' . esc($tunit) . '</small>';
             }
 
+            $actionsHtml = '';
+            if ($canEdit) {
+                $actionsHtml .= '<a class="btn btn-sm btn-light" href="' . site_url('alerts/edit/' . $a['id']) . '"><i class="bi bi-pencil"></i></a> ';
+            }
+            if ($canDelete) {
+                $actionsHtml .= '<a class="btn btn-sm btn-outline-danger" href="' . site_url('alerts/delete/' . $a['id']) . '" data-method="post" data-confirm-message="Remove this alert definition?"><i class="bi bi-trash"></i></a>';
+            }
+            if ($actionsHtml === '') {
+                $actionsHtml = '<span class="text-muted small">—</span>';
+            }
+
             $data[] = [
                 'name'      => '<strong>' . esc($a['name']) . '</strong>' . ($desc !== '' ? '<br><small class="text-muted">' . esc($desc) . '</small>' : ''),
                 'project'   => esc($proj !== '' ? $proj : '-'),
@@ -4284,8 +4372,7 @@ class App extends BaseController
                 'severity'  => alert_badge($a['alert_type']),
                 'threshold' => $threshold,
                 'active'    => $activeBadge,
-                'actions'   => '<a class="btn btn-sm btn-light" href="' . site_url('alerts/edit/' . $a['id']) . '"><i class="bi bi-pencil"></i></a> '
-                    . '<a class="btn btn-sm btn-outline-danger" href="' . site_url('alerts/delete/' . $a['id']) . '" data-method="post" data-confirm-message="Remove this alert definition?"><i class="bi bi-trash"></i></a>',
+                'actions'   => $actionsHtml,
             ];
         }
 

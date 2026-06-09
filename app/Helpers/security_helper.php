@@ -94,7 +94,7 @@ if (!function_exists('login_attempt_record')) {
                 ->where('attempted_at <', $cutoff)
                 ->delete();
         } catch (\Throwable $e) {
-            error_log('pview alert >> login_attempt_record failed: ' . $e->getMessage());
+            log_message('error', 'pview alert >> login_attempt_record failed: ' . $e->getMessage());
         }
     }
 }
@@ -161,7 +161,7 @@ if (!function_exists('api_rate_check')) {
             // PERF-01: The 24-hour pruning DELETE has been moved to tat_monitor.php
             // (runs once per cron tick) to avoid lock contention on every API call.
         } catch (\Throwable $e) {
-            error_log('pview alert >> api_rate_check insert failed: ' . $e->getMessage());
+            log_message('error', 'pview alert >> api_rate_check insert failed: ' . $e->getMessage());
         }
         return ['allowed' => true, 'retry_after_seconds' => 0];
     }

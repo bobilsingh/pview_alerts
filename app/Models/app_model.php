@@ -742,6 +742,17 @@ class App_model
             }
             $data['notify_user_ids'] = json_encode(array_values(array_unique($cleaned)));
         }
+        $existing = $this->db->table('escalation_matrix')
+            ->where('flow_id', (int) $data['flow_id'])
+            ->where('state_id', (int) $data['state_id'])
+            ->where('level', (int) $data['level'])
+            ->get()->getRowArray();
+        if (!empty($existing)) {
+            $this->db->table('escalation_matrix')->where('id', (int) $existing['id'])->update($data);
+            $id = (int) $existing['id'];
+            log_message('debug', "pview alert >> escalation update: query=[" . $this->db->getLastQuery() . "], id=[" . $id . "]");
+            return $id;
+        }
         $data['created_at'] = date('Y-m-d H:i:s');
         $data['created_by'] = (string) session('user_id');
         $this->db->table('escalation_matrix')->insert($data);
@@ -1014,6 +1025,15 @@ class App_model
             $length = 200;
         }
 
+        $scopeUserPk = null;
+        $scopeIsAdmin = false;
+        if (isset($args['scope_user_pk'])) {
+            $scopeUserPk = $args['scope_user_pk'];
+        }
+        if (isset($args['scope_is_admin'])) {
+            $scopeIsAdmin = (bool) $args['scope_is_admin'];
+        }
+
         $q = $this->ticketSelect();
         $this->ticketApplyFilters($q, $filters);
 
@@ -1026,22 +1046,16 @@ class App_model
             $usedFulltext = $this->applyTicketSearch($q, $search);
         }
 
+        $this->applyUserScope($q, 't', $scopeUserPk, $scopeIsAdmin, 's');
+
         if ($usedFulltext) {
             $escapedSearch = $this->db->escapeString($search);
             $q->orderBy("MATCH(t.alarm_id, t.title, t.description) AGAINST ('{$escapedSearch}' IN BOOLEAN MODE)", 'desc', false);
         }
         $rows = $q->orderBy($orderCol, $orderDir)->limit($length, $start)->get()->getResultArray();
 
-        $scopeUserPk = null;
-        $scopeIsAdmin = false;
-        if (isset($args['scope_user_pk'])) {
-            $scopeUserPk = $args['scope_user_pk'];
-        }
-        if (isset($args['scope_is_admin'])) {
-            $scopeIsAdmin = (bool) $args['scope_is_admin'];
-        }
         $totalAll      = $this->ticketCountAll($scopeUserPk, $scopeIsAdmin);
-        $totalFiltered = $this->ticketCountFiltered($filters, $search);
+        $totalFiltered = $this->ticketCountFiltered($filters, $search, $scopeUserPk, $scopeIsAdmin);
 
         log_message('debug', "pview alert >> ticket dataTable page: query=[" . $this->db->getLastQuery() . "], start=[" . $start . "], length=[" . $length . "], rows=[" . count($rows) . "], total_all=[" . $totalAll . "], total_filtered=[" . $totalFiltered . "]");
 
@@ -1060,7 +1074,7 @@ class App_model
         return (int) $q->countAllResults();
     }
 
-    public function ticketCountFiltered($filters, $search = '')
+    public function ticketCountFiltered($filters, $search = '', $userPk = null, $isAdmin = false)
     {
         $q = $this->db->table('tickets t')
             ->join('projects p', 'p.id = t.project_id',          'left')
@@ -1071,6 +1085,7 @@ class App_model
         if ($search !== '') {
             $this->applyTicketSearch($q, $search);
         }
+        $this->applyUserScope($q, 't', $userPk, $isAdmin, 's');
         return (int) $q->countAllResults();
     }
 

@@ -13,7 +13,7 @@ class User extends BaseController
         $this->user_model = new user_model();
     }
 
-    /** GET /login  → show form (or redirect if already logged in). */
+    /** GET /maintenance — shown to non-admin users during maintenance mode; super_admin sees a disable button. */
     public function maintenance()
     {
         if (!app_setting_bool('maintenance_mode', false)) {
@@ -626,6 +626,7 @@ class User extends BaseController
     /** POST /users/update_theme — background AJAX call to update user theme pref. */
     public function update_theme()
     {
+        check_isvalidated();
         $session = \Config\Services::session();
         $session->start();
 
