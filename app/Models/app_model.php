@@ -108,9 +108,26 @@ class App_model
         return $cache;
     }
 
-    public function projectGetAll()
+    // Dynamically applies project isolation based on user assignments if user_projects table exists
+    private function applyProjectScope($q, $alias = 'projects', $userPk = null, $isAdmin = false)
     {
-        $rows    = $this->db->table('projects')->where('deleted_at', null)->orderBy('created_at', 'desc')->get()->getResultArray();
+        if ($isAdmin === true || empty($userPk)) {
+            return;
+        }
+        static $tableExists = null;
+        if ($tableExists === null) {
+            $tableExists = $this->db->tableExists('user_projects');
+        }
+        if ($tableExists) {
+            $q->join('user_projects up', 'up.project_id = ' . $alias . '.id AND up.user_id = ' . $this->db->escape((string)$userPk), 'inner');
+        }
+    }
+
+    public function projectGetAll($userPk = null, $isAdmin = false)
+    {
+        $q = $this->db->table('projects p')->select('p.*')->where('p.deleted_at', null);
+        $this->applyProjectScope($q, 'p', $userPk, $isAdmin);
+        $rows = $q->orderBy('p.created_at', 'desc')->get()->getResultArray();
         $nameMap = $this->userNameBatch(array_column($rows, 'created_by'));
         $out = [];
         foreach ($rows as $r) {
@@ -128,9 +145,11 @@ class App_model
         return $this->db->table('projects')->where('id', (int) $id)->where('deleted_at', null)->get()->getRowArray();
     }
 
-    public function projectGetActive()
+    public function projectGetActive($userPk = null, $isAdmin = false)
     {
-        return $this->db->table('projects')->where('status', 'active')->where('deleted_at', null)->orderBy('name', 'asc')->get()->getResultArray();
+        $q = $this->db->table('projects p')->select('p.*')->where('p.status', 'active')->where('p.deleted_at', null);
+        $this->applyProjectScope($q, 'p', $userPk, $isAdmin);
+        return $q->orderBy('p.name', 'asc')->get()->getResultArray();
     }
 
     public function projectSave($data)
@@ -175,9 +194,11 @@ class App_model
         return $ok;
     }
 
-    public function projectCountActive()
+    public function projectCountActive($userPk = null, $isAdmin = false)
     {
-        return (int) $this->db->table('projects')->where('status', 'active')->where('deleted_at', null)->countAllResults();
+        $q = $this->db->table('projects p')->where('p.status', 'active')->where('p.deleted_at', null);
+        $this->applyProjectScope($q, 'p', $userPk, $isAdmin);
+        return (int) $q->countAllResults();
     }
 
     // Returns true when an active project with this name already exists ($ignoreId skips the row being edited).
@@ -901,7 +922,6 @@ class App_model
             ->orWhere("JSON_CONTAINS(" . $sAlias . ".l2_user_ids, {$jsonNeedle})", null, false)
             ->orWhere("JSON_CONTAINS(" . $sAlias . ".l3_user_ids, {$jsonNeedle})", null, false)
             ->orWhere("JSON_CONTAINS(" . $sAlias . ".l4_user_ids, {$jsonNeedle})", null, false)
-            ->orWhere("EXISTS (SELECT 1 FROM ticket_actions ta WHERE ta.ticket_id = " . $tAlias . ".id AND ta.performed_by = " . $this->db->escape($uid) . ")", null, false)
             ->groupEnd();
     }
 
@@ -943,7 +963,6 @@ class App_model
                 ->orWhere("JSON_CONTAINS(s.l2_user_ids, {$jsonNeedle})", null, false)
                 ->orWhere("JSON_CONTAINS(s.l3_user_ids, {$jsonNeedle})", null, false)
                 ->orWhere("JSON_CONTAINS(s.l4_user_ids, {$jsonNeedle})", null, false)
-                ->orWhere("EXISTS (SELECT 1 FROM ticket_actions ta WHERE ta.ticket_id = t.id AND ta.performed_by = " . $this->db->escape($uid) . ")", null, false)
                 ->groupEnd();
         }
     }
@@ -1135,7 +1154,7 @@ class App_model
         $buckets = [];
         $fmt     = $days <= 14 ? 'D' : 'd-M';
         $today   = new \DateTime();
-        for ($i = $days; $i >= 1; $i--) {
+        for ($i = $days - 1; $i >= 0; $i--) {
             $date   = clone $today;
             $date->modify("-{$i} days");
             $dayKey    = $date->format('Y-m-d');
@@ -1198,11 +1217,10 @@ class App_model
                 . " OR JSON_CONTAINS(s.l1_user_ids, ?)"
                 . " OR JSON_CONTAINS(s.l2_user_ids, ?)"
                 . " OR JSON_CONTAINS(s.l3_user_ids, ?)"
-                . " OR JSON_CONTAINS(s.l4_user_ids, ?)"
-                . " OR EXISTS (SELECT 1 FROM ticket_actions ta WHERE ta.ticket_id = t.id AND ta.performed_by = ?))";
+                . " OR JSON_CONTAINS(s.l4_user_ids, ?))";
             $uid     = (string) $userPk;
             $uidJson = json_encode($uid);
-            $params = [$uid, $uid, $uidJson, $uidJson, $uidJson, $uidJson, $uid];
+            $params = [$uid, $uid, $uidJson, $uidJson, $uidJson, $uidJson];
         }
 
         $sql = $select . $from . " WHERE " . $where;
@@ -1526,9 +1544,11 @@ class App_model
     public function projectsForDT($args)
     {
         $allowedCols = [
-            'p.name'       => 'p.name',
-            'p.status'     => 'p.status',
-            'p.created_at' => 'p.created_at',
+            'p.name'        => 'p.name',
+            'p.description' => 'p.description',
+            'p.status'      => 'p.status',
+            'p.created_by'  => 'p.created_by',
+            'p.created_at'  => 'p.created_at',
         ];
         $orderCol = 'p.created_at';
         if (!empty($args['order_col']) && isset($allowedCols[$args['order_col']])) {
@@ -1542,10 +1562,22 @@ class App_model
         $start  = isset($args['start'])  ? (int) $args['start']  : 0;
         $length = isset($args['length']) ? (int) $args['length'] : 25;
         $search = isset($args['search']) ? (string) $args['search'] : '';
+        $scopeUserPk  = isset($args['scope_user_pk']) ? $args['scope_user_pk'] : null;
+        $scopeIsAdmin = isset($args['scope_is_admin']) ? (bool) $args['scope_is_admin'] : false;
 
         $total = (int) $this->db->table('projects')->where('deleted_at', null)->countAllResults();
 
-        $baseFrom = "FROM projects p WHERE p.deleted_at IS NULL";
+        $baseFrom = "FROM projects p ";
+        
+        static $tableExists = null;
+        if ($tableExists === null) {
+            $tableExists = $this->db->tableExists('user_projects');
+        }
+        if (!$scopeIsAdmin && !empty($scopeUserPk) && $tableExists) {
+            $baseFrom .= " INNER JOIN user_projects up ON up.project_id = p.id AND up.user_id = " . $this->db->escape((string)$scopeUserPk) . " ";
+        }
+        $baseFrom .= " WHERE p.deleted_at IS NULL";
+        
         $params   = [];
         if ($search !== '') {
             $like      = '%' . $search . '%';
@@ -1580,7 +1612,9 @@ class App_model
         $allowedCols = [
             'f.name'       => 'f.name',
             'p.name'       => 'p.name',
+            'f.id'         => 'f.id',
             'f.status'     => 'f.status',
+            'f.created_by' => 'f.created_by',
             'f.created_at' => 'f.created_at',
         ];
         $orderCol = 'f.created_at';
@@ -1639,11 +1673,13 @@ class App_model
     public function alertsForDT($args)
     {
         $allowedCols = [
-            'a.name'       => 'a.name',
-            'p.name'       => 'p.name',
-            'a.alert_type' => 'a.alert_type',
-            'a.is_active'  => 'a.is_active',
-            'a.created_at' => 'a.created_at',
+            'a.name'            => 'a.name',
+            'p.name'            => 'p.name',
+            'f.name'            => 'f.name',
+            'a.alert_type'      => 'a.alert_type',
+            'a.threshold_value' => 'a.threshold_value',
+            'a.is_active'       => 'a.is_active',
+            'a.created_at'      => 'a.created_at',
         ];
         $orderCol = 'a.created_at';
         if (!empty($args['order_col']) && isset($allowedCols[$args['order_col']])) {

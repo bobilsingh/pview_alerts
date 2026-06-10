@@ -1429,8 +1429,9 @@ textarea.form-control {
   transition: background-color 0.15s var(--ease-smooth);
 }
 
-.table tbody tr:hover {
-  background-color: var(--surface-2);
+.table tbody tr:hover,
+.table tbody tr:hover > td {
+  background-color: var(--surface-2) !important;
 }
 
 .table tbody tr td {
@@ -1444,9 +1445,9 @@ textarea.form-control {
 }
 
 /* Escalated row highlight — explicit text colors for both themes */
-.table tbody tr.row-escalated {
+/*.table tbody tr.row-escalated {
   background-color: rgba(239, 68, 68, 0.1);
-}
+}*/
 .table tbody tr.row-escalated td,
 .table tbody tr.row-escalated .fw-semibold,
 .table tbody tr.row-escalated .alarm-id {

@@ -18,6 +18,7 @@ if ($userName !== '') {
 $initials = strtoupper(substr($initialSource, 0, 1));
 $releaseVersion = config('App')->releaseVersion;
 $appName       = app_setting('app_name', 'pView');
+$appLogo       = app_setting('app_logo', '');
 
 $uri = service('uri');
 $first = $uri->getSegment(1);
@@ -66,7 +67,11 @@ $errMsg = \Config\Services::session()->getFlashdata('error');
 
 <aside class="sidebar" id="appSidebar">
   <div class="brand">
-    <div class="brand-mark"><i class="bi bi-broadcast-pin"></i></div>
+    <?php if ($appLogo !== '') { ?>
+      <img src="<?= base_url($appLogo); ?>?v=<?= esc(app_setting('asset_version', '1')); ?>" alt="Logo" class="brand-logo-img" style="max-width: 30px; max-height: 30px; object-fit: contain;">
+    <?php } else { ?>
+      <div class="brand-mark"><i class="bi bi-broadcast-pin"></i></div>
+    <?php } ?>
     <div class="brand-text">
       <div class="brand-title-row">
         <span><?= esc($appName); ?></span>

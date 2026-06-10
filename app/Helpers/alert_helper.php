@@ -285,18 +285,27 @@ if (!function_exists('safe_alarm_id')) {
 }
 
 if (!function_exists('verify_ticket_access')) {
-    function verify_ticket_access($ticket)
+    function verify_ticket_access($ticket, $checkUid = null, $checkRole = null)
     {
         if (empty($ticket)) {
             return false;
         }
 
-        $role = logged_user_role();
+        if ($checkRole !== null) {
+            $role = $checkRole;
+        } else {
+            $role = logged_user_role();
+        }
+
         if (role_has_admin_scope($role)) {
             return $ticket;
         }
 
-        $uid = (string) logged_user_id();
+        if ($checkUid !== null) {
+            $uid = (string) $checkUid;
+        } else {
+            $uid = (string) logged_user_id();
+        }
         $assignee = (string) (isset($ticket['current_assignee']) ? $ticket['current_assignee'] : '');
         $raisedBy = (string) (isset($ticket['raised_by']) ? $ticket['raised_by'] : '');
         if ($uid !== '' && $assignee === $uid) {
@@ -317,16 +326,6 @@ if (!function_exists('verify_ticket_access')) {
                 if (is_array($arr) && in_array($uid, array_map('strval', $arr), true)) {
                     return $ticket;
                 }
-            }
-        }
-
-        if ($uid !== '') {
-            $historyCount = $db->table('ticket_actions')
-                ->where('ticket_id', (int) $ticket['id'])
-                ->where('performed_by', $uid)
-                ->countAllResults();
-            if ($historyCount > 0) {
-                return $ticket;
             }
         }
 
@@ -708,7 +707,7 @@ if (!function_exists('send_email')) {
 
 if (!function_exists('parse_mentions')) {
     // Extracts @username tokens from text, resolves to active user_ids, and excludes the author.
-    function parse_mentions($text, $excludeUserId = '')
+    function parse_mentions($text, $excludeUserId = '', $ticket = null)
     {
         $text = (string) $text;
         if ($text === '') {
@@ -724,7 +723,7 @@ if (!function_exists('parse_mentions')) {
         $excludeUserId = (string) $excludeUserId;
         $db = \Config\Database::connect();
         $rows = $db->table('users')
-            ->select('user_id')
+            ->select('user_id, role')
             ->whereIn('user_id', $candidates)
             ->where('is_active', 1)
             ->where('deleted_at', null)
@@ -734,6 +733,12 @@ if (!function_exists('parse_mentions')) {
             $uid = (string) $r['user_id'];
             if ($uid === '' || $uid === $excludeUserId) {
                 continue;
+            }
+            if ($ticket !== null) {
+                $hasAccess = verify_ticket_access($ticket, $uid, $r['role']);
+                if ($hasAccess === false) {
+                    continue;
+                }
             }
             $out[] = $uid;
         }

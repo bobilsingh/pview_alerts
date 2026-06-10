@@ -245,11 +245,6 @@ $appDocument.ready(function () {
   // --- Users ---
   initUserIdLiveCheck();
 
-  // --- Settings ---
-  initSendTestEmail();
-  initBumpAssetVersion();
-  initClearSettingsCache();
-
   // --- Cron Panel ---
   initCronRunsTable();
 
@@ -757,8 +752,8 @@ function updateTatCountdowns() {
 
 function initDashCustomize() {
   var $toggle = $("#dashCustomizeToggle");
-  var $panel  = $("#dashCustomizePanel");
-  var $close  = $("#dashCustomizeClose");
+  var $panel = $("#dashCustomizePanel");
+  var $close = $("#dashCustomizeClose");
   var $cancel = $("#dashCustomizeCancel");
 
   if ($toggle.length === 0) {
@@ -2598,7 +2593,7 @@ function initSidebarMenu() {
         closeDrawer();
       } else {
         openDrawer();
-      }z
+      }
     } else {
       toggleDesktopCollapse();
     }
@@ -3565,112 +3560,6 @@ function initMentionAutocomplete() {
 }
 
 // ============================================================
-// 24. SETTINGS — Test email, asset version bump
-// ============================================================
-//
-// Tiny wrapper around the /settings/send_test_email POST endpoint. Wired
-// once on document.ready; lives at the bottom of the file alongside the
-// other admin-page handlers.
-function initSendTestEmail() {
-  $appDocument.off("click.sendTestEmail").on("click.sendTestEmail", "#sendTestEmailBtn", function (e) {
-    e.preventDefault();
-    var $btn = $(this);
-    var url = $btn.attr("data-url");
-    if (!url) {
-      return;
-    }
-    $btn.attr("disabled", "disabled");
-    $.ajax({
-      url: url,
-      type: "POST",
-      dataType: "json",
-      success: function (response) {
-        if (response && response.success) {
-          showSuccess(response.message || "Test email sent");
-        } else {
-          showError(extractErrorMessage(response, "Test email failed"));
-        }
-      },
-      error: function () {
-        showError("Network error sending test email");
-      },
-      complete: function () {
-        $btn.removeAttr("disabled");
-      },
-    });
-  });
-}
-
-// One-click cache-buster for app.css / app.js. POSTs to the bump
-// endpoint, updates the asset_version field in place with the new
-// number, and shows a toast nudging the admin to refresh once so they
-// can see the new files load.
-function initBumpAssetVersion() {
-  $appDocument.off("click.bumpAssetVersion").on("click.bumpAssetVersion", "#bumpAssetVersionBtn", function (e) {
-    e.preventDefault();
-    var $btn = $(this);
-    var url = $btn.attr("data-url");
-    if (!url) {
-      return;
-    }
-    $btn.attr("disabled", "disabled");
-    $.ajax({
-      url: url,
-      type: "POST",
-      dataType: "json",
-      success: function (response) {
-        if (response && response.success) {
-          if (response.data && response.data.value) {
-            // Sync the visible input so the admin sees the new value
-            // without needing to reload the Settings page.
-            $("#set_asset_version").val(response.data.value);
-          }
-          showSuccess(response.message || "Asset version bumped");
-        } else {
-          showError(extractErrorMessage(response, "Bump failed"));
-        }
-      },
-      error: function () {
-        showError("Network error bumping asset version");
-      },
-      complete: function () {
-        $btn.removeAttr("disabled");
-      },
-    });
-  });
-}
-
-function initClearSettingsCache() {
-  $appDocument.off("click.clearSettingsCache").on("click.clearSettingsCache", "#clearSettingsCacheBtn", function (e) {
-    e.preventDefault();
-    var $btn = $(this);
-    var url = $btn.attr("data-url");
-    if (!url) {
-      return;
-    }
-    $btn.attr("disabled", "disabled");
-    $.ajax({
-      url: url,
-      type: "POST",
-      dataType: "json",
-      success: function (response) {
-        if (response && response.success) {
-          showSuccess(response.message || "Settings cache cleared");
-        } else {
-          showError(extractErrorMessage(response, "Clear cache failed"));
-        }
-      },
-      error: function () {
-        showError("Network error clearing settings cache");
-      },
-      complete: function () {
-        $btn.removeAttr("disabled");
-      },
-    });
-  });
-}
-
-// ============================================================
 // 27. DATE RANGE WIDGET — global reusable date-range picker
 // ============================================================
 //
@@ -3752,7 +3641,7 @@ function initDateRangeWidgets() {
     $widget.find("[data-date-range-from], [data-date-range-to]").on("change", function () {
       $widget.find(".drw-preset").removeClass("active");
       var from = $widget.find("[data-date-range-from]").val();
-      var to   = $widget.find("[data-date-range-to]").val();
+      var to = $widget.find("[data-date-range-to]").val();
       var $err = $widget.find(".drw-error");
       if (from && to && from > to) {
         $err.text("From date cannot be after To date.").show();

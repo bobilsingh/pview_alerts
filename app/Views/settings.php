@@ -15,12 +15,12 @@ if (!function_exists('setting_label')) {
 
 // Group keys logically so the page reads top-to-bottom.
 $groups = [
-  'Branding'      => ['app_name', 'login_show_demo_creds'],
+  'Branding'      => ['app_name', 'client_name', 'app_logo', 'app_favicon', 'primary_color', 'secondary_color', 'login_show_demo_creds'],
   'Security'      => ['maintenance_mode', 'password_min_length', 'password_require_letter', 'password_require_digit', 'password_rotate_days', 'login_max_attempts', 'login_lockout_minutes', 'session_idle_timeout_minutes'],
   'Rate Limiting' => ['api_rate_per_minute', 'api_rate_per_hour'],
   'Attachments'   => ['upload_max_mb', 'upload_allowed_ext', 'upload_blocked_ext'],
   'TAT defaults'  => ['default_tat_l1_minutes', 'default_tat_l2_minutes', 'default_tat_l3_minutes', 'default_tat_l4_minutes'],
-  'UI'            => ['datatable_page_length', 'dashboard_trend_ranges'],
+  'UI'            => ['dashboard_trend_ranges'],
   'Live polling'  => ['live_poll_seconds', 'live_audio_enabled', 'live_browser_notify', 'analytics_refresh_seconds'],
   'Email / SMTP'  => ['email_protocol', 'email_smtp_host', 'email_smtp_port', 'email_smtp_user', 'email_smtp_pass', 'email_smtp_crypto', 'email_from_email', 'email_from_name'],
   'Notification queue' => ['notification_batch_size', 'notification_max_attempts'],
@@ -61,6 +61,11 @@ $passwordKeys = ['email_smtp_pass'];
 // Authoritative descriptions — override whatever is stored in the DB.
 $descOverrides = [
   'app_name'                => 'Application name shown in the browser tab and sidebar.',
+  'client_name'             => 'Client organization name shown in footer and headers.',
+  'app_logo'                => 'Application logo shown in sidebar and login page. (max 2MB)',
+  'app_favicon'             => 'Application favicon tab icon. (max 500KB)',
+  'primary_color'           => 'Primary theme brand color (overrides default cyan).',
+  'secondary_color'         => 'Secondary theme brand color (overrides default dark cyan).',
   'login_show_demo_creds'   => 'Show demo credentials on the login page (disable in production).',
   'password_min_length'     => 'Minimum number of characters required for a password.',
   'password_require_letter' => 'Require at least one letter in every password.',
@@ -114,7 +119,7 @@ foreach ($groups as $keys) {
 // Keys that exist in the DB but must never appear in the UI.
 // Managed only via code or direct DB — exposing them in the Settings page
 // caused accidental misconfiguration (e.g. session_timeout_minutes set to 1).
-$hidden = ['session_timeout_minutes'];
+$hidden = ['session_timeout_minutes', 'datatable_page_length'];
 
 $other = [];
 foreach ($byKey as $k => $row) {
@@ -155,7 +160,7 @@ if (!empty($other)) {
   </div>
 <?php } ?>
 
-<form method="post" action="<?= site_url('settings/save'); ?>" data-loading-form="1">
+<form method="post" action="<?= site_url('settings/save'); ?>" data-loading-form="1" enctype="multipart/form-data">
   <?php foreach ($groups as $groupName => $keys) { ?>
     <?php
     // Skip an empty group (e.g. if a seeded key was deleted manually).
@@ -216,7 +221,70 @@ if (!empty($other)) {
               <?php } ?>
 
               <?php if (!$isBool) { ?>
-                <?php if ($isPass) { ?>
+                <?php if ($key === 'app_logo') { ?>
+                  <!-- Logo Preview and File Input -->
+                  <div class="mb-2 d-flex align-items-center gap-3">
+                    <div class="brand-logo-preview-box p-2 border rounded bg-dark d-flex align-items-center justify-content-center" style="width: 120px; height: 60px;">
+                      <?php if ($value !== '') { ?>
+                        <img id="logoPreview" src="<?= base_url($value); ?>?v=<?= esc(app_setting('asset_version', '1')); ?>" alt="Logo Preview" style="max-width: 100%; max-height: 100%; object-fit: contain;">
+                      <?php } else { ?>
+                        <div id="logoPreviewDefault" class="brand-mark" style="font-size: 24px;"><i class="bi bi-broadcast-pin"></i></div>
+                        <img id="logoPreview" src="" alt="Logo Preview" class="d-none" style="max-width: 100%; max-height: 100%; object-fit: contain;">
+                      <?php } ?>
+                    </div>
+                    <div>
+                      <small class="text-muted d-block">Preview</small>
+                      <?php if ($value !== '') { ?>
+                        <button type="submit" name="clear_logo" value="1" class="btn btn-sm btn-outline-danger mt-1">
+                          <i class="bi bi-trash"></i> Reset
+                        </button>
+                      <?php } ?>
+                    </div>
+                  </div>
+                  <input type="file" class="form-control" name="app_logo" id="set_app_logo" accept="image/png, image/jpeg, image/jpg, image/svg+xml, image/webp">
+
+                <?php } else if ($key === 'app_favicon') { ?>
+                  <!-- Favicon Preview and File Input -->
+                  <div class="mb-2 d-flex align-items-center gap-3">
+                    <div class="brand-favicon-preview-box p-2 border rounded bg-dark d-flex align-items-center justify-content-center" style="width: 60px; height: 60px;">
+                      <?php if ($value !== '') { ?>
+                        <img id="faviconPreview" src="<?= base_url($value); ?>?v=<?= esc(app_setting('asset_version', '1')); ?>" alt="Favicon Preview" style="max-width: 32px; max-height: 32px; object-fit: contain;">
+                      <?php } else { ?>
+                        <div id="faviconPreviewDefault" class="brand-mark" style="font-size: 20px;"><i class="bi bi-broadcast-pin"></i></div>
+                        <img id="faviconPreview" src="" alt="Favicon Preview" class="d-none" style="max-width: 32px; max-height: 32px; object-fit: contain;">
+                      <?php } ?>
+                    </div>
+                    <div>
+                      <small class="text-muted d-block">Preview</small>
+                      <?php if ($value !== '') { ?>
+                        <button type="submit" name="clear_favicon" value="1" class="btn btn-sm btn-outline-danger mt-1">
+                          <i class="bi bi-trash"></i> Reset
+                        </button>
+                      <?php } ?>
+                    </div>
+                  </div>
+                  <input type="file" class="form-control" name="app_favicon" id="set_app_favicon" accept="image/png, image/jpeg, image/jpg, image/x-icon, image/vnd.microsoft.icon, image/svg+xml, image/webp">
+
+                <?php } else if ($key === 'primary_color' || $key === 'secondary_color') { ?>
+                  <!-- Theme Color Inputs -->
+                  <?php
+                  $defaultColor = '#0792cd';
+                  if ($key === 'secondary_color') {
+                      $defaultColor = '#0476a7';
+                  }
+                  $colorVal = $value;
+                  if ($colorVal === '') {
+                      $colorVal = $defaultColor;
+                  }
+                  ?>
+                  <div class="input-group">
+                    <input type="color" class="form-control form-control-color" style="max-width: 60px; padding: 4px; height: 38px;"
+                      id="color_picker_<?= esc($key); ?>" value="<?= esc($colorVal); ?>">
+                    <input type="text" class="form-control color-text-input" name="<?= esc($key); ?>" id="set_<?= esc($key); ?>"
+                      value="<?= esc($value); ?>" placeholder="<?= esc($defaultColor); ?>" data-picker-id="color_picker_<?= esc($key); ?>">
+                  </div>
+
+                <?php } else if ($isPass) { ?>
                   <input type="password" class="form-control"
                     name="<?= esc($key); ?>" id="set_<?= esc($key); ?>"
                     autocomplete="new-password"
@@ -351,3 +419,4 @@ if (!empty($other)) {
     </div>
   </div>
 </form>
+<script src="<?= base_url('assets/js/settings.js'); ?>?v=<?= esc(app_setting('asset_version', '1')); ?>"></script>

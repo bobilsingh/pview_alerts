@@ -1,7 +1,5 @@
 /* ============================================================
    DARK THEME — theme-dark.css
-   Scoped to [data-theme="dark"] on the <html> element.
-   Loaded after app.css — do not add light-mode rules here.
    ============================================================ */
 
 /* ============================================================
@@ -738,9 +736,9 @@
 }
 
 /* --- Escalated row highlight --- */
-[data-theme="dark"] .table tbody tr.row-escalated {
-  background-color: rgba(239, 68, 68, 0.15);
-}
+/*[data-theme="dark"] .table tbody tr.row-escalated {
+  background-color: rgba(249, 249, 28, 0.15);
+}*/
 
 [data-theme="dark"] .table tbody tr.row-escalated td,
 [data-theme="dark"] .table tbody tr.row-escalated .fw-semibold,

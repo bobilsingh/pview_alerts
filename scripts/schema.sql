@@ -620,6 +620,7 @@ INSERT INTO `migrations` (`version`, `class`, `group`, `namespace`, `time`, `bat
 ('2026-06-03-000001', 'App\\Database\\Migrations\\AddPerformanceIndexes',   'default', 'App', 1748908800, 1),
 ('2026-06-04-000001', 'App\\Database\\Migrations\\TicketLifecycleFeatures', 'default', 'App', 1748995200, 2),
 ('2026-06-04-000002', 'App\\Database\\Migrations\\AddCronRuns',             'default', 'App', 1748995200, 2),
-('2026-06-08-000001', 'App\\Database\\Migrations\\AddSearchIndexes',        'default', 'App', 1749340800, 3);
+('2026-06-08-000001', 'App\\Database\\Migrations\\AddSearchIndexes',        'default', 'App', 1749340800, 3),
+('2026-06-10-000001', 'App\\Database\\Migrations\\AddBrandingSettings',     'default', 'App', 1749513600, 4);
 
--- Dump completed on 2026-06-05  9:57:51 | schema updated 2026-06-08
+-- Dump completed on 2026-06-05  9:57:51 | schema updated 2026-06-10

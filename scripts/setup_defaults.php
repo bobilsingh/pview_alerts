@@ -194,6 +194,11 @@ say('==> Seeding default app settings...');
 $settings = [
     // Branding
     ['app_name',                        'pView',          'Application display name'],
+    ['client_name',                     'AlertOps',       'Client organization display name'],
+    ['app_logo',                        '',               'Path to custom uploaded logo'],
+    ['app_favicon',                     '',               'Path to custom uploaded favicon'],
+    ['primary_color',                   '',               'Primary theme color (hex format, e.g. #0792cd)'],
+    ['secondary_color',                 '',               'Secondary theme color (hex format, e.g. #0476a7)'],
     ['login_show_demo_creds',           '0',              'Show demo login credentials on login page (0 = No, 1 = Yes)'],
 
     // Security

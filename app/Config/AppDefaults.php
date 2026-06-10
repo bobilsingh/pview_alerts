@@ -44,5 +44,10 @@ class AppDefaults
         'notification_batch_size'      => '50',
         'notification_max_attempts'    => '5',
         'asset_version'                => '1',
+        'client_name'                  => 'AlertOps',
+        'app_logo'                     => '',
+        'app_favicon'                  => '',
+        'primary_color'                => '',
+        'secondary_color'              => '',
     ];
 }

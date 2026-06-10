@@ -74,7 +74,7 @@ class App extends BaseController
 
         $data = [
             'title'             => 'Dashboard',
-            'projectCount'      => $this->app_model->projectCountActive(),
+            'projectCount'      => $this->app_model->projectCountActive($userPk, $isAdmin),
             'flowCount'         => $this->app_model->flowCountActive(),
             'openCount'         => $openCount,
             'criticalCount'     => $alertTypeCounts['critical'],
@@ -90,7 +90,7 @@ class App extends BaseController
             'tatBreached'       => $this->app_model->ticketCountTatBreached($userPk, $isAdmin, $prefDefaultProjectId),
             'kpiVisible'            => $prefKpiVisible,
             'prefProjectName'       => $prefProjectName,
-            'custProjects'          => $this->app_model->projectGetActive(),
+            'custProjects'          => $this->app_model->projectGetActive($userPk, $isAdmin),
             'custDefaultProjectId'  => $prefDefaultProjectId,
             'custKpiVisible'        => $custKpiVisible,
             'custDefaultTrendRange' => $prefDefaultTrendRange,
@@ -108,7 +108,7 @@ class App extends BaseController
         $data = [
             'title'    => 'Projects',
             'view'     => 'list',
-            'projects' => $this->app_model->projectGetAll(),
+            'projects' => $this->app_model->projectGetAll(logged_user_id(), role_has_admin_scope()),
             'project'  => null,
         ];
         echo view('templates/header', $data);
@@ -255,7 +255,7 @@ class App extends BaseController
             'title'    => 'Add Flow',
             'view'     => 'form',
             'flow'     => null,
-            'projects' => $this->app_model->projectGetActive(),
+            'projects' => $this->app_model->projectGetActive(logged_user_id(), role_has_admin_scope()),
         ];
         echo view('templates/header', $data);
         echo view('templates/sidebar', $data);
@@ -313,7 +313,7 @@ class App extends BaseController
             'title'    => 'Edit Flow',
             'view'     => 'form',
             'flow'     => $flow,
-            'projects' => $this->app_model->projectGetActive(),
+            'projects' => $this->app_model->projectGetActive(logged_user_id(), role_has_admin_scope()),
         ];
         echo view('templates/header', $data);
         echo view('templates/sidebar', $data);
@@ -728,7 +728,7 @@ class App extends BaseController
             'title'    => 'Add Alert Definition',
             'view'     => 'form',
             'alert'    => null,
-            'projects' => $this->app_model->projectGetActive(),
+            'projects' => $this->app_model->projectGetActive(logged_user_id(), role_has_admin_scope()),
             'flows'    => $this->app_model->flowGetActive(),
             'users'    => $this->user_model->getActive(),
         ];
@@ -789,7 +789,7 @@ class App extends BaseController
             'title'    => 'Edit Alert Definition',
             'view'     => 'form',
             'alert'    => $alert,
-            'projects' => $this->app_model->projectGetActive(),
+            'projects' => $this->app_model->projectGetActive(logged_user_id(), role_has_admin_scope()),
             'flows'    => $this->app_model->flowGetActive(),
             'users'    => $this->user_model->getActive(),
         ];
@@ -934,7 +934,7 @@ class App extends BaseController
             'title'    => 'API Keys',
             'view'     => 'api_keys',
             'keys'     => $this->app_model->apiKeyGetAll(),
-            'projects' => $this->app_model->projectGetActive(),
+            'projects' => $this->app_model->projectGetActive(logged_user_id(), role_has_admin_scope()),
             'newKey'   => $this->session->getFlashdata('newKey'),
         ];
         echo view('templates/header', $data);
@@ -997,7 +997,7 @@ class App extends BaseController
             'view'          => 'list',
             'mode'          => 'my',
             'filters'       => $filters,
-            'projects'      => $this->app_model->projectGetActive(),
+            'projects'      => $this->app_model->projectGetActive(logged_user_id(), role_has_admin_scope()),
             'flows'         => $this->app_model->flowGetActive(),
             'savedFilters'  => $this->app_model->savedFilterList(logged_user_id(), 'tickets'),
         ];
@@ -1026,7 +1026,7 @@ class App extends BaseController
             'view'          => 'list',
             'mode'          => 'all',
             'filters'       => $filters,
-            'projects'      => $this->app_model->projectGetActive(),
+            'projects'      => $this->app_model->projectGetActive(logged_user_id(), role_has_admin_scope()),
             'flows'         => $this->app_model->flowGetActive(),
             'savedFilters'  => $this->app_model->savedFilterList(logged_user_id(), 'tickets'),
         ];
@@ -1042,7 +1042,7 @@ class App extends BaseController
         $data = [
             'title'    => 'Raise Ticket',
             'view'     => 'create',
-            'projects' => $this->app_model->projectGetActive(),
+            'projects' => $this->app_model->projectGetActive(logged_user_id(), role_has_admin_scope()),
         ];
         echo view('templates/header', $data);
         echo view('templates/sidebar', $data);
@@ -1422,7 +1422,7 @@ class App extends BaseController
             $this->app_model->ticketLogAction($ticket['id'], 'commented', ['comment' => $comment]);
 
             try {
-                $mentioned = parse_mentions($comment, (string) logged_user_id());
+                $mentioned = parse_mentions($comment, (string) logged_user_id(), $ticket);
                 if (!empty($mentioned)) {
                     $body = '<p><strong>' . esc(logged_user_name()) . '</strong> mentioned you in ticket '
                         . '<strong>' . esc($ticket['alarm_id']) . '</strong>:</p>'
@@ -1685,6 +1685,10 @@ class App extends BaseController
             return $r;
         }
         $ticket = $r;
+
+        if (!empty($ticket['current_assignee']) && !role_has_admin_scope(logged_user_role()) && (string) $ticket['current_assignee'] !== (string) logged_user_id()) {
+            return json_fail('Only the assigned operator or an admin can reassign this ticket.');
+        }
 
         if ($this->ticketIsTerminal($ticket)) {
             return json_fail('Ticket is ' . $ticket['status'] . '; cannot reassign.');
@@ -2082,16 +2086,16 @@ class App extends BaseController
         }
 
         $colNames = [
-            0 => 'created_at',   // checkbox — not sortable in the UI
-            1 => 'alarm_id',
-            2 => 'title',
-            3 => 'alert_type',   // severity
-            4 => 'priority',
-            5 => 'state_name',
-            6 => 'current_level',
-            7 => 'assignee_name',
-            8 => 'state_entered_at',
-            9 => 'created_at',
+            0 => 't.alarm_id',
+            1 => 't.title',
+            2 => 't.alert_type',
+            3 => 't.priority',
+            4 => 's.name',
+            5 => 't.current_level',
+            6 => 'ua.name',
+            7 => 't.state_entered_at',
+            8 => 't.created_at',
+            9 => 't.created_at', // actions fallback
         ];
         $orderArr = $this->request->getGet('order');
         $orderCol = 'created_at';
@@ -3472,6 +3476,12 @@ class App extends BaseController
         $rows    = $this->app_model->settingGetAll();
         foreach ($rows as $row) {
             $key = (string) $row['setting_key'];
+            
+            // Skip logo and favicon files from standard text inputs
+            if ($key === 'app_logo' || $key === 'app_favicon') {
+                continue;
+            }
+
             // Authoritative list of keys that are checkboxes (on/off toggles).
             static $booleanKeys = [
                 'maintenance_mode',
@@ -3505,6 +3515,114 @@ class App extends BaseController
                     $newVal = '(updated)';
                 }
                 $changedKeys[$key] = [$oldVal, $newVal];
+            }
+        }
+
+        // Handle Logo Reset/Upload
+        if ($this->request->getPost('clear_logo') !== null) {
+            $oldLogo = app_setting('app_logo', '');
+            if ($oldLogo !== '') {
+                $oldPath = FCPATH . $oldLogo;
+                if (file_exists($oldPath) && is_file($oldPath)) {
+                    @unlink($oldPath);
+                }
+            }
+            $this->app_model->settingSet('app_logo', '', $userId);
+            $changed++;
+            $changedKeys['app_logo'] = [$oldLogo, ''];
+        } else {
+            $logoFile = $this->request->getFile('app_logo');
+            if ($logoFile !== null && $logoFile->isValid() && !$logoFile->hasMoved()) {
+                // Size validation: max 2MB
+                $maxLogoSize = 2 * 1024 * 1024;
+                if ($logoFile->getSize() > $maxLogoSize) {
+                    $this->session->setFlashdata('error', 'Logo file size exceeds the 2MB limit.');
+                    return redirect()->to(site_url('settings'));
+                }
+
+                // Type validation
+                $allowedLogoMimes = ['image/png', 'image/jpeg', 'image/jpg', 'image/svg+xml', 'image/webp'];
+                $logoMime = $logoFile->getMimeType();
+                $logoExt = $logoFile->getExtension();
+                if (in_array($logoMime, $allowedLogoMimes, true) && in_array(strtolower($logoExt), ['png', 'jpg', 'jpeg', 'svg', 'webp'], true)) {
+                    $uploadDir = FCPATH . 'uploads/branding';
+                    if (!is_dir($uploadDir)) {
+                        mkdir($uploadDir, 0755, true);
+                    }
+
+                    $newLogoName = 'logo_' . time() . '.' . $logoExt;
+                    $oldLogo = app_setting('app_logo', '');
+
+                    if ($logoFile->move($uploadDir, $newLogoName)) {
+                        if ($oldLogo !== '') {
+                            $oldPath = FCPATH . $oldLogo;
+                            if (file_exists($oldPath) && is_file($oldPath)) {
+                                @unlink($oldPath);
+                            }
+                        }
+                        $newLogoPath = 'uploads/branding/' . $newLogoName;
+                        $this->app_model->settingSet('app_logo', $newLogoPath, $userId);
+                        $changed++;
+                        $changedKeys['app_logo'] = [$oldLogo, $newLogoPath];
+                    }
+                } else {
+                    $this->session->setFlashdata('error', 'Invalid logo file type. Only PNG, JPG, SVG, and WEBP are supported.');
+                    return redirect()->to(site_url('settings'));
+                }
+            }
+        }
+
+        // Handle Favicon Reset/Upload
+        if ($this->request->getPost('clear_favicon') !== null) {
+            $oldFavicon = app_setting('app_favicon', '');
+            if ($oldFavicon !== '') {
+                $oldPath = FCPATH . $oldFavicon;
+                if (file_exists($oldPath) && is_file($oldPath)) {
+                    @unlink($oldPath);
+                }
+            }
+            $this->app_model->settingSet('app_favicon', '', $userId);
+            $changed++;
+            $changedKeys['app_favicon'] = [$oldFavicon, ''];
+        } else {
+            $favFile = $this->request->getFile('app_favicon');
+            if ($favFile !== null && $favFile->isValid() && !$favFile->hasMoved()) {
+                // Size validation: max 500KB
+                $maxFavSize = 500 * 1024;
+                if ($favFile->getSize() > $maxFavSize) {
+                    $this->session->setFlashdata('error', 'Favicon file size exceeds the 500KB limit.');
+                    return redirect()->to(site_url('settings'));
+                }
+
+                // Type validation
+                $allowedFavMimes = ['image/png', 'image/jpeg', 'image/jpg', 'image/x-icon', 'image/vnd.microsoft.icon', 'image/svg+xml', 'image/webp'];
+                $favMime = $favFile->getMimeType();
+                $favExt = $favFile->getExtension();
+                if (in_array($favMime, $allowedFavMimes, true) && in_array(strtolower($favExt), ['png', 'jpg', 'jpeg', 'ico', 'svg', 'webp'], true)) {
+                    $uploadDir = FCPATH . 'uploads/branding';
+                    if (!is_dir($uploadDir)) {
+                        mkdir($uploadDir, 0755, true);
+                    }
+
+                    $newFavName = 'favicon_' . time() . '.' . $favExt;
+                    $oldFavicon = app_setting('app_favicon', '');
+
+                    if ($favFile->move($uploadDir, $newFavName)) {
+                        if ($oldFavicon !== '') {
+                            $oldPath = FCPATH . $oldFavicon;
+                            if (file_exists($oldPath) && is_file($oldPath)) {
+                                @unlink($oldPath);
+                            }
+                        }
+                        $newFavPath = 'uploads/branding/' . $newFavName;
+                        $this->app_model->settingSet('app_favicon', $newFavPath, $userId);
+                        $changed++;
+                        $changedKeys['app_favicon'] = [$oldFavicon, $newFavPath];
+                    }
+                } else {
+                    $this->session->setFlashdata('error', 'Invalid favicon file type. Only PNG, JPG, ICO, SVG, and WEBP are supported.');
+                    return redirect()->to(site_url('settings'));
+                }
             }
         }
 
@@ -4223,13 +4341,15 @@ class App extends BaseController
         // to 'p.name'.
         $colMap = [
             0 => 'p.name',
-            1 => 'p.name',         // Description — fallback
+            1 => 'p.description',
             2 => 'p.status',
-            3 => 'p.name',         // Created By — fallback (no FK-name index)
+            3 => 'p.created_by',
             4 => 'p.created_at',
-            5 => 'p.name',         // Actions — fallback
+            5 => 'p.created_at', // actions fallback
         ];
         $params    = dt_parse_request($this->request, $colMap);
+        $params['scope_user_pk']  = logged_user_id();
+        $params['scope_is_admin'] = role_has_admin_scope();
         $result    = $this->app_model->projectsForDT($params);
         $canEdit   = has_module_access('projects', 'edit')   === true;
         $canDelete = has_module_access('projects', 'delete') === true;
@@ -4275,11 +4395,11 @@ class App extends BaseController
         $colMap = [
             0 => 'f.name',
             1 => 'p.name',
-            2 => 'f.name',
+            2 => 'f.id', // state_count fallback
             3 => 'f.status',
-            4 => 'f.name',
+            4 => 'f.created_by',
             5 => 'f.created_at',
-            6 => 'f.name',
+            6 => 'f.created_at', // actions fallback
         ];
         $params    = dt_parse_request($this->request, $colMap);
         $result    = $this->app_model->flowsForDT($params);
@@ -4326,11 +4446,11 @@ class App extends BaseController
         $colMap = [
             0 => 'a.name',
             1 => 'p.name',
-            2 => 'a.name',
+            2 => 'f.name',
             3 => 'a.alert_type',
-            4 => 'a.name',
+            4 => 'a.threshold_value',
             5 => 'a.is_active',
-            6 => 'a.name',
+            6 => 'a.created_at', // actions fallback
         ];
         $params    = dt_parse_request($this->request, $colMap);
         $result    = $this->app_model->alertsForDT($params);
