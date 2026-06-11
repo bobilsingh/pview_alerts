@@ -285,14 +285,20 @@ DROP TABLE IF EXISTS `modules`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!40101 SET character_set_client = utf8 */;
 CREATE TABLE `modules` (
-  `id`          int(10) unsigned NOT NULL AUTO_INCREMENT,
-  `module_key`  varchar(50)  NOT NULL,
-  `name`        varchar(100) NOT NULL,
-  `description` varchar(255) NOT NULL DEFAULT '',
-  `is_builtin`  tinyint(1)   NOT NULL DEFAULT 0,
-  `sort_order`  int(11)      NOT NULL DEFAULT 100,
-  `created_at`  datetime     NOT NULL,
-  `created_by`  varchar(100)          DEFAULT NULL,
+  `id`                    int(10) unsigned NOT NULL AUTO_INCREMENT,
+  `module_key`            varchar(50)  NOT NULL,
+  `permission_module_key` varchar(100) DEFAULT NULL,
+  `permission_action`     varchar(50)  NOT NULL DEFAULT 'view',
+  `name`                  varchar(100) NOT NULL,
+  `category`              varchar(100) NOT NULL DEFAULT 'General',
+  `icon`                  varchar(100) NOT NULL DEFAULT 'bi-circle',
+  `uri_path`              varchar(255) DEFAULT NULL,
+  `show_in_menu`          tinyint(4)   NOT NULL DEFAULT 1,
+  `description`           varchar(255) NOT NULL DEFAULT '',
+  `is_builtin`            tinyint(1)   NOT NULL DEFAULT 0,
+  `sort_order`            int(11)      NOT NULL DEFAULT 100,
+  `created_at`            datetime     NOT NULL,
+  `created_by`            varchar(100)          DEFAULT NULL,
   PRIMARY KEY (`id`),
   UNIQUE KEY `idx_module_key` (`module_key`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
@@ -621,6 +627,7 @@ INSERT INTO `migrations` (`version`, `class`, `group`, `namespace`, `time`, `bat
 ('2026-06-04-000001', 'App\\Database\\Migrations\\TicketLifecycleFeatures', 'default', 'App', 1748995200, 2),
 ('2026-06-04-000002', 'App\\Database\\Migrations\\AddCronRuns',             'default', 'App', 1748995200, 2),
 ('2026-06-08-000001', 'App\\Database\\Migrations\\AddSearchIndexes',        'default', 'App', 1749340800, 3),
-('2026-06-10-000001', 'App\\Database\\Migrations\\AddBrandingSettings',     'default', 'App', 1749513600, 4);
+('2026-06-10-000001', 'App\\Database\\Migrations\\AddBrandingSettings',     'default', 'App', 1749513600, 4),
+('2026-06-10-000002', 'App\\Database\\Migrations\\MakeModulesDynamic',      'default', 'App', 1749599999, 5);
 
 -- Dump completed on 2026-06-05  9:57:51 | schema updated 2026-06-10

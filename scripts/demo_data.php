@@ -19,7 +19,7 @@ $DB_USER = 'root';
 $DB_PASS = '';
 $DB_NAME = 'pview_alerts';
 
-$OPERATOR = 'demo_usr';
+$OPERATOR = 'admin';
 
 $db = mysqli_connect($DB_HOST, $DB_USER, $DB_PASS, $DB_NAME);
 if (!$db) {

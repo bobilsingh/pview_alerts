@@ -1362,16 +1362,6 @@ class App extends BaseController
                 return (int) $b['sort_order'] - (int) $a['sort_order'];
             });
             $previousStates = array_values($previousStates);
-        } elseif (!$isInitialState && $currentSortOrder > 0) {
-            foreach ($allStates as $s) {
-                if ((int) $s['sort_order'] > 0 && (int) $s['sort_order'] < $currentSortOrder) {
-                    $previousStates[] = $s;
-                }
-            }
-            usort($previousStates, function ($a, $b) {
-                return (int) $b['sort_order'] - (int) $a['sort_order'];
-            });
-            $previousStates = array_values($previousStates);
         }
 
         $data = [
@@ -1585,13 +1575,9 @@ class App extends BaseController
                 (int) $ticket['current_state_id'],
                 'backward'
             );
-            if (!empty($bwdTransitions)) {
-                $validBwdIds = array_map('intval', array_column($bwdTransitions, 'to_state_id'));
-                if (!in_array($targetId, $validBwdIds, true)) {
-                    return json_fail('This state is not a configured backward target from the current state.');
-                }
-            } elseif ((int) $next['sort_order'] >= (int) $currentState['sort_order']) {
-                return json_fail('Backward movement must target an earlier state in the workflow.');
+            $validBwdIds = array_map('intval', array_column($bwdTransitions, 'to_state_id'));
+            if (!in_array($targetId, $validBwdIds, true)) {
+                return json_fail('This state is not a configured backward target from the current state.');
             }
         }
 
@@ -1797,14 +1783,59 @@ class App extends BaseController
         if (!role_has_admin_scope(logged_user_role()) && (string) $ticket['current_assignee'] !== (string) logged_user_id()) {
             return json_fail('Only the assigned operator or an admin can reopen this ticket.');
         }
-        $newStatus = 'open';
-        if (!empty($ticket['current_assignee'])) {
-            $newStatus = 'in_progress';
+        $initialState = $this->app_model->stateGetInitial((int) $ticket['flow_id']);
+        $targetStateId = (int) $ticket['current_state_id'];
+        $stateChanged = false;
+
+        if (!empty($initialState)) {
+            $targetStateId = (int) $initialState['id'];
+            $stateChanged = ((int) $ticket['current_state_id'] !== $targetStateId);
         }
+
+        if ($stateChanged) {
+            $this->app_model->ticketMoveToState($ticket['id'], $targetStateId);
+        }
+
+        $currentAssignee = '';
+        if (isset($ticket['current_assignee'])) {
+            $currentAssignee = (string) $ticket['current_assignee'];
+        }
+        $hasValidAssignee = false;
+        if ($currentAssignee !== '' && !empty($initialState)) {
+            $newPool = $this->app_model->stateLevelUsers($initialState, 1);
+            if (in_array($currentAssignee, $newPool, true)) {
+                $hasValidAssignee = true;
+            }
+        }
+
+        $newStatus = 'open';
+        $newAssignee = null;
+        if ($hasValidAssignee) {
+            $newStatus = 'in_progress';
+            $newAssignee = $currentAssignee;
+        }
+
         $this->app_model->ticketUpdate($ticket['id'], [
-            'status'      => $newStatus,
-            'resolved_at' => null,
+            'current_assignee' => $newAssignee,
+            'status'           => $newStatus,
+            'resolved_at'      => null,
         ]);
+
+        if ($currentAssignee !== '' && !$hasValidAssignee) {
+            $this->app_model->ticketLogAction($ticket['id'], 'unassigned', [
+                'comment' => 'Assignee cleared — not in ' . $initialState['name'] . ' L1 pool',
+            ]);
+        }
+
+        if ($stateChanged && !empty($initialState)) {
+            $this->app_model->ticketLogAction($ticket['id'], 'state_changed', [
+                'from_state_id'   => (int) $ticket['current_state_id'],
+                'to_state_id'     => $targetStateId,
+                'transition_type' => 'backward',
+                'comment'         => 'Auto-moved back to state ' . $initialState['name'] . ' on reopen',
+            ]);
+        }
+
         $this->app_model->ticketLogAction($ticket['id'], 'reopened', [
             'comment' => 'Ticket reopened by ' . logged_user_name(),
         ]);
@@ -3196,6 +3227,11 @@ class App extends BaseController
         $name        = trim((string) $this->request->getPost('name'));
         $description = trim((string) $this->request->getPost('description'));
         $sortOrder   = (int) $this->request->getPost('sort_order');
+        $category    = trim((string) $this->request->getPost('category'));
+        $icon        = trim((string) $this->request->getPost('icon'));
+        $uriPath     = trim((string) $this->request->getPost('uri_path'));
+        $permModule  = trim((string) $this->request->getPost('permission_module_key'));
+        $permAction  = trim((string) $this->request->getPost('permission_action'));
 
         if ($moduleKey === '' || $name === '') {
             $this->session->setFlashdata('error', 'Module key and name are required.');
@@ -3218,27 +3254,48 @@ class App extends BaseController
         if ($sortOrder < 1) {
             $sortOrder = 100;
         }
+        if ($category === '') {
+            $category = 'General';
+        }
+        if ($icon === '') {
+            $icon = 'bi-circle';
+        }
+        if ($uriPath === '') {
+            $uriPath = null;
+        }
+        if ($permModule === '') {
+            $permModule = $moduleKey;
+        }
+        if ($permAction === '') {
+            $permAction = 'view';
+        }
 
         $this->db->table('modules')->insert([
-            'module_key'  => $moduleKey,
-            'name'        => $name,
-            'description' => $description,
-            'is_builtin'  => 0,
-            'sort_order'  => $sortOrder,
-            'created_at'  => date('Y-m-d H:i:s'),
-            'created_by'  => (string) logged_user_id(),
+            'module_key'            => $moduleKey,
+            'permission_module_key' => $permModule,
+            'permission_action'     => $permAction,
+            'name'                  => $name,
+            'category'              => $category,
+            'icon'                  => $icon,
+            'uri_path'              => $uriPath,
+            'show_in_menu'          => 1,
+            'description'           => $description,
+            'is_builtin'            => 0,
+            'sort_order'            => $sortOrder,
+            'created_at'            => date('Y-m-d H:i:s'),
+            'created_by'            => (string) logged_user_id(),
         ]);
 
         $roles = $this->user_model->getAllRoles();
         foreach ($roles as $role) {
             $exists = $this->db->table('module_permissions')
                 ->where('role', (string) $role['role_key'])
-                ->where('module_key', $moduleKey)
+                ->where('module_key', $permModule)
                 ->countAllResults();
             if ($exists === 0) {
                 $this->db->table('module_permissions')->insert([
                     'role'       => (string) $role['role_key'],
-                    'module_key' => $moduleKey,
+                    'module_key' => $permModule,
                     'can_view'   => 0,
                     'can_add'    => 0,
                     'can_edit'   => 0,

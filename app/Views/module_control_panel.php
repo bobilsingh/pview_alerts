@@ -183,24 +183,65 @@ foreach ($permissions as $p) {
 
 	<?php if (has_module_access('module_control_panel', 'add') === true) { ?>
 		<div class="collapse" id="addModulePanel">
-			<div class="card-body border-bottom">
+			<div class="card-body border-bottom bg-light">
 				<form method="post" action="<?= site_url('module_control_panel/module/add'); ?>" data-loading-form="1">
 					<?= csrf_field(); ?>
-					<div class="row g-2">
-						<div class="col-md-2">
+					<div class="row g-3">
+						<!-- Row 1 -->
+						<div class="col-md-3">
 							<label class="form-label fw-semibold">Module Key <span class="text-danger">*</span></label>
-							<input type="text" name="module_key" class="form-control" placeholder="e.g. my_reports" pattern="[a-z][a-z0-9_]{1,49}" required>
+							<input type="text" name="module_key" class="form-control form-control-sm" placeholder="e.g. my_reports" pattern="[a-z][a-z0-9_]{1,49}" required>
 						</div>
 						<div class="col-md-3">
 							<label class="form-label fw-semibold">Display Name <span class="text-danger">*</span></label>
-							<input type="text" name="name" class="form-control" placeholder="e.g. My Reports" required>
+							<input type="text" name="name" class="form-control form-control-sm" placeholder="e.g. My Reports" required>
 						</div>
-						<div class="col-md-5">
+						<div class="col-md-3">
+							<label class="form-label fw-semibold">Category / Group <span class="text-danger">*</span></label>
+							<input type="text" name="category" class="form-control form-control-sm" placeholder="e.g. Operations" list="categoriesList" required>
+							<datalist id="categoriesList">
+								<option value="Overview">
+								<option value="Configuration">
+								<option value="Operations">
+								<option value="System">
+								<option value="Administration">
+							</datalist>
+						</div>
+						<div class="col-md-3">
+							<label class="form-label fw-semibold">Sort Order</label>
+							<input type="number" name="sort_order" class="form-control form-control-sm" placeholder="e.g. 100" min="1">
+						</div>
+
+						<!-- Row 2 -->
+						<div class="col-md-3">
+							<label class="form-label fw-semibold">Bootstrap Icon</label>
+							<input type="text" name="icon" class="form-control form-control-sm" placeholder="e.g. bi-file-earmark-bar-graph">
+						</div>
+						<div class="col-md-3">
+							<label class="form-label fw-semibold">URI Path (URL Route)</label>
+							<input type="text" name="uri_path" class="form-control form-control-sm" placeholder="e.g. reports">
+						</div>
+						<div class="col-md-3">
+							<label class="form-label fw-semibold">Permission Module Key</label>
+							<input type="text" name="permission_module_key" class="form-control form-control-sm" placeholder="e.g. tickets (default to key)">
+						</div>
+						<div class="col-md-3">
+							<label class="form-label fw-semibold">Permission Action</label>
+							<select name="permission_action" class="form-select form-select-sm">
+								<option value="view" selected>view</option>
+								<option value="add">add</option>
+								<option value="edit">edit</option>
+								<option value="delete">delete</option>
+							</select>
+						</div>
+
+						<!-- Row 3 -->
+						<div class="col-md-10">
 							<label class="form-label fw-semibold">Description</label>
-							<input type="text" name="description" class="form-control" placeholder="Short description shown in the permission grid">
+							<input type="text" name="description" class="form-control form-control-sm" placeholder="Short description shown in the permission grid">
 						</div>
 						<div class="col-md-2 d-flex align-items-end">
-							<button type="submit" class="btn btn-primary w-100">Add</button>
+							<button type="submit" class="btn btn-primary btn-sm w-100 py-2"><i class="bi bi-plus-lg"></i> Add Module</button>
 						</div>
 					</div>
 					<div class="mt-2 small text-muted">

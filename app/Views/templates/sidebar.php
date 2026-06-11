@@ -83,163 +83,126 @@ $errMsg = \Config\Services::session()->getFlashdata('error');
 
   <nav class="nav">
     <?php
-    // Overview group — Dashboard lives in its own section at the top of
-    // the menu so it sits above Configuration / Operations / System and
-    // matches operator muscle-memory ("status page first").
-    if (has_module_access('dashboard', 'view') === true) {
-    ?>
-      <div class="nav-section">Overview</div>
-      <a class="nav-link <?php if ($first === 'dashboard') {
-                            echo 'active';
-                          } ?>" href="<?= site_url('dashboard'); ?>"><i class="bi bi-speedometer2"></i><span>Dashboard</span></a>
-    <?php } ?>
+    // Predefined category order to preserve user navigation structure
+    $predefinedCategories = ['Overview', 'Configuration', 'Operations', 'System', 'Administration'];
 
+    $db = \Config\Database::connect();
+    $modulesFromDb = $db->table('modules')
+      ->where('show_in_menu', 1)
+      ->orderBy('sort_order', 'asc')
+      ->get()->getResultArray();
+
+    $grouped = [];
+    foreach ($modulesFromDb as $m) {
+      $permKey = '';
+      if (!empty($m['permission_module_key'])) {
+        $permKey = $m['permission_module_key'];
+      } else {
+        $permKey = $m['module_key'];
+      }
+
+      $permAction = '';
+      if (!empty($m['permission_action'])) {
+        $permAction = $m['permission_action'];
+      } else {
+        $permAction = 'view';
+      }
+
+      if (has_module_access($permKey, $permAction) === true) {
+        $grouped[$m['category']][] = $m;
+      }
+    }
+
+    $allCategories = array_unique(array_merge($predefinedCategories, array_keys($grouped)));
+
+    foreach ($allCategories as $cat) {
+      if (empty($grouped[$cat])) {
+        continue;
+      }
+      echo '<div class="nav-section">' . esc($cat) . '</div>';
+      foreach ($grouped[$cat] as $m) {
+        $uriPath = (string) $m['uri_path'];
+        $parts = explode('/', $uriPath);
+        
+        $pFirst = '';
+        if (isset($parts[0])) {
+          $pFirst = $parts[0];
+        }
+        
+        $pSecond = '';
+        if (isset($parts[1])) {
+          $pSecond = $parts[1];
+        }
+
+        $isActive = false;
+        if ($pFirst === $first) {
+          if ($pSecond === $second) {
+            $isActive = true;
+          } elseif ($pSecond === '') {
+            $hasMoreSpecific = false;
+            foreach ($modulesFromDb as $other) {
+              $otherUri = (string) $other['uri_path'];
+              $otherParts = explode('/', $otherUri);
+              
+              $otherFirst = '';
+              if (isset($otherParts[0])) {
+                $otherFirst = $otherParts[0];
+              }
+              
+              $otherSecond = '';
+              if (isset($otherParts[1])) {
+                $otherSecond = $otherParts[1];
+              }
+              
+              if ($otherFirst === $first && $otherSecond === $second) {
+                $otherPermKey = '';
+                if (!empty($other['permission_module_key'])) {
+                  $otherPermKey = $other['permission_module_key'];
+                } else {
+                  $otherPermKey = $other['module_key'];
+                }
+                
+                $otherPermAction = '';
+                if (!empty($other['permission_action'])) {
+                  $otherPermAction = $other['permission_action'];
+                } else {
+                  $otherPermAction = 'view';
+                }
+                
+                if (has_module_access($otherPermKey, $otherPermAction) === true) {
+                  $hasMoreSpecific = true;
+                  break;
+                }
+              }
+            }
+            if (!$hasMoreSpecific) {
+              $isActive = true;
+            }
+          }
+        }
+
+        $activeClass = '';
+        if ($isActive) {
+          $activeClass = 'active';
+        }
+        
+        $linkUrl = site_url($uriPath);
+        
+        $iconClass = '';
+        if (!empty($m['icon'])) {
+          $iconClass = $m['icon'];
+        } else {
+          $iconClass = 'bi-circle';
+        }
+    ?>
+        <a class="nav-link <?= $activeClass; ?>" href="<?= esc($linkUrl); ?>">
+          <i class="<?= esc($iconClass); ?>"></i>
+          <span><?= esc($m['name']); ?></span>
+        </a>
     <?php
-    $showConfig = false;
-    if (has_module_access('projects', 'view') === true) {
-      $showConfig = true;
+      }
     }
-    if (has_module_access('flows', 'view') === true) {
-      $showConfig = true;
-    }
-    if (has_module_access('alerts', 'view') === true) {
-      $showConfig = true;
-    }
-    if (has_module_access('escalation', 'view') === true) {
-      $showConfig = true;
-    }
-
-    if ($showConfig === true) {
     ?>
-      <div class="nav-section">Configuration</div>
-      <?php if (has_module_access('projects', 'view') === true) { ?>
-        <a class="nav-link <?php if ($first === 'projects') {
-                              echo 'active';
-                            } ?>" href="<?= site_url('projects'); ?>"><i class="bi bi-folder2-open"></i><span>Projects</span></a>
-      <?php } ?>
-      <?php if (has_module_access('flows', 'view') === true) { ?>
-        <a class="nav-link <?php if ($first === 'flows') {
-                              echo 'active';
-                            } ?>" href="<?= site_url('flows'); ?>"><i class="bi bi-diagram-3"></i><span>Flows</span></a>
-      <?php } ?>
-      <?php if (has_module_access('alerts', 'view') === true) { ?>
-        <a class="nav-link <?php if ($first === 'alerts') {
-                              echo 'active';
-                            } ?>" href="<?= site_url('alerts'); ?>"><i class="bi bi-bell-fill"></i><span>Alert Defs</span></a>
-      <?php } ?>
-      <?php if (has_module_access('escalation', 'view') === true) { ?>
-        <a class="nav-link <?php if ($first === 'escalation') {
-                              echo 'active';
-                            } ?>" href="<?= site_url('escalation'); ?>"><i class="bi bi-graph-up-arrow"></i><span>Escalation</span></a>
-      <?php } ?>
-    <?php } ?>
-
-    <?php
-    // Dashboard moved to its own Overview group above — Operations now
-    // covers tickets only.
-    $showOps = false;
-    if (has_module_access('tickets', 'view') === true) {
-      $showOps = true;
-    }
-    if (has_module_access('tickets', 'add') === true) {
-      $showOps = true;
-    }
-    if (has_module_access('tickets_all', 'view') === true) {
-      $showOps = true;
-    }
-
-    if ($showOps === true) {
-    ?>
-      <div class="nav-section">Operations</div>
-      <?php if (has_module_access('tickets', 'view') === true) { ?>
-        <a class="nav-link <?php if ($first === 'tickets' && $second === '') {
-                              echo 'active';
-                            } ?>" href="<?= site_url('tickets'); ?>"><i class="bi bi-inbox-fill"></i><span>My Tickets</span></a>
-      <?php } ?>
-      <?php if (has_module_access('tickets', 'add') === true) { ?>
-        <a class="nav-link <?php if ($first === 'tickets' && $second === 'create') {
-                              echo 'active';
-                            } ?>" href="<?= site_url('tickets/create'); ?>"><i class="bi bi-plus-square"></i><span>Raise Ticket</span></a>
-      <?php } ?>
-      <?php if (has_module_access('tickets_all', 'view') === true) { ?>
-        <a class="nav-link <?php if ($first === 'tickets' && $second === 'all') {
-                              echo 'active';
-                            } ?>" href="<?= site_url('tickets/all'); ?>"><i class="bi bi-list-task"></i><span>All Tickets</span></a>
-      <?php } ?>
-    <?php } ?>
-
-    <?php
-    // --- System section: manage users and monitor the system ---
-    $showSystem = false;
-    if (has_module_access('users', 'view') === true) {
-      $showSystem = true;
-    }
-    if (has_module_access('api_keys', 'view') === true) {
-      $showSystem = true;
-    }
-    if (has_module_access('activity_logs', 'view') === true) {
-      $showSystem = true;
-    }
-    if (has_module_access('cron_panel', 'view') === true) {
-      $showSystem = true;
-    }
-
-    if ($showSystem === true) {
-    ?>
-      <div class="nav-section">System</div>
-      <?php if (has_module_access('users', 'view') === true) { ?>
-        <a class="nav-link <?php if ($first === 'users') {
-                              echo 'active';
-                            } ?>" href="<?= site_url('users'); ?>"><i class="bi bi-people-fill"></i><span>Users</span></a>
-      <?php } ?>
-      <?php if (has_module_access('api_keys', 'view') === true) { ?>
-        <a class="nav-link <?php if ($first === 'api_keys') {
-                              echo 'active';
-                            } ?>" href="<?= site_url('api_keys'); ?>"><i class="bi bi-key-fill"></i><span>API Keys</span></a>
-      <?php } ?>
-      <?php if (has_module_access('activity_logs', 'view') === true) { ?>
-        <a class="nav-link <?php if ($first === 'activity_logs') {
-                              echo 'active';
-                            } ?>" href="<?= site_url('activity_logs'); ?>"><i class="bi bi-clipboard-data"></i><span>Activity Log</span></a>
-      <?php } ?>
-      <?php if (has_module_access('cron_panel', 'view') === true) { ?>
-        <a class="nav-link <?php if ($first === 'cron_panel') {
-                              echo 'active';
-                            } ?>" href="<?= site_url('cron_panel'); ?>"><i class="bi bi-clock-history"></i><span>Cron Panel</span></a>
-      <?php } ?>
-    <?php } ?>
-
-    <?php
-    $showAdmin = false;
-    if (has_module_access('roles', 'view') === true) {
-      $showAdmin = true;
-    }
-    if (has_module_access('settings', 'view') === true) {
-      $showAdmin = true;
-    }
-    if (has_module_access('module_control_panel', 'view') === true) {
-      $showAdmin = true;
-    }
-
-    if ($showAdmin === true) {
-    ?>
-      <div class="nav-section">Administration</div>
-      <?php if (has_module_access('roles', 'view') === true) { ?>
-        <a class="nav-link <?php if ($first === 'roles') {
-                              echo 'active';
-                            } ?>" href="<?= site_url('roles'); ?>"><i class="bi bi-person-badge"></i><span>Roles</span></a>
-      <?php } ?>
-      <?php if (has_module_access('settings', 'view') === true) { ?>
-        <a class="nav-link <?php if ($first === 'settings') {
-                              echo 'active';
-                            } ?>" href="<?= site_url('settings'); ?>"><i class="bi bi-gear-fill"></i><span>Settings</span></a>
-      <?php } ?>
-      <?php if (has_module_access('module_control_panel', 'view') === true) { ?>
-        <a class="nav-link <?php if ($first === 'module_control_panel') {
-                              echo 'active';
-                            } ?>" href="<?= site_url('module_control_panel'); ?>"><i class="bi bi-shield-lock-fill"></i><span>Manage Module</span></a>
-      <?php } ?>
-    <?php } ?>
   </nav>
 
   <div class="sidebar-footer">

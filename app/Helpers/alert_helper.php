@@ -1340,6 +1340,32 @@ if (!function_exists('has_module_access')) {
             return false;
         }
 
+        // Enforce that the module key must be registered in the modules table.
+        // If it was deleted, no role (including Super Admin) should be able to access it.
+        static $registered_modules = null;
+        if ($registered_modules === null) {
+            $registered_modules = [];
+            try {
+                $db = \Config\Database::connect();
+                $rows = $db->table('modules')->select('module_key, permission_module_key')->get()->getResultArray();
+                foreach ($rows as $row) {
+                    if (!empty($row['module_key'])) {
+                        $registered_modules[strtolower($row['module_key'])] = true;
+                    }
+                    if (!empty($row['permission_module_key'])) {
+                        $registered_modules[strtolower($row['permission_module_key'])] = true;
+                    }
+                }
+            } catch (\Throwable $e) {
+                log_message('error', 'has_module_access() failed to load module list: ' . $e->getMessage());
+            }
+        }
+
+        $lookupKey = strtolower((string) $module_key);
+        if (!isset($registered_modules[$lookupKey])) {
+            return false;
+        }
+
         // Settings is always super_admin only — excluded from role configuration by design.
         if ($module_key === 'settings') {
             if ($role === ROLE_SUPER_ADMIN) {
