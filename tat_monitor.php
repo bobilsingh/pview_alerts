@@ -185,6 +185,63 @@ try {
     $db->table('api_request_log')->where('requested_at <', $apiCutoff)->delete();
     $db->table('login_attempts')->where('attempted_at <', $oldCutoff)->delete();
     echo "Log tables pruned: api_request_log < " . $apiCutoff . ", login_attempts < " . $oldCutoff . "\n";
+
+    // Clean up file logs and session files once every 24 hours.
+    $lastCleanup = cache('last_log_cleanup_time');
+    $currentTime = time();
+    $shouldClean = false;
+    if ($lastCleanup === null) {
+        $shouldClean = true;
+    } else {
+        if (($currentTime - (int)$lastCleanup) >= 86400) {
+            $shouldClean = true;
+        }
+    }
+
+    if ($shouldClean) {
+        // Clean up file logs (older than 7 days)
+        $logDir = WRITEPATH . 'logs';
+        if (is_dir($logDir)) {
+            $files = glob($logDir . '/*.log');
+            if (is_array($files)) {
+                $sevenDaysAgo = $currentTime - (7 * 86400);
+                $prunedLogsCount = 0;
+                foreach ($files as $file) {
+                    if (is_file($file) && filemtime($file) < $sevenDaysAgo) {
+                        if (@unlink($file)) {
+                            $prunedLogsCount = $prunedLogsCount + 1;
+                        }
+                    }
+                }
+                if ($prunedLogsCount > 0) {
+                    echo "Pruned " . $prunedLogsCount . " log files older than 7 days.\n";
+                }
+            }
+        }
+
+        // Clean up session files (older than 7 days)
+        $sessionDir = WRITEPATH . 'session';
+        if (is_dir($sessionDir)) {
+            $files = glob($sessionDir . '/ci_session*');
+            if (is_array($files)) {
+                $sevenDaysAgo = $currentTime - (7 * 86400);
+                $prunedSessionsCount = 0;
+                foreach ($files as $file) {
+                    if (is_file($file) && filemtime($file) < $sevenDaysAgo) {
+                        if (@unlink($file)) {
+                            $prunedSessionsCount = $prunedSessionsCount + 1;
+                        }
+                    }
+                }
+                if ($prunedSessionsCount > 0) {
+                    echo "Pruned " . $prunedSessionsCount . " session files older than 7 days.\n";
+                }
+            }
+        }
+
+        // Save current timestamp to cache (expires in 48 hours to ensure persistent tracking)
+        cache()->save('last_log_cleanup_time', $currentTime, 172800);
+    }
 } catch (\Throwable $e) {
     error_log('pview alert >> tat_monitor log prune failed: ' . $e->getMessage());
 }

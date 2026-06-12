@@ -146,6 +146,16 @@ if (!function_exists('check_isvalidated')) {
                 }
             }
         }
+        // Check if the current request is a background polling request.
+        $isBackgroundPoll = false;
+        $requestUri = (string) service('request')->getUri()->getPath();
+        if (
+            strpos($requestUri, 'notifications/actionable_count') !== false
+            || strpos($requestUri, 'activity_logs/analytics') !== false
+        ) {
+            $isBackgroundPoll = true;
+        }
+
         // Idle session timeout — 0 means disabled (default).
         $timeoutMin = app_setting_int('session_timeout_minutes', 0);
         if ($timeoutMin > 0) {
@@ -156,7 +166,9 @@ if (!function_exists('check_isvalidated')) {
                 exit;
             }
         }
-        $session->set('last_activity', time());
+        if (!$isBackgroundPoll) {
+            $session->set('last_activity', time());
+        }
         // Force password change if flagged; exempt /password/change and /logout
         // to avoid a redirect loop.
         if ($session->get('password_must_rotate')) {

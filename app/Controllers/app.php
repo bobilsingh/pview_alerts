@@ -1777,11 +1777,28 @@ class App extends BaseController
             return $r;
         }
         $ticket = $r;
-        if ((string) ($ticket['status'] ?? '') !== 'resolved') {
+        $ticketStatus = '';
+        if (isset($ticket['status'])) {
+            $ticketStatus = (string) $ticket['status'];
+        }
+        if ($ticketStatus !== 'resolved') {
             return json_fail('Only resolved tickets can be reopened.');
         }
-        if (!role_has_admin_scope(logged_user_role()) && (string) $ticket['current_assignee'] !== (string) logged_user_id()) {
-            return json_fail('Only the assigned operator or an admin can reopen this ticket.');
+
+        $canReopen = false;
+        if (logged_user_role() === ROLE_SUPER_ADMIN) {
+            $canReopen = true;
+        } else {
+            $raisedBy = '';
+            if (isset($ticket['raised_by'])) {
+                $raisedBy = (string) $ticket['raised_by'];
+            }
+            if ($raisedBy !== '' && $raisedBy === (string) logged_user_id()) {
+                $canReopen = true;
+            }
+        }
+        if (!$canReopen) {
+            return json_fail('Only the ticket creator or a super_admin can reopen this ticket.');
         }
         $initialState = $this->app_model->stateGetInitial((int) $ticket['flow_id']);
         $targetStateId = (int) $ticket['current_state_id'];
@@ -2196,10 +2213,16 @@ class App extends BaseController
             $checkbox = '';
             $actions = '';
             $canReopen = false;
-            if (role_has_admin_scope(logged_user_role())) {
+            if (logged_user_role() === ROLE_SUPER_ADMIN) {
                 $canReopen = true;
-            } elseif ((string) ($t['current_assignee'] ?? '') === (string) logged_user_id()) {
-                $canReopen = true;
+            } else {
+                $raisedBy = '';
+                if (isset($t['raised_by'])) {
+                    $raisedBy = (string) $t['raised_by'];
+                }
+                if ($raisedBy !== '' && $raisedBy === (string) logged_user_id()) {
+                    $canReopen = true;
+                }
             }
             if (isset($t['status']) && $t['status'] === 'resolved' && $canReopen) {
                 $actions = '<button class="btn btn-sm btn-outline-warning list-reopen-btn" data-url="' . site_url('tickets/reopen/' . esc($t['alarm_id'])) . '" aria-label="Reopen ticket"><i class="bi bi-arrow-counterclockwise"></i> Reopen</button>';

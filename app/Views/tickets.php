@@ -828,6 +828,7 @@ if (!function_exists('ticket_activity_icon')) {
                   <?php if ($ticketStatus === 'closed') { echo 'disabled'; } ?>>
                   <i class="bi bi-x-circle"></i> Close
                 </button>
+                <!--
                 <?php if ($ticketStatus === 'resolved') { ?>
                   <button id="reopenBtn"
                     data-url="<?= site_url('tickets/reopen/' . $alarmId); ?>"
@@ -835,6 +836,7 @@ if (!function_exists('ticket_activity_icon')) {
                     <i class="bi bi-arrow-counterclockwise"></i> Reopen
                   </button>
                 <?php } ?>
+                -->
               </div>
             </div>
 
