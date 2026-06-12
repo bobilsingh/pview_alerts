@@ -1028,7 +1028,9 @@ function submitNormalForm($form, options) {
     dataType: "json",
     success: function (response) {
       if (handleResponse(response, options.successMessage)) {
-        if (options.reloadOnSuccess) {
+        if (typeof options.onSuccess === "function") {
+          options.onSuccess(response, $form);
+        } else if (options.reloadOnSuccess) {
           window.location.reload();
         }
       }
@@ -1058,7 +1060,9 @@ function submitFileForm(form, options) {
     contentType: false,
     success: function (response) {
       if (handleResponse(response, options.successMessage)) {
-        if (options.reloadOnSuccess) {
+        if (typeof options.onSuccess === "function") {
+          options.onSuccess(response, $form);
+        } else if (options.reloadOnSuccess) {
           window.location.reload();
         }
       }
@@ -1137,6 +1141,53 @@ function bindPostButton(selector) {
   });
 }
 
+function escapeHtml(string) {
+  return String(string)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
+}
+
+function appendTimelineItem(commentText, iconHtml) {
+  var $feed = $(".activity-feed");
+  if (!$feed.length) {
+    return;
+  }
+
+  // Remove "No activity yet" if present
+  $feed.find(".text-muted.small").remove();
+
+  // Format current date time as Y-m-d H:i:s
+  var now = new Date();
+  var year = now.getFullYear();
+  var month = ("0" + (now.getMonth() + 1)).slice(-2);
+  var day = ("0" + now.getDate()).slice(-2);
+  var hours = ("0" + now.getHours()).slice(-2);
+  var minutes = ("0" + now.getMinutes()).slice(-2);
+  var seconds = ("0" + now.getSeconds()).slice(-2);
+  var dateTimeStr = year + "-" + month + "-" + day + " " + hours + ":" + minutes + ":" + seconds;
+
+  // Read logged-in user name from the DOM (.topbar-user .name)
+  var performerName = $(".topbar-user .name").text().trim() || "You";
+
+  var html = '<li class="activity-item new-activity-item" style="display:none;">';
+  html += '  <div class="activity-icon">' + iconHtml + '</div>';
+  html += '  <div class="activity-body">';
+  html += '    <div class="activity-meta">';
+  html += '      <strong>' + escapeHtml(performerName) + '</strong> ';
+  html += '      <span class="text-muted">' + dateTimeStr + '</span>';
+  html += '    </div>';
+  html += '    <div class="activity-text">' + commentText + '</div>';
+  html += '  </div>';
+  html += '</li>';
+
+  var $item = $(html);
+  $feed.prepend($item);
+  $item.slideDown(200);
+}
+
 // ============================================================
 // 18. TICKET DETAIL — Actions, inline editing, copy alarm ID
 // ============================================================
@@ -1166,6 +1217,9 @@ function initPriorityInline() {
       success: function (response) {
         if (response && response.success) {
           showSuccess("Priority updated");
+          var prioVal = $field.val() || "";
+          var prioLabel = prioVal.charAt(0).toUpperCase() + prioVal.slice(1);
+          appendTimelineItem("Priority changed to " + escapeHtml(prioLabel), '<i class="bi bi-tag text-warning"></i>');
         } else {
           showError(extractErrorMessage(response, "Failed to update priority"));
         }
@@ -1321,13 +1375,28 @@ function initTicketDetailPage() {
   bindPostForm("#commentForm", {
     successMessage: "Comment added",
     errorMessage: "Network error",
-    reloadOnSuccess: true,
+    reloadOnSuccess: false,
+    onSuccess: function (response, $form) {
+      var $commentArea = $form.find("textarea[name='comment']");
+      var commentVal = $commentArea.val() || "";
+      appendTimelineItem(escapeHtml(commentVal), '<i class="bi bi-chat-left-text text-primary"></i>');
+      $commentArea.val("");
+    }
   });
 
   bindPostForm("#assignForm", {
     successMessage: "Assigned",
     errorMessage: "Network error",
-    reloadOnSuccess: true,
+    reloadOnSuccess: false,
+    onSuccess: function (response, $form) {
+      var $select = $form.find("select[name='user_id']");
+      var selectedText = $select.find("option:selected").text();
+      var name = selectedText.split(" - ")[0];
+
+      $("#assigneeValue").text(name);
+      appendTimelineItem("Assigned ticket to " + escapeHtml(name), '<i class="bi bi-person-check text-primary"></i>');
+      $select.val("");
+    }
   });
 
   bindPostForm("#attachForm", {

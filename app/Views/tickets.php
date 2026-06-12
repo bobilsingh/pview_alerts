@@ -1039,7 +1039,7 @@ if (!function_exists('ticket_activity_icon')) {
             </tr>
             <tr>
               <td>Assignee</td>
-              <td><?= esc(or_default(view_value($ticket, 'assignee_name', null), '-')); ?></td>
+              <td id="assigneeValue"><?= esc(or_default(view_value($ticket, 'assignee_name', null), '-')); ?></td>
             </tr>
             <tr>
               <td>Source</td>
