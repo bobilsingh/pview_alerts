@@ -1586,32 +1586,27 @@ if (!function_exists('has_module_access')) {
     }
 }
 
-// Walks the sidebar in render order and returns the first module the
-if (!function_exists('_first_accessible_module')) {
-    function _first_accessible_module()
+// Walks the sidebar in render order and returns the first module the user sees.
+if (!function_exists('get_first_accessible_module')) {
+    function get_first_accessible_module()
     {
         static $cached = null;
         if ($cached !== null) {
             return $cached;
         }
         $candidates = [
-            // Overview group
-            ['dashboard',     'view', 'dashboard',      'Dashboard'],
-            // Configuration group
-            ['projects',      'view', 'projects',       'Projects'],
-            ['flows',         'view', 'flows',          'Flows'],
-            ['alerts',        'view', 'alerts',         'Alert Defs'],
-            ['escalation',    'view', 'escalation',     'Escalation'],
-            // Operations group
-            ['tickets',       'view', 'tickets',        'My Tickets'],
-            ['tickets',       'add',  'tickets/create', 'Raise Ticket'],
-            ['tickets_all',   'view', 'tickets/all',    'All Tickets'],
-            // the user sees in the menu.
+            ['dashboard',            'view', 'dashboard',            'Dashboard'],
+            ['projects',             'view', 'projects',             'Projects'],
+            ['flows',                'view', 'flows',                'Flows'],
+            ['alerts',               'view', 'alerts',               'Alert Defs'],
+            ['escalation',           'view', 'escalation',           'Escalation'],
+            ['tickets',              'view', 'tickets',              'My Tickets'],
+            ['tickets',              'add',  'tickets/create',       'Raise Ticket'],
+            ['tickets_all',          'view', 'tickets/all',          'All Tickets'],
             ['users',                'view', 'users',                'Users'],
             ['api_keys',             'view', 'api_keys',             'API Keys'],
             ['activity_logs',        'view', 'activity_logs',        'Activity Log'],
             ['cron_panel',           'view', 'cron_panel',           'Cron Panel'],
-            // Administration group
             ['settings',             'view', 'settings',             'Settings'],
             ['roles',                'view', 'roles',                'Roles'],
             ['module_control_panel', 'view', 'module_control_panel', 'Module Permissions'],
@@ -1630,7 +1625,7 @@ if (!function_exists('_first_accessible_module')) {
 if (!function_exists('first_accessible_module_url')) {
     function first_accessible_module_url()
     {
-        $info = _first_accessible_module();
+        $info = get_first_accessible_module();
         return $info['url'];
     }
 }
@@ -1638,7 +1633,7 @@ if (!function_exists('first_accessible_module_url')) {
 if (!function_exists('first_accessible_module_label')) {
     function first_accessible_module_label()
     {
-        $info = _first_accessible_module();
+        $info = get_first_accessible_module();
         return $info['label'];
     }
 }
