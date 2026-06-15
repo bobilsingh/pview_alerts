@@ -29,8 +29,11 @@ var APP_MOBILE_BREAKPOINT = "(max-width: 992px)";
 // localStorage wrappers — silent in private-mode / cross-origin iframes.
 function getLocalPref(key) {
   try {
-    return localStorage.getItem(key);
+    var val = localStorage.getItem(key);
+    console.log("[Preferences] Get pref key: " + key + " = " + val);
+    return val;
   } catch (error) {
+    console.error("[Preferences] Error getting key: " + key, error);
     return null;
   }
 }
@@ -38,8 +41,9 @@ function getLocalPref(key) {
 function saveLocalPref(key, value) {
   try {
     localStorage.setItem(key, value);
+    console.log("[Preferences] Save pref key: " + key + " = " + value);
   } catch (error) {
-    // ignore quota / access errors - the preference just won't persist
+    console.error("[Preferences] Error saving key: " + key + " = " + value, error);
   }
 }
 
@@ -136,13 +140,15 @@ function toBoolean(val) {
 // Applies saved theme + sidebar state before the page renders (no flash).
 // Default is collapsed; expanded only when the user has explicitly chosen it.
 function applyUserPreferences() {
-  if (getLocalPref("pview-sidebar") === "collapsed") {
+  var sidebarPref = getLocalPref("pview-sidebar");
+  if (sidebarPref === "collapsed") {
     $appHtml.attr("data-sidebar", "collapsed");
   } else {
     $appHtml.attr("data-sidebar", "expanded");
   }
 
   var t = getLocalPref("noc-theme") || "dark";
+  console.log("[Preferences] Applying preferences - Sidebar: " + (sidebarPref || "expanded") + ", Theme: " + t);
   $appHtml.attr("data-theme", t);
 }
 
@@ -1019,6 +1025,7 @@ function submitNormalForm($form, options) {
     return;
   }
 
+  console.log("[Form AJAX] Submitting normal form targeting URL: " + url);
   data = $form.serialize();
 
   $.ajax({
@@ -1028,14 +1035,18 @@ function submitNormalForm($form, options) {
     dataType: "json",
     success: function (response) {
       if (handleResponse(response, options.successMessage)) {
+        console.log("[Form AJAX] Form submitted successfully: " + url);
         if (typeof options.onSuccess === "function") {
           options.onSuccess(response, $form);
         } else if (options.reloadOnSuccess) {
           window.location.reload();
         }
+      } else {
+        console.warn("[Form AJAX] Form submission returned failure status: " + url);
       }
     },
-    error: function () {
+    error: function (xhr) {
+      console.error("[Form AJAX] Network error during form submission for URL: " + url, xhr);
       showError(options.errorMessage);
     },
   });
@@ -1050,6 +1061,7 @@ function submitFileForm(form, options) {
     return;
   }
 
+  console.log("[Form AJAX] Submitting form with attachments targeting URL: " + url);
   formData = new FormData(form);
 
   $.ajax({
@@ -1060,14 +1072,18 @@ function submitFileForm(form, options) {
     contentType: false,
     success: function (response) {
       if (handleResponse(response, options.successMessage)) {
+        console.log("[Form AJAX] File form submitted successfully: " + url);
         if (typeof options.onSuccess === "function") {
           options.onSuccess(response, $form);
         } else if (options.reloadOnSuccess) {
           window.location.reload();
         }
+      } else {
+        console.warn("[Form AJAX] File form submission returned failure status: " + url);
       }
     },
-    error: function () {
+    error: function (xhr) {
+      console.error("[Form AJAX] Network error during file form submission for URL: " + url, xhr);
       showError(options.errorMessage);
     },
   });
@@ -1099,7 +1115,7 @@ function bindPostForm(selector, options) {
   });
 }
 
-function bindPostButton(selector) {
+function bindPostButton(selector, onSuccess) {
   var $button = $(selector);
 
   if (!$button.length) {
@@ -1123,6 +1139,7 @@ function bindPostButton(selector) {
     }
 
     confirmDialog(label + "?", function () {
+      console.log("[Post Button Action] Initiating action: " + label + " targeting: " + url);
       $.ajax({
         url: url,
         type: "POST",
@@ -1130,10 +1147,16 @@ function bindPostButton(selector) {
         dataType: "json",
         success: function (response) {
           if (handleResponse(response, "Action completed")) {
-            window.location.reload();
+            console.log("[Post Button Action] Action completed successfully: " + label);
+            if (typeof onSuccess === "function") {
+              onSuccess(response, $clickedButton);
+            } else {
+              window.location.reload();
+            }
           }
         },
         error: function () {
+          console.error("[Post Button Action] Network error occurred during action: " + label);
           showError("Network error");
         },
       });
@@ -1186,6 +1209,132 @@ function appendTimelineItem(commentText, iconHtml) {
   var $item = $(html);
   $feed.prepend($item);
   $item.slideDown(200);
+}
+
+function refreshTicketDetailsAndActions(onDone) {
+  console.log("[Ticket Refresh] Initiating background content refresh...");
+  $.get(window.location.href, function (html) {
+    console.log("[Ticket Refresh] Successfully fetched fresh HTML page content.");
+    var $html = $(html);
+
+    // 1. Replace the header badges
+    var $newHeaderBadges = $html.find("#ticketHeaderBadges");
+    if ($newHeaderBadges.length) {
+      $("#ticketHeaderBadges").replaceWith($newHeaderBadges);
+      console.log("[Ticket Refresh] Swapped ticket header badges.");
+    }
+
+    // 2. Replace the details card
+    var $newDetails = $html.find("#ticketDetailsCard");
+    if ($newDetails.length) {
+      $("#ticketDetailsCard").replaceWith($newDetails);
+      console.log("[Ticket Refresh] Swapped ticket details card.");
+    }
+
+    // 3. Preserve active tab and replace the take action card
+    var activeTabId = $("#ticketActionCard .nav-tabs .nav-link.active").attr("href");
+    var $newAction = $html.find("#ticketActionCard");
+    if ($newAction.length) {
+      $("#ticketActionCard").replaceWith($newAction);
+      console.log("[Ticket Refresh] Swapped take action card.");
+      if (activeTabId) {
+        console.log("[Ticket Refresh] Restoring active tab focus: " + activeTabId);
+        var $newActionCard = $("#ticketActionCard");
+        $newActionCard.find(".nav-tabs .nav-link").removeClass("active");
+        $newActionCard.find(".tab-content .tab-pane").removeClass("show active");
+
+        var $tabLink = $newActionCard.find('.nav-tabs .nav-link[href="' + activeTabId + '"]');
+        if ($tabLink.length) {
+          $tabLink.addClass("active");
+          $newActionCard.find(activeTabId).addClass("show active");
+        } else {
+          $newActionCard.find(".nav-tabs .nav-link").first().addClass("active");
+          $newActionCard.find(".tab-content .tab-pane").first().addClass("show active");
+        }
+      }
+    }
+
+    // 4. Replace timeline container
+    var $newTimeline = $html.find("#timelineList");
+    if ($newTimeline.length) {
+      $("#timelineList").replaceWith($newTimeline);
+      console.log("[Ticket Refresh] Swapped activity timeline list.");
+    }
+
+    // 5. Replace and re-initialize flow visualizer
+    var $newFlow = $html.find(".flow-widget");
+    if ($newFlow.length) {
+      $(".flow-widget").replaceWith($newFlow);
+      console.log("[Ticket Refresh] Swapped workflow visualizer widget.");
+      initFlowVis();
+    }
+
+    // 6. Re-run necessary initializers on replaced elements
+    console.log("[Ticket Refresh] Re-initializing dynamic form elements and counters.");
+    initSelectFields();
+    initTatCountdowns();
+
+    // Re-bind details page forms and buttons
+    bindPostForm("#commentForm", {
+      successMessage: "Comment added",
+      errorMessage: "Network error",
+      reloadOnSuccess: false,
+      onSuccess: function (response, $form) {
+        console.log("[Comment Form] Submit success, adding comment to timeline and refreshing details...");
+        var $commentArea = $form.find("textarea[name='comment']");
+        var commentVal = $commentArea.val() || "";
+        appendTimelineItem(escapeHtml(commentVal), '<i class="bi bi-chat-left-text text-primary"></i>');
+        $commentArea.val("");
+        refreshTicketDetailsAndActions();
+      }
+    });
+
+    bindPostForm("#assignForm", {
+      successMessage: "Assigned",
+      errorMessage: "Network error",
+      reloadOnSuccess: false,
+      onSuccess: function (response, $form) {
+        console.log("[Assign Form] Submit success, updating assignee display and refreshing details...");
+        var $select = $form.find("select[name='user_id']");
+        var selectedText = $select.find("option:selected").text();
+        var name = selectedText.split(" - ")[0];
+
+        $("#assigneeValue").text(name);
+        appendTimelineItem("Assigned ticket to " + escapeHtml(name), '<i class="bi bi-person-check text-primary"></i>');
+        $select.val("");
+        refreshTicketDetailsAndActions();
+      }
+    });
+
+    bindPostForm("#attachForm", {
+      successMessage: "File attached",
+      errorMessage: "Upload failed",
+      reloadOnSuccess: true,
+      isFile: true,
+    });
+
+    bindPostButton("#resolveBtn", function () {
+      console.log("[Action Button] Resolve action completed successfully. Refreshing UI...");
+      refreshTicketDetailsAndActions();
+    });
+    bindPostButton("#closeBtn", function () {
+      console.log("[Action Button] Close action completed successfully. Refreshing UI...");
+      refreshTicketDetailsAndActions();
+    });
+    bindPostButton("#reopenBtn", function () {
+      console.log("[Action Button] Reopen action completed successfully. Refreshing UI...");
+      refreshTicketDetailsAndActions();
+    });
+
+    initPriorityInline();
+    initEditableFields();
+
+    console.log("[Ticket Refresh] Background content refresh complete.");
+
+    if (onDone) {
+      onDone();
+    }
+  });
 }
 
 // ============================================================
@@ -1381,6 +1530,7 @@ function initTicketDetailPage() {
       var commentVal = $commentArea.val() || "";
       appendTimelineItem(escapeHtml(commentVal), '<i class="bi bi-chat-left-text text-primary"></i>');
       $commentArea.val("");
+      refreshTicketDetailsAndActions();
     }
   });
 
@@ -1396,6 +1546,7 @@ function initTicketDetailPage() {
       $("#assigneeValue").text(name);
       appendTimelineItem("Assigned ticket to " + escapeHtml(name), '<i class="bi bi-person-check text-primary"></i>');
       $select.val("");
+      refreshTicketDetailsAndActions();
     }
   });
 
@@ -1415,33 +1566,50 @@ function initTicketDetailPage() {
     if ($btn.prop("disabled") || !url || !targetId) {
       return;
     }
-    $btn.prop("disabled", true);
-    $.ajax({
-      url: url,
-      type: "POST",
-      data: { target_state_id: targetId, transition_type: transType, reason: "" },
-      dataType: "json",
-      success: function (res) {
-        $btn.prop("disabled", false);
-        if (res && res.success) {
-          showSuccess(res.message || "State moved");
-          setTimeout(function () {
-            window.location.reload();
-          }, 600);
-        } else {
-          showError(res && res.message ? res.message : "Failed to move state.");
-        }
-      },
-      error: function () {
-        $btn.prop("disabled", false);
-        showError("Network error.");
-      },
+    var label = $.trim($btn.text());
+    if (!label) {
+      label = "Move state";
+    }
+    confirmDialog(label + "?", function () {
+      console.log("[Move State Button] User confirmed forward transition to state ID: " + targetId);
+      $btn.prop("disabled", true);
+      $.ajax({
+        url: url,
+        type: "POST",
+        data: { target_state_id: targetId, transition_type: transType, reason: "" },
+        dataType: "json",
+        success: function (res) {
+          $btn.prop("disabled", false);
+          if (res && res.success) {
+            console.log("[Move State Button] State moved successfully. Server response: " + (res.message || "State moved"));
+            showSuccess(res.message || "State moved");
+            refreshTicketDetailsAndActions();
+          } else {
+            console.error("[Move State Button] Failed to move state: " + (res && res.message ? res.message : "unknown error"));
+            showError(res && res.message ? res.message : "Failed to move state.");
+          }
+        },
+        error: function () {
+          $btn.prop("disabled", false);
+          console.error("[Move State Button] Network error occurred during state transition.");
+          showError("Network error.");
+        },
+      });
     });
   });
 
-  bindPostButton("#resolveBtn");
-  bindPostButton("#closeBtn");
-  bindPostButton("#reopenBtn");
+  bindPostButton("#resolveBtn", function () {
+    console.log("[Resolve Button] Resolve action completed. Refreshing UI...");
+    refreshTicketDetailsAndActions();
+  });
+  bindPostButton("#closeBtn", function () {
+    console.log("[Close Button] Close action completed. Refreshing UI...");
+    refreshTicketDetailsAndActions();
+  });
+  bindPostButton("#reopenBtn", function () {
+    console.log("[Reopen Button] Reopen action completed. Refreshing UI...");
+    refreshTicketDetailsAndActions();
+  });
 
   initPriorityInline();
   initEditableFields();
@@ -2249,29 +2417,39 @@ function initMoveStateTypedForms() {
     var transType = $form.find("[name='transition_type']").val();
     var reason = $form.find("[name='reason']").val() || "";
 
-    var $btn = $form.find("button[type='submit']");
-    $btn.prop("disabled", true);
+    var stateName = $form.find("select[name='target_state_id'] option:selected").text().trim();
+    var confirmMsg = "Move to " + stateName + "?";
+    if (transType === "backward") {
+      confirmMsg = "Send back to " + stateName + "?";
+    }
 
-    $.ajax({
-      url: url,
-      type: "POST",
-      data: { target_state_id: targetId, transition_type: transType, reason: reason },
-      dataType: "json",
-      success: function (res) {
-        $btn.prop("disabled", false);
-        if (res && res.success) {
-          showSuccess(res.message || "Done");
-          setTimeout(function () {
-            window.location.reload();
-          }, 600);
-        } else {
-          showError(res && res.message ? res.message : "Failed to move state.");
-        }
-      },
-      error: function () {
-        $btn.prop("disabled", false);
-        showError("Network error.");
-      },
+    confirmDialog(confirmMsg, function () {
+      console.log("[Move State Typed Form] User confirmed " + transType + " transition to state: " + stateName + " (ID: " + targetId + "), reason length: " + reason.length);
+      var $btn = $form.find("button[type='submit']");
+      $btn.prop("disabled", true);
+
+      $.ajax({
+        url: url,
+        type: "POST",
+        data: { target_state_id: targetId, transition_type: transType, reason: reason },
+        dataType: "json",
+        success: function (res) {
+          $btn.prop("disabled", false);
+          if (res && res.success) {
+            console.log("[Move State Typed Form] Transition succeeded. Server message: " + (res.message || "Done"));
+            showSuccess(res.message || "Done");
+            refreshTicketDetailsAndActions();
+          } else {
+            console.error("[Move State Typed Form] Transition failed: " + (res && res.message ? res.message : "unknown error"));
+            showError(res && res.message ? res.message : "Failed to move state.");
+          }
+        },
+        error: function () {
+          $btn.prop("disabled", false);
+          console.error("[Move State Typed Form] Network error occurred during state transition.");
+          showError("Network error.");
+        },
+      });
     });
   });
 }
@@ -2497,6 +2675,8 @@ function initThemeSwitch() {
     var currentTheme = $appHtml.attr("data-theme") || "dark";
     var newTheme = currentTheme === "dark" ? "light" : "dark";
 
+    console.log("[Theme Toggle] Switch clicked. Current: " + currentTheme + ", target: " + newTheme);
+
     // Update HTML attribute
     $appHtml.attr("data-theme", newTheme);
 
@@ -2508,6 +2688,7 @@ function initThemeSwitch() {
 
     // Redraw charts if present
     if (trendChart) {
+      console.log("[Theme Toggle] Redrawing trend chart grid lines for: " + newTheme + " theme.");
       var isDark = newTheme === "dark";
       trendChart.options.scales.y.grid.color = getTrendGridColor(isDark);
       trendChart.options.scales.y.grid.lineWidth = getTrendGridLineWidth(isDark);
@@ -2517,19 +2698,22 @@ function initThemeSwitch() {
     // Persist in user profile via AJAX POST
     var updateUrl = $toggle.attr("data-update-url");
     if (updateUrl) {
+      console.log("[Theme Toggle] Syncing theme selection to database URL: " + updateUrl);
       $.ajax({
         url: updateUrl,
         type: "POST",
         data: { theme: newTheme },
         dataType: "json",
-        success: function (response) {
-          if (response && response.success) {
-            // success, silent
+        success: function (res) {
+          if (res && res.success) {
+            console.log("[Theme Toggle] Database sync succeeded.");
+          } else {
+            console.warn("[Theme Toggle] Database sync failed: " + (res && res.message ? res.message : "unknown"));
           }
         },
-        error: function () {
-          // silent ignore
-        },
+        error: function (xhr) {
+          console.error("[Theme Toggle] Database sync failed due to network error.", xhr);
+        }
       });
     }
   });
@@ -2642,6 +2826,7 @@ function initSidebarMenu() {
     if (current === "collapsed") {
       next = "expanded";
     }
+    console.log("[Sidebar Toggle] Collapsing/Expanding desktop sidebar. Current: " + current + ", next: " + next);
     applyDesktopState(next);
     saveLocalPref("pview-sidebar", next);
   }
@@ -2657,6 +2842,7 @@ function initSidebarMenu() {
 
   $toggle.off("click.sidebarToggle").on("click.sidebarToggle", function (e) {
     e.preventDefault();
+    console.log("[Sidebar Toggle] Toggle clicked. Mobile view: " + isMobile());
     if (isMobile()) {
       if ($sidebar.hasClass("is-open")) {
         closeDrawer();
@@ -2989,11 +3175,6 @@ function updateTabBadge(total) {
 }
 
 // Favicon badge — draws a red disc with the count when there are
-// actionable critical alarms so operators see the alert even when the
-// browser tab isn't active. Original favicon href is captured once so we
-// can restore it when the count drops to zero. We don't try to overlay
-// the badge on the original icon (Chrome can't render .ico into canvas
-// reliably); instead we draw a clean red badge that's always legible.
 var bellOriginalFaviconHref = null;
 var bellLastFaviconCount = -1;
 
@@ -3069,6 +3250,7 @@ function refreshBellBadge() {
   }
 
   bellRefreshInFlight = true;
+  console.log("[Bell Poll] Fetching live notification count...");
 
   $.ajax({
     url: url,
@@ -3083,11 +3265,14 @@ function refreshBellBadge() {
           total = parseInt(data.total, 10);
         }
 
+        console.log("[Bell Poll] Count update: " + total + " total alarms (baseline: " + bellLastSeenTotal + ")");
+
         // Only fire cue + notification when the number actually went UP.
         // First load just records the baseline silently.
         if (bellLastSeenTotal !== null && total > bellLastSeenTotal) {
           var audioOn = readMetaSetting("live_audio_enabled", "1") === "1";
           var notifyOn = readMetaSetting("live_browser_notify", "1") === "1";
+          console.log("[Bell Poll] New alarms detected! Audio: " + audioOn + ", Push Notify: " + notifyOn);
           if (audioOn) {
             playAlertBeep();
           }
@@ -3108,6 +3293,9 @@ function refreshBellBadge() {
         updateFaviconBadge(crit);
         applyBellBadge(data);
       }
+    },
+    error: function (xhr) {
+      console.error("[Bell Poll] Network error fetching notification badge counts.", xhr);
     },
     complete: function () {
       bellRefreshInFlight = false;

@@ -1,4 +1,6 @@
 document.addEventListener("DOMContentLoaded", function () {
+  console.log("[Settings] Initializing Settings page event handlers...");
+
   // 1. Client-side Logo Preview and Validation
   var logoInput = document.getElementById("set_app_logo");
   var logoPreview = document.getElementById("logoPreview");
@@ -8,8 +10,10 @@ document.addEventListener("DOMContentLoaded", function () {
     logoInput.addEventListener("change", function (e) {
       var file = e.target.files[0];
       if (file) {
+        console.log("[Settings Logo] New file selected: " + file.name + " (" + file.size + " bytes, type: " + file.type + ")");
         // Size validation: 2MB
         if (file.size > 2 * 1024 * 1024) {
+          console.warn("[Settings Logo] Size validation failed. " + file.size + " bytes exceeds 2MB limit.");
           alert("Logo file size exceeds the 2MB limit.");
           logoInput.value = "";
           return;
@@ -18,6 +22,7 @@ document.addEventListener("DOMContentLoaded", function () {
         // MIME validation
         var allowedTypes = ["image/png", "image/jpeg", "image/jpg", "image/svg+xml", "image/webp"];
         if (allowedTypes.indexOf(file.type) === -1) {
+          console.warn("[Settings Logo] MIME type validation failed: " + file.type);
           alert("Invalid file type. Only PNG, JPG, SVG, and WEBP are supported.");
           logoInput.value = "";
           return;
@@ -25,6 +30,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
         var reader = new FileReader();
         reader.onload = function (evt) {
+          console.log("[Settings Logo] FileReader load complete. Rendered logo preview in DOM.");
           if (logoPreview) {
             logoPreview.src = evt.target.result;
             logoPreview.classList.remove("d-none");
@@ -47,8 +53,10 @@ document.addEventListener("DOMContentLoaded", function () {
     favInput.addEventListener("change", function (e) {
       var file = e.target.files[0];
       if (file) {
+        console.log("[Settings Favicon] New file selected: " + file.name + " (" + file.size + " bytes, type: " + file.type + ")");
         // Size validation: 500KB
         if (file.size > 500 * 1024) {
+          console.warn("[Settings Favicon] Size validation failed. " + file.size + " bytes exceeds 500KB limit.");
           alert("Favicon file size exceeds the 500KB limit.");
           favInput.value = "";
           return;
@@ -57,6 +65,7 @@ document.addEventListener("DOMContentLoaded", function () {
         // MIME validation
         var allowedTypes = ["image/png", "image/jpeg", "image/jpg", "image/x-icon", "image/vnd.microsoft.icon", "image/svg+xml", "image/webp"];
         if (allowedTypes.indexOf(file.type) === -1) {
+          console.warn("[Settings Favicon] MIME type validation failed: " + file.type);
           alert("Invalid file type. Only PNG, JPG, ICO, SVG, and WEBP are supported.");
           favInput.value = "";
           return;
@@ -64,6 +73,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
         var reader = new FileReader();
         reader.onload = function (evt) {
+          console.log("[Settings Favicon] FileReader load complete. Rendered favicon preview in DOM.");
           if (favPreview) {
             favPreview.src = evt.target.result;
             favPreview.classList.remove("d-none");
@@ -86,14 +96,17 @@ document.addEventListener("DOMContentLoaded", function () {
     if (picker) {
       // Sync from picker to text input
       picker.addEventListener("input", function () {
+        console.log("[Settings Theme Sync] Syncing color picker value to text: " + picker.value);
         input.value = picker.value;
       });
 
       // Sync from text input to picker (only when valid 6-char hex code)
       input.addEventListener("input", function () {
         var val = input.value.trim();
+        console.log("[Settings Theme Sync] Text color changed: " + val);
         var hexPattern = /^#[0-9A-Fa-f]{6}$/;
         if (hexPattern.test(val)) {
+          console.log("[Settings Theme Sync] Syncing valid text color to picker: " + val);
           picker.value = val;
         }
       });
@@ -121,6 +134,7 @@ function initSendTestEmail() {
     if (!url) {
       return;
     }
+    console.log("[Settings Email] Sending test email. URL: " + url);
     $btn.attr("disabled", "disabled");
     $.ajax({
       url: url,
@@ -128,12 +142,15 @@ function initSendTestEmail() {
       dataType: "json",
       success: function (response) {
         if (response && response.success) {
+          console.log("[Settings Email] Test email sent successfully. Message: " + (response.message || ""));
           showSuccess(response.message || "Test email sent");
         } else {
+          console.error("[Settings Email] Failed to send test email: " + extractErrorMessage(response, "unknown error"));
           showError(extractErrorMessage(response, "Test email failed"));
         }
       },
       error: function () {
+        console.error("[Settings Email] Network error sending test email.");
         showError("Network error sending test email");
       },
       complete: function () {
@@ -155,6 +172,7 @@ function initBumpAssetVersion() {
     if (!url) {
       return;
     }
+    console.log("[Settings Assets] Bumping asset version. URL: " + url);
     $btn.attr("disabled", "disabled");
     $.ajax({
       url: url,
@@ -165,14 +183,17 @@ function initBumpAssetVersion() {
           if (response.data && response.data.value) {
             // Sync the visible input so the admin sees the new value
             // without needing to reload the Settings page.
+            console.log("[Settings Assets] Version bumped. New value: " + response.data.value);
             $("#set_asset_version").val(response.data.value);
           }
           showSuccess(response.message || "Asset version bumped");
         } else {
+          console.error("[Settings Assets] Bump failed: " + extractErrorMessage(response, "unknown error"));
           showError(extractErrorMessage(response, "Bump failed"));
         }
       },
       error: function () {
+        console.error("[Settings Assets] Network error bumping asset version.");
         showError("Network error bumping asset version");
       },
       complete: function () {
@@ -182,6 +203,7 @@ function initBumpAssetVersion() {
   });
 }
 
+// One-click cache-buster for app_settings cache.
 function initClearSettingsCache() {
   $appDocument.off("click.clearSettingsCache").on("click.clearSettingsCache", "#clearSettingsCacheBtn", function (e) {
     e.preventDefault();
@@ -190,6 +212,7 @@ function initClearSettingsCache() {
     if (!url) {
       return;
     }
+    console.log("[Settings Cache] Clearing settings cache. URL: " + url);
     $btn.attr("disabled", "disabled");
     $.ajax({
       url: url,
@@ -197,12 +220,15 @@ function initClearSettingsCache() {
       dataType: "json",
       success: function (response) {
         if (response && response.success) {
+          console.log("[Settings Cache] Settings cache cleared successfully.");
           showSuccess(response.message || "Settings cache cleared");
         } else {
+          console.error("[Settings Cache] Clear cache failed: " + extractErrorMessage(response, "unknown error"));
           showError(extractErrorMessage(response, "Clear cache failed"));
         }
       },
       error: function () {
+        console.error("[Settings Cache] Network error clearing settings cache.");
         showError("Network error clearing settings cache");
       },
       complete: function () {

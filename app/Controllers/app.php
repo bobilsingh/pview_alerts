@@ -9,8 +9,7 @@ class App extends BaseController
 {
     public $app_model;
     public $user_model;
-    public $api_key_row;  // populated by apiAuthenticate()
-
+    public $api_key_row;
     function __construct()
     {
         $this->app_model  = new app_model();
@@ -3556,7 +3555,7 @@ class App extends BaseController
         $rows    = $this->app_model->settingGetAll();
         foreach ($rows as $row) {
             $key = (string) $row['setting_key'];
-            
+
             // Skip logo and favicon files from standard text inputs
             if ($key === 'app_logo' || $key === 'app_favicon') {
                 continue;

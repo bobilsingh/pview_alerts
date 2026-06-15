@@ -116,6 +116,8 @@ function initServerTable(tableSelector, ajaxUrl, columns, extra) {
     return;
   }
 
+  console.log("[DataTable] Initializing server-side table: " + tableSelector + " (URL: " + ajaxUrl + ")");
+
   config = {
     processing: true,
     serverSide: true,
@@ -133,6 +135,7 @@ function initServerTable(tableSelector, ajaxUrl, columns, extra) {
         if (xhr && xhr.responseJSON && xhr.responseJSON.message) {
           msg = xhr.responseJSON.message;
         }
+        console.error("[DataTable] Ajax error loading data for " + tableSelector + ": " + msg, xhr);
         showError(msg);
       },
     },
@@ -152,6 +155,7 @@ function initServerTable(tableSelector, ajaxUrl, columns, extra) {
       },
     },
     drawCallback: function () {
+      console.log("[DataTable] Table redrawn: " + tableSelector);
       var api = this.api && this.api();
       if (api && typeof api.columns === "function") {
         api.columns.adjust();
@@ -180,9 +184,11 @@ function initTableFromDataUrl(tableSelector, columns, extra) {
 
   ajaxUrl = $table.attr("data-table-url");
   if (!ajaxUrl) {
+    console.warn("[DataTable] Table exists but is missing data-table-url attribute: " + tableSelector);
     return;
   }
 
+  console.log("[DataTable] Found data URL for " + tableSelector + ": " + ajaxUrl);
   initServerTable(tableSelector, ajaxUrl, columns, extra);
 }
 
@@ -592,7 +598,9 @@ function initListReopenButtons() {
     if (!url) {
       return;
     }
+    console.log("[DataTable Action] Reopen button clicked. Target URL: " + url);
     confirmDialog("Reopen this ticket?", function () {
+      console.log("[DataTable Action] Reopen confirmed. Sending request to: " + url);
       $btn.prop("disabled", true);
       $.ajax({
         url: url,
@@ -600,17 +608,22 @@ function initListReopenButtons() {
         dataType: "json",
         success: function (res) {
           if (res && res.success) {
+            console.log("[DataTable Action] Reopen success. Server response: " + (res.message || ""));
             showSuccess(res.message || "Ticket reopened");
             var dt = $("#ticketsTable").DataTable();
             if (dt) {
+              console.log("[DataTable Action] Reloading tickets list DataTable...");
               dt.ajax.reload(null, false);
             }
           } else {
-            showError(res && res.message ? res.message : "Failed to reopen");
+            var errorMsg = res && res.message ? res.message : "Failed to reopen";
+            console.error("[DataTable Action] Reopen failed: " + errorMsg);
+            showError(errorMsg);
             $btn.prop("disabled", false);
           }
         },
-        error: function () {
+        error: function (xhr) {
+          console.error("[DataTable Action] Network error during reopen request.", xhr);
           showError("Network error");
           $btn.prop("disabled", false);
         },

@@ -580,7 +580,7 @@ if (!function_exists('ticket_activity_icon')) {
         raised <?= esc($ticket['created_at']); ?>
       </div>
     </div>
-    <div class="d-flex gap-2">
+    <div class="d-flex gap-2" id="ticketHeaderBadges">
       <?= alert_badge($ticketType); ?>
       <?= status_badge($ticketStatus); ?>
     </div>
@@ -668,7 +668,7 @@ if (!function_exists('ticket_activity_icon')) {
         </div>
       </div>
 
-      <div class="card mb-3">
+      <div class="card mb-3" id="ticketActionCard">
         <div class="card-header">
           <strong><i class="bi bi-lightning-charge text-primary"></i> Take Action</strong>
         </div>
@@ -874,7 +874,7 @@ if (!function_exists('ticket_activity_icon')) {
           <strong><i class="bi bi-clock-history text-primary"></i> Activity Timeline</strong>
         </div>
         <div class="card-body">
-          <ul class="activity-feed">
+          <ul class="activity-feed" id="timelineList">
             <?php foreach ($timeline as $a) { ?>
               <?php
               $performer = 'System';
@@ -993,7 +993,7 @@ if (!function_exists('ticket_activity_icon')) {
     </div>
 
     <div class="col-lg-4">
-      <div class="card mb-3">
+      <div class="card mb-3" id="ticketDetailsCard">
         <div class="card-header">
           <strong><i class="bi bi-info-circle text-primary"></i> Details</strong>
         </div>
