@@ -20,7 +20,7 @@ $groups = [
   'Rate Limiting' => ['api_rate_per_minute', 'api_rate_per_hour'],
   'Attachments'   => ['upload_max_mb', 'upload_allowed_ext', 'upload_blocked_ext'],
   'TAT defaults'  => ['default_tat_l1_minutes', 'default_tat_l2_minutes', 'default_tat_l3_minutes', 'default_tat_l4_minutes'],
-  'UI'            => ['dashboard_trend_ranges'],
+  'UI'            => ['dashboard_trend_ranges', 'datatable_page_length'],
   'Live polling'  => ['live_poll_seconds', 'live_audio_enabled', 'live_browser_notify', 'analytics_refresh_seconds'],
   'Email / SMTP'  => ['email_protocol', 'email_smtp_host', 'email_smtp_port', 'email_smtp_user', 'email_smtp_pass', 'email_smtp_crypto', 'email_from_email', 'email_from_name'],
   'Notification queue' => ['notification_batch_size', 'notification_max_attempts'],
@@ -119,7 +119,7 @@ foreach ($groups as $keys) {
 // Keys that exist in the DB but must never appear in the UI.
 // Managed only via code or direct DB — exposing them in the Settings page
 // caused accidental misconfiguration (e.g. session_timeout_minutes set to 1).
-$hidden = ['session_timeout_minutes', 'datatable_page_length'];
+$hidden = ['session_timeout_minutes'];
 
 $other = [];
 foreach ($byKey as $k => $row) {
