@@ -609,7 +609,7 @@ if (!function_exists('ticket_activity_icon')) {
             data-field="description"
             data-url="<?= site_url('tickets/action/' . $alarmId); ?>"><?= esc($descToShow); ?></div>
 
-          <?php helper('flow'); ?>
+          <?php helper('app'); ?>
           <?= flow_widget_html(
             flow_vis_ticket_data($allStates, (int) $currentStateId, isset($allTransitions) ? $allTransitions : []),
             ['subtitle' => 'Ticket progress through this flow', 'variant' => 'ticket', 'legend' => false]

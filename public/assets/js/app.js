@@ -160,7 +160,7 @@ function setupToastr() {
     closeButton: true,
     progressBar: true,
     positionClass: "toast-top-right",
-    timeOut: 4000,
+    timeOut: 1000,
   };
 }
 
@@ -190,7 +190,7 @@ $appDocument.ready(function () {
           });
         }
       });
-    }, 15000);
+    }, 2000);
   }
 
   // --- Layout ---

@@ -10,7 +10,7 @@ if (!function_exists('view_value')) {
   }
 }
 
-helper('flow');
+helper('app');
 
 if (!isset($view) || $view === '') {
   $view = 'list';

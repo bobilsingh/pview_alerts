@@ -17,7 +17,7 @@ use Psr\Log\LoggerInterface;
  */
 class BaseController extends Controller
 {
-    protected $helpers = ['alert', 'flow', 'security', 'url', 'form', 'csv'];
+    protected $helpers = ['app', 'security', 'url', 'form'];
 
     protected $session;
     protected $db;
