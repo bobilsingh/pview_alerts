@@ -2470,53 +2470,8 @@ class App extends BaseController
             ['mode' => $mode, 'row_count' => count($rows), 'filters' => $filters]
         );
 
-        // Stream CSV row-by-row to avoid buffering large exports in memory.
-        header('Content-Type: text/csv; charset=utf-8');
-        header('Content-Disposition: attachment; filename="' . $filename . '"');
-        header('Cache-Control: no-store, no-cache, must-revalidate');
-        header('Pragma: no-cache');
-
-        $out = fopen('php://output', 'w');
-        // BOM so Excel opens UTF-8 cleanly.
-        fwrite($out, "\xEF\xBB\xBF");
-        fputcsv($out, [
-            'Alarm ID',
-            'Title',
-            'Project',
-            'Flow',
-            'State',
-            'Level',
-            'Severity',
-            'Priority',
-            'Status',
-            'Assignee',
-            'Raised By',
-            'Source',
-            'Created At',
-            'Resolved At',
-            'Closed At',
-        ]);
-        foreach ($rows as $r) {
-            fputcsv($out, [
-                isset($r['alarm_id'])         ? $r['alarm_id']         : '',
-                isset($r['title'])            ? $r['title']            : '',
-                isset($r['project_name'])     ? $r['project_name']     : '',
-                isset($r['flow_name'])        ? $r['flow_name']        : '',
-                isset($r['state_name'])       ? $r['state_name']       : '',
-                isset($r['current_level'])    ? 'L' . (int) $r['current_level'] : '',
-                isset($r['alert_type'])       ? strtoupper($r['alert_type']) : '',
-                isset($r['priority'])         ? strtoupper($r['priority']) : '',
-                isset($r['status'])           ? str_replace('_', ' ', strtoupper($r['status'])) : '',
-                isset($r['assignee_name'])    ? $r['assignee_name']    : '',
-                isset($r['raised_by_name'])   ? $r['raised_by_name']   : '',
-                isset($r['source'])           ? $r['source']           : '',
-                isset($r['created_at'])       ? $r['created_at']       : '',
-                isset($r['resolved_at'])      ? $r['resolved_at']      : '',
-                isset($r['closed_at'])        ? $r['closed_at']        : '',
-            ]);
-        }
-        fclose($out);
-        exit;
+        $userSelectedCols = (string) $this->request->getGet('export_cols');
+        export_csv_data($filename, 'tickets', $rows, $userSelectedCols);
     }
 
     private function apiAuthenticate()
@@ -4155,52 +4110,6 @@ class App extends BaseController
 
         $filename = 'activity-' . date('Ymd-His') . '.csv';
 
-        // Stream row-by-row (mirrors tickets_export) so a 50k export
-        // doesn't buffer in memory.
-        header('Content-Type: text/csv; charset=utf-8');
-        header('Content-Disposition: attachment; filename="' . $filename . '"');
-        header('Cache-Control: no-store, no-cache, must-revalidate');
-        header('Pragma: no-cache');
-
-        $out = fopen('php://output', 'w');
-        // UTF-8 BOM so Excel opens accented names/IDs cleanly.
-        fwrite($out, "\xEF\xBB\xBF");
-        fputcsv($out, [
-            'Time',
-            'User ID',
-            'User Name',
-            'Role',
-            'Module',
-            'Action',
-            'Entity Type',
-            'Entity ID',
-            'Summary',
-            'IP Address',
-            'URL',
-            'Method',
-            'Status',
-            'Meta',
-        ]);
-        foreach ($rows as $r) {
-            fputcsv($out, [
-                isset($r['created_at'])   ? $r['created_at']   : '',
-                isset($r['user_id'])      ? $r['user_id']      : '',
-                isset($r['user_name'])    ? $r['user_name']    : '',
-                isset($r['user_role'])    ? $r['user_role']    : '',
-                isset($r['module'])       ? $r['module']       : '',
-                isset($r['action'])       ? $r['action']       : '',
-                isset($r['entity_type'])  ? $r['entity_type']  : '',
-                isset($r['entity_id'])    ? $r['entity_id']    : '',
-                isset($r['summary'])      ? $r['summary']      : '',
-                isset($r['ip_address'])   ? $r['ip_address']   : '',
-                isset($r['url'])          ? $r['url']          : '',
-                isset($r['method'])       ? $r['method']       : '',
-                isset($r['status'])       ? $r['status']       : '',
-                isset($r['meta'])         ? $r['meta']         : '',
-            ]);
-        }
-        fclose($out);
-
         // Audit the audit-export itself so an admin downloading the trail
         // also leaves a row behind. Won't appear in *this* CSV (already
         // streamed) but lands in the next export / live viewer.
@@ -4219,7 +4128,9 @@ class App extends BaseController
                 'search' => $fSearch,
             ]]
         );
-        exit;
+
+        $userSelectedCols = (string) $this->request->getGet('export_cols');
+        export_csv_data($filename, 'activity_logs', $rows, $userSelectedCols);
     }
 
     /** GET /activity_logs/analytics — JSON analytics summary for the Analytics tab.
