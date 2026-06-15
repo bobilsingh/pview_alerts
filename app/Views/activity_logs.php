@@ -43,7 +43,7 @@ $today        = date('Y-m-d');
 
     <!-- Filter bar -->
     <div class="card mb-3">
-      <?= view('filters/filter_bar', [
+      <?= view('filter', [
         'fbTitle'          => 'Filters',
         'fbCountId'        => 'activityFilterBadge',
         'fbApplyId'        => 'activityApplyBtn',
@@ -160,7 +160,7 @@ $today        = date('Y-m-d');
       <!-- Analytics date range + refresh controls -->
       <div class="d-flex flex-wrap align-items-center gap-2 mb-3">
         <label class="form-label small mb-0 fw-semibold">Period:</label>
-        <?= view('filters/filter_bar', [
+        <?= view('filter', [
           'only_widget' => true,
           'drFromId'    => 'analyticsFrom',
           'drToId'      => 'analyticsTo',

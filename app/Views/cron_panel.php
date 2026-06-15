@@ -182,7 +182,7 @@ $today = date('Y-m-d');
   <div class="card">
 
     <!-- Filter bar with the shared date-range widget -->
-    <?= view('filters/filter_bar', [
+    <?= view('filter', [
       'fbTitle'          => 'Run History',
       'fbApplyId'        => 'cronApplyBtn',
       'show_date_widget' => true,

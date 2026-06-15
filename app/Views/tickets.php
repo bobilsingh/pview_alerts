@@ -268,7 +268,7 @@ if (!function_exists('ticket_activity_icon')) {
         <!-- Date range — left of Apply -->
         <span class="filter-bar-sep"></span>
         <div class="filter-bar-date">
-          <?= view('filters/filter_bar', [
+          <?= view('filter', [
             'only_widget' => true,
             'drFromName'  => 'f_from',
             'drToName'    => 'f_to',
