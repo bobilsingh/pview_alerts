@@ -2461,14 +2461,7 @@ class App extends BaseController
         }
 
         $filename = 'tickets-' . date('Ymd-His') . '.csv';
-        activity_log(
-            'tickets',
-            'export',
-            null,
-            null,
-            'Exported ' . count($rows) . ' tickets (' . $mode . ')',
-            ['mode' => $mode, 'row_count' => count($rows), 'filters' => $filters]
-        );
+        activity_log('tickets', 'export', null, null, 'Exported ' . count($rows) . ' tickets (' . $mode . ')', ['mode' => $mode, 'row_count' => count($rows), 'filters' => $filters]);
 
         $userSelectedCols = (string) $this->request->getGet('export_cols');
         export_csv_data($filename, 'tickets', $rows, $userSelectedCols);
@@ -4113,21 +4106,7 @@ class App extends BaseController
         // Audit the audit-export itself so an admin downloading the trail
         // also leaves a row behind. Won't appear in *this* CSV (already
         // streamed) but lands in the next export / live viewer.
-        activity_log(
-            'activity_logs',
-            'export',
-            null,
-            null,
-            'Exported ' . count($rows) . ' activity rows to CSV',
-            ['row_count' => count($rows), 'filters' => [
-                'user' => $fUser,
-                'module' => $fModule,
-                'action' => $fAction,
-                'from' => $fFrom,
-                'to' => $fTo,
-                'search' => $fSearch,
-            ]]
-        );
+        activity_log('activity_logs', 'export', null, null, 'Exported ' . count($rows) . ' activity rows to CSV', ['row_count' => count($rows), 'filters' => ['user' => $fUser, 'module' => $fModule, 'action' => $fAction, 'from' => $fFrom, 'to' => $fTo, 'search' => $fSearch]]);
 
         $userSelectedCols = (string) $this->request->getGet('export_cols');
         export_csv_data($filename, 'activity_logs', $rows, $userSelectedCols);
