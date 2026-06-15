@@ -6,11 +6,13 @@ class User_model
 {
     public $db;
 
+    // Constructor to initialize dependencies and references.
     function __construct()
     {
         $this->db = \Config\Database::connect();
     }
 
+    // Fetches all users.
     public function getAll()
     {
         return $this->db->table('users')
@@ -19,6 +21,7 @@ class User_model
             ->get()->getResultArray();
     }
 
+    // Fetches a user by ID.
     public function getById($id)
     {
         return $this->db->table('users')
@@ -36,6 +39,7 @@ class User_model
             ->get()->getRowArray();
     }
 
+    // Fetches users by a list of IDs.
     public function getByIds($ids)
     {
         if (empty($ids)) {
@@ -61,6 +65,7 @@ class User_model
             ->get()->getResultArray();
     }
 
+    // Fetches active users.
     public function getActive()
     {
         return $this->db->table('users')
@@ -70,6 +75,7 @@ class User_model
             ->get()->getResultArray();
     }
 
+    // Fetches assignable users pool.
     public function getPoolUsers($callerUserId)
     {
         $caller = (string) $callerUserId;
@@ -123,6 +129,7 @@ class User_model
         return $q->countAllResults() > 0;
     }
 
+    // Saves a new user.
     public function save($data)
     {
         if (isset($data['password']) && $data['password'] !== '') {
@@ -138,6 +145,7 @@ class User_model
         return $id;
     }
 
+    // Updates user details.
     public function update($id, $data)
     {
         if (isset($data['password']) && $data['password'] !== '') {
@@ -164,6 +172,7 @@ class User_model
         return $ok;
     }
 
+    // Marks a user as deleted.
     public function softDelete($id)
     {
         $row = $this->db->table('users')->select('user_id')->where('id', (int) $id)->get()->getRowArray();
@@ -214,17 +223,26 @@ class User_model
             log_message('debug', "pview alert >> Login failed: bad password for login=[" . $login . "]");
             return false;
         }
-        log_message('debug', "pview alert >> Login OK: login=[" . $login . "], user_pk=[" . $row['id'] . "], user_id=[" . (isset($row['user_id']) ? $row['user_id'] : '') . "]");
+        $rowUserId = '';
+        if (isset($row['user_id'])) {
+            $rowUserId = $row['user_id'];
+        }
+        log_message('debug', "pview alert >> Login OK: login=[" . $login . "], user_pk=[" . $row['id'] . "], user_id=[" . $rowUserId . "]");
         return $row;
     }
 
+    // Saves user profile preferences into session at login.
     public function setSession($user)
     {
         $session = \Config\Services::session();
         $session->start();
 
         $rotateDays = (int) app_setting('password_rotate_days', 90);
-        $must_rotate = password_must_rotate(isset($user['password_changed_at']) ? $user['password_changed_at'] : null, $rotateDays);
+        $pwdChangedAt = null;
+        if (isset($user['password_changed_at'])) {
+            $pwdChangedAt = $user['password_changed_at'];
+        }
+        $must_rotate = password_must_rotate($pwdChangedAt, $rotateDays);
 
         // user_id = human FK string (e.g. "bobil.singh"); user_pk = numeric PK.
         $userIdStr = '';
@@ -243,13 +261,18 @@ class User_model
         // Wipe pre-login session state before writing fresh user data.
         session_unset();
 
+        $themeVal = 'dark';
+        if (isset($user['theme'])) {
+            $themeVal = $user['theme'];
+        }
+
         $session->set([
             'user_pk'              => (int) $user['id'],
             'user_id'              => $userIdStr,
             'user_name'            => $user['name'],
             'user_email'           => $user['email'],
             'user_role'            => $user['role'],
-            'theme'                => isset($user['theme']) ? $user['theme'] : 'dark',
+            'theme'                => $themeVal,
             'dashboard_layout'     => $dashboardLayout,
             'logged_in'            => true,
             'password_must_rotate' => $must_rotate,
@@ -259,6 +282,7 @@ class User_model
         log_message('debug', "pview alert >> Session set for user_pk=[" . $user['id'] . "], user_id=[" . $userIdStr . "], password_must_rotate=[" . (int) $must_rotate . "]");
     }
 
+    // Destroys user session on logout.
     public function logout()
     {
         $session = \Config\Services::session();
@@ -273,6 +297,7 @@ class User_model
         log_message('debug', "pview alert >> Logout: user_pk=[" . (int) $uid . "]");
     }
 
+    // Fetches users formatted for server-side DataTable.
     public function usersForDT($args)
     {
         $allowedCols = [
@@ -293,9 +318,18 @@ class User_model
             $orderDir = 'DESC';
         }
 
-        $start  = isset($args['start'])  ? (int) $args['start']  : 0;
-        $length = isset($args['length']) ? (int) $args['length'] : 25;
-        $search = isset($args['search']) ? (string) $args['search'] : '';
+        $start = 0;
+        if (isset($args['start'])) {
+            $start = (int) $args['start'];
+        }
+        $length = 25;
+        if (isset($args['length'])) {
+            $length = (int) $args['length'];
+        }
+        $search = '';
+        if (isset($args['search'])) {
+            $search = (string) $args['search'];
+        }
 
         $total = (int) $this->db->table('users')->where('deleted_at', null)->countAllResults();
 
@@ -310,7 +344,10 @@ class User_model
 
         $countSql = "SELECT COUNT(*) AS cnt FROM users " . $baseWhere;
         $countRow = $this->db->query($countSql, $params)->getRow();
-        $filtered = isset($countRow->cnt) ? (int) $countRow->cnt : 0;
+        $filtered = 0;
+        if (isset($countRow->cnt)) {
+            $filtered = (int) $countRow->cnt;
+        }
 
         $dataSql = "SELECT id, user_id, name, email, role, phone, is_active, created_at
                     FROM users " . $baseWhere . "
@@ -321,6 +358,7 @@ class User_model
         return ['total' => $total, 'filtered' => $filtered, 'rows' => $rows];
     }
 
+    // Fetches all system roles.
     public function getAllRoles()
     {
         return $this->db->table('roles')
@@ -329,6 +367,7 @@ class User_model
             ->get()->getResultArray();
     }
 
+    // Fetches a role by its key.
     public function getRoleByKey($role_key)
     {
         return $this->db->table('roles')
@@ -336,6 +375,7 @@ class User_model
             ->get()->getRowArray();
     }
 
+    // Checks if a role key already exists.
     public function roleKeyExists($role_key)
     {
         return $this->db->table('roles')
@@ -352,6 +392,7 @@ class User_model
             ->countAllResults();
     }
 
+    // Saves a role definition.
     public function saveRole($data)
     {
         $data['created_at'] = date('Y-m-d H:i:s');
@@ -373,13 +414,18 @@ class User_model
     // Updates the admin-scope flag (controls global vs own-ticket visibility).
     public function updateRoleAdminScope($role_key, $isAdminScope)
     {
+        $adminScopeVal = 0;
+        if ((int) $isAdminScope === 1) {
+            $adminScopeVal = 1;
+        }
         $ok = $this->db->table('roles')
             ->where('role_key', (string) $role_key)
-            ->update(['is_admin_scope' => (int) $isAdminScope === 1 ? 1 : 0]);
+            ->update(['is_admin_scope' => $adminScopeVal]);
         log_message('debug', "pview alert >> role updateAdminScope: query=[" . $this->db->getLastQuery() . "], ok=[" . (int) $ok . "]");
         return $ok;
     }
 
+    // Deletes a role.
     public function deleteRole($role_key)
     {
         $row = $this->getRoleByKey($role_key);

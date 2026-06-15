@@ -8,6 +8,7 @@ class User extends BaseController
 {
     public $user_model;
 
+    // Constructor to initialize dependencies and references.
     function __construct()
     {
         $this->user_model = new user_model();
@@ -39,6 +40,7 @@ class User extends BaseController
         echo view('templates/auth_footer');
     }
 
+    // Disables maintenance mode globally.
     public function maintenance_disable()
     {
         $session = \Config\Services::session();
@@ -56,6 +58,7 @@ class User extends BaseController
         return redirect()->to(site_url('dashboard'));
     }
 
+    // Renders the login page.
     public function login()
     {
         $session = \Config\Services::session();
@@ -127,8 +130,16 @@ class User extends BaseController
         login_attempts_clear($ip, $login);
 
         $this->user_model->setSession($user);
-        log_message('debug', "pview alert >> Login complete: login=[" . $login . "], user_pk=[" . $user['id'] . "], user_id=[" . (isset($user['user_id']) ? $user['user_id'] : '') . "], role=[" . $user['role'] . "]");
-        activity_log('auth', 'login', 'user', (string) $user['id'], 'Login: ' . (isset($user['name']) ? $user['name'] : $login));
+        $loggedUserIdVal = '';
+        if (isset($user['user_id'])) {
+            $loggedUserIdVal = $user['user_id'];
+        }
+        log_message('debug', "pview alert >> Login complete: login=[" . $login . "], user_pk=[" . $user['id'] . "], user_id=[" . $loggedUserIdVal . "], role=[" . $user['role'] . "]");
+                $loginLogName = $login;
+        if (isset($user['name'])) {
+            $loginLogName = $user['name'];
+        }
+        activity_log('auth', 'login', 'user', (string) $user['id'], 'Login: ' . $loginLogName);
 
         // Redirect to the originally requested page, or fall back to first accessible module.
         $redirectUrl = $session->get('redirect_after_login');
@@ -494,8 +505,15 @@ class User extends BaseController
 
         log_message('debug', "pview alert >> users delete request: id=[" . $id . "]");
         $this->user_model->softDelete($id);
-        $deletedName = isset($row['name']) ? (string) $row['name'] : '';
-        activity_log('users', 'delete', 'user', (string) $id, 'Removed user "' . $deletedName . '"', ['user_id' => isset($row['user_id']) ? $row['user_id'] : '', 'name' => $deletedName]);
+        $deletedName = '';
+        if (isset($row['name'])) {
+            $deletedName = (string) $row['name'];
+        }
+                $deletedUid = '';
+        if (isset($row['user_id'])) {
+            $deletedUid = $row['user_id'];
+        }
+        activity_log('users', 'delete', 'user', (string) $id, 'Removed user "' . $deletedName . '"', ['user_id' => $deletedUid, 'name' => $deletedName]);
         $this->session->setFlashdata('success', 'User removed.');
         return redirect()->to(site_url('users'));
     }
@@ -543,11 +561,23 @@ class User extends BaseController
             if (!empty($u['is_active'])) {
                 $activeBadge = '<span class="badge bg-success">YES</span>';
             }
-            $phone = isset($u['phone']) ? (string) $u['phone'] : '';
-            $uid   = isset($u['user_id']) ? (string) $u['user_id'] : '';
-            $role  = isset($u['role']) ? str_replace('_', ' ', strtoupper((string) $u['role'])) : '';
+            $phone = '';
+            if (isset($u['phone'])) {
+                $phone = (string) $u['phone'];
+            }
+            $uid = '';
+            if (isset($u['user_id'])) {
+                $uid = (string) $u['user_id'];
+            }
+            $role = '';
+            if (isset($u['role'])) {
+                $role = str_replace('_', ' ', strtoupper((string) $u['role']));
+            }
 
-            $rowRoleKey = isset($u['role']) ? (string) $u['role'] : '';
+            $rowRoleKey = '';
+            if (isset($u['role'])) {
+                $rowRoleKey = (string) $u['role'];
+            }
             $allowedRow = ($rowRoleKey !== '' && in_array($rowRoleKey, $assignable, true));
 
             $actionsHtml = '';
@@ -561,12 +591,21 @@ class User extends BaseController
                 $actionsHtml = '<span class="text-muted small">—</span>';
             }
 
+            $uidVal = '-';
+            if ($uid !== '') {
+                $uidVal = $uid;
+            }
+            $phoneVal = '-';
+            if ($phone !== '') {
+                $phoneVal = $phone;
+            }
+
             $data[] = [
-                'user_id'    => '<code class="user-id-chip">' . esc($uid !== '' ? $uid : '-') . '</code>',
+                'user_id'    => '<code class="user-id-chip">' . esc($uidVal) . '</code>',
                 'name'       => '<strong>' . esc($u['name']) . '</strong>',
                 'email'      => '<span class="text-muted">' . esc($u['email']) . '</span>',
                 'role'       => '<span class="badge bg-info text-dark">' . esc($role) . '</span>',
-                'phone'      => '<span class="text-muted">' . esc($phone !== '' ? $phone : '-') . '</span>',
+                'phone'      => '<span class="text-muted">' . esc($phoneVal) . '</span>',
                 'is_active'  => $activeBadge,
                 'created_at' => '<span class="text-muted small">' . esc($u['created_at']) . '</span>',
                 'actions'    => $actionsHtml,

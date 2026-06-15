@@ -25,8 +25,7 @@ if (!function_exists('app_settings_all')) {
         // Cache miss — re-fetch from DB and persist for 5 minutes.
         $reqCache = [];
         try {
-            $db   = \Config\Database::connect();
-            $rows = $db->table('app_settings')->get()->getResultArray();
+            $rows = model('Helper_model')->getSettings();
             foreach ($rows as $r) {
                 $reqCache[(string) $r['setting_key']] = (string) $r['setting_value'];
             }
@@ -218,10 +217,7 @@ if (!function_exists('assignable_role_keys')) {
 
         $allowed = [];
         try {
-            $db = \Config\Database::connect();
-            $rows = $db->table('roles')
-                ->select('role_key, is_admin_scope')
-                ->get()->getResultArray();
+            $rows = model('Helper_model')->getAssignableRoles();
             foreach ($rows as $r) {
                 $key            = (string) $r['role_key'];
                 $isSuper        = ($key === ROLE_SUPER_ADMIN);
@@ -261,16 +257,11 @@ if (!function_exists('role_has_admin_scope')) {
         if ($cache === null) {
             $cache = [];
             try {
-                $db = \Config\Database::connect();
+                $helperModel = model('Helper_model');
                 // Defensive: roles table may not exist on very old installs.
-                $tableCheck = $db->query("SHOW TABLES LIKE 'roles'")->getResultArray();
+                $tableCheck = $helperModel->checkTableExistsRaw('roles');
                 if (!empty($tableCheck)) {
-                    $rows = $db->table('roles')
-                        ->select('role_key, is_admin_scope')
-                        ->get()->getResultArray();
-                    foreach ($rows as $r) {
-                        $cache[(string) $r['role_key']] = ((int) ($r['is_admin_scope'] ?? 0)) === 1;
-                    }
+                    $cache = $helperModel->getRolesScopeMap();
                 }
             } catch (\Throwable $e) {
                 log_message('error', 'role_has_admin_scope() lookup failed: ' . $e->getMessage());
@@ -318,8 +309,18 @@ if (!function_exists('verify_ticket_access')) {
         } else {
             $uid = (string) logged_user_id();
         }
-        $assignee = (string) (isset($ticket['current_assignee']) ? $ticket['current_assignee'] : '');
-        $raisedBy = (string) (isset($ticket['raised_by']) ? $ticket['raised_by'] : '');
+        $rawAssignee = '';
+        if (isset($ticket['current_assignee'])) {
+            $rawAssignee = $ticket['current_assignee'];
+        }
+        $assignee = (string) $rawAssignee;
+
+        $rawRaisedBy = '';
+        if (isset($ticket['raised_by'])) {
+            $rawRaisedBy = $ticket['raised_by'];
+        }
+        $raisedBy = (string) $rawRaisedBy;
+
         if ($uid !== '' && $assignee === $uid) {
             return $ticket;
         }
@@ -327,14 +328,19 @@ if (!function_exists('verify_ticket_access')) {
             return $ticket;
         }
 
-        $db = \Config\Database::connect();
-        $state = $db->table('states')
-            ->where('id', (int) (isset($ticket['current_state_id']) ? $ticket['current_state_id'] : 0))
-            ->get()->getRowArray();
+        $stateId = 0;
+        if (isset($ticket['current_state_id'])) {
+            $stateId = $ticket['current_state_id'];
+        }
+        $state = model('App_model')->stateGetById($stateId);
         if ($state) {
             for ($lvl = 1; $lvl <= 4; $lvl++) {
                 $lvlKey = 'l' . $lvl . '_user_ids';
-                $arr = json_decode((string) (isset($state[$lvlKey]) ? $state[$lvlKey] : '[]'), true);
+                $rawLvlVal = '[]';
+                if (isset($state[$lvlKey])) {
+                    $rawLvlVal = $state[$lvlKey];
+                }
+                $arr = json_decode((string) $rawLvlVal, true);
                 if (is_array($arr) && in_array($uid, array_map('strval', $arr), true)) {
                     return $ticket;
                 }
@@ -349,7 +355,10 @@ if (!function_exists('logged_user_id')) {
     function logged_user_id()
     {
         $uid = \Config\Services::session()->get('user_id');
-        return !empty($uid) ? (string) $uid : '';
+        if (!empty($uid)) {
+            return (string) $uid;
+        }
+        return '';
     }
 }
 
@@ -393,16 +402,8 @@ if (!function_exists('user_dashboard_pref')) {
 if (!function_exists('generate_alarm_id')) {
     function generate_alarm_id()
     {
-        $db    = \Config\Database::connect();
         $today = date('Ymd');
-
-        $db->query(
-            "INSERT INTO alarm_id_sequence (day_key, last_seq) VALUES (?, LAST_INSERT_ID(1))
-             ON DUPLICATE KEY UPDATE last_seq = LAST_INSERT_ID(last_seq + 1)",
-            [$today]
-        );
-        $row = $db->query("SELECT LAST_INSERT_ID() AS n")->getRow();
-        $num = isset($row->n) ? (int) $row->n : 1;
+        $num = model('Helper_model')->incrementAlarmSequence($today);
         return 'ALM-' . $today . '-' . str_pad((string) $num, 5, '0', STR_PAD_LEFT);
     }
 }
@@ -411,10 +412,23 @@ if (!function_exists('generate_alarm_id')) {
 if (!function_exists('mail_subject')) {
     function mail_subject($event, $context)
     {
-        $alarm = isset($context['alarm_id']) ? $context['alarm_id'] : 'ALERT';
-        $title = isset($context['title']) ? $context['title'] : '';
-        $sev   = strtoupper((string) (isset($context['alert_type']) ? $context['alert_type'] : ''));
-        $lvl   = isset($context['level']) ? (int) $context['level'] : 0;
+        $alarm = 'ALERT';
+        if (isset($context['alarm_id'])) {
+            $alarm = $context['alarm_id'];
+        }
+        $title = '';
+        if (isset($context['title'])) {
+            $title = $context['title'];
+        }
+        $rawSev = '';
+        if (isset($context['alert_type'])) {
+            $rawSev = $context['alert_type'];
+        }
+        $sev   = strtoupper((string) $rawSev);
+        $lvl   = 0;
+        if (isset($context['level'])) {
+            $lvl   = (int) $context['level'];
+        }
 
         $tag = '[' . $sev . ']';
         if ($sev === '') {
@@ -427,10 +441,16 @@ if (!function_exists('mail_subject')) {
             case 'assigned':
                 return $tag . ' Ticket ' . $alarm . ' assigned to you';
             case 'state_changed':
-                $to = isset($context['to_state_name']) ? $context['to_state_name'] : '';
+                $to = '';
+                if (isset($context['to_state_name'])) {
+                    $to = $context['to_state_name'];
+                }
                 return $tag . ' ' . $alarm . ' moved → ' . $to;
             case 'level_escalated':
-                $newLvl = isset($context['to_level']) ? (int) $context['to_level'] : $lvl;
+                $newLvl = $lvl;
+                if (isset($context['to_level'])) {
+                    $newLvl = (int) $context['to_level'];
+                }
                 return '[ESCALATED L' . $newLvl . '] ' . $alarm . ' — ' . $title;
             case 'resolved':
                 return '[RESOLVED] ' . $alarm . ' — ' . $title;
@@ -468,20 +488,90 @@ if (!function_exists('mail_kv_row')) {
 if (!function_exists('mail_html_body')) {
     function mail_html_body($event, $context)
     {
-        $alarm     = (string) (isset($context['alarm_id'])      ? $context['alarm_id']      : '');
-        $title     = (string) (isset($context['title'])         ? $context['title']         : '');
-        $desc      = (string) (isset($context['description'])   ? $context['description']   : '');
-        $severity  = strtolower((string) (isset($context['alert_type']) ? $context['alert_type'] : 'info'));
-        $priority  = strtolower((string) (isset($context['priority'])   ? $context['priority']   : 'medium'));
-        $project   = (string) (isset($context['project_name']) ? $context['project_name'] : '');
-        $flow      = (string) (isset($context['flow_name'])    ? $context['flow_name']    : '');
-        $state     = (string) (isset($context['state_name'])   ? $context['state_name']   : '');
-        $level     = (int)    (isset($context['level'])        ? $context['level']        : 1);
-        $tatExp    = (string) (isset($context['tat_expires_at']) ? $context['tat_expires_at'] : '');
-        $url       = (string) (isset($context['ticket_url'])   ? $context['ticket_url']   : '#');
-        $actor     = (string) (isset($context['actor_name'])   ? $context['actor_name']   : 'system');
-        $recipient = (string) (isset($context['recipient_name']) ? $context['recipient_name'] : 'team');
-        $comment   = (string) (isset($context['comment'])      ? $context['comment']      : '');
+        $rawAlarm = '';
+        if (isset($context['alarm_id'])) {
+            $rawAlarm = $context['alarm_id'];
+        }
+        $alarm = (string) $rawAlarm;
+
+        $rawTitle = '';
+        if (isset($context['title'])) {
+            $rawTitle = $context['title'];
+        }
+        $title = (string) $rawTitle;
+
+        $rawDesc = '';
+        if (isset($context['description'])) {
+            $rawDesc = $context['description'];
+        }
+        $desc = (string) $rawDesc;
+
+        $rawSeverity = 'info';
+        if (isset($context['alert_type'])) {
+            $rawSeverity = $context['alert_type'];
+        }
+        $severity  = strtolower((string) $rawSeverity);
+
+        $rawPriority = 'medium';
+        if (isset($context['priority'])) {
+            $rawPriority = $context['priority'];
+        }
+        $priority  = strtolower((string) $rawPriority);
+
+        $rawProject = '';
+        if (isset($context['project_name'])) {
+            $rawProject = $context['project_name'];
+        }
+        $project   = (string) $rawProject;
+
+        $rawFlow = '';
+        if (isset($context['flow_name'])) {
+            $rawFlow = $context['flow_name'];
+        }
+        $flow      = (string) $rawFlow;
+
+        $rawState = '';
+        if (isset($context['state_name'])) {
+            $rawState = $context['state_name'];
+        }
+        $state     = (string) $rawState;
+
+        $rawLevel = 1;
+        if (isset($context['level'])) {
+            $rawLevel = $context['level'];
+        }
+        $level     = (int) $rawLevel;
+
+        $rawTatExp = '';
+        if (isset($context['tat_expires_at'])) {
+            $rawTatExp = $context['tat_expires_at'];
+        }
+        $tatExp    = (string) $rawTatExp;
+
+        $rawUrl = '#';
+        if (isset($context['ticket_url'])) {
+            $rawUrl = $context['ticket_url'];
+        }
+        $url       = (string) $rawUrl;
+
+        $rawActor = 'system';
+        if (isset($context['actor_name'])) {
+            $rawActor = $context['actor_name'];
+        }
+        $actor     = (string) $rawActor;
+
+        $rawRecipient = 'team';
+        if (isset($context['recipient_name'])) {
+            $rawRecipient = $context['recipient_name'];
+        }
+        $recipient = (string) $rawRecipient;
+
+        $rawComment = '';
+        if (isset($context['comment'])) {
+            $rawComment = $context['comment'];
+        }
+        $comment   = (string) $rawComment;
+
         $appName   = (string) app_setting('app_name', 'pView Alert System');
 
         $palette = [
@@ -489,7 +579,11 @@ if (!function_exists('mail_html_body')) {
             'major'    => ['#F59E0B', '#B45309', 'MAJOR'],
             'critical' => ['#EF4444', '#B91C1C', 'CRITICAL'],
         ];
-        $pal = isset($palette[$severity]) ? $palette[$severity] : $palette['info'];
+
+        $pal = $palette['info'];
+        if (isset($palette[$severity])) {
+            $pal = $palette[$severity];
+        }
         $sevColor = $pal[0];
         $sevDark  = $pal[1];
         $sevLabel = $pal[2];
@@ -500,7 +594,10 @@ if (!function_exists('mail_html_body')) {
             'high'   => ['#F97316', 'HIGH'],
             'urgent' => ['#DC2626', 'URGENT'],
         ];
-        $pp = isset($prio[$priority]) ? $prio[$priority] : $prio['medium'];
+        $pp = $prio['medium'];
+        if (isset($prio[$priority])) {
+            $pp = $prio[$priority];
+        }
 
         $headline = 'Alert update';
         $lead     = 'There is an update on ticket ' . $alarm . '.';
@@ -515,14 +612,26 @@ if (!function_exists('mail_html_body')) {
                 $lead     = '<strong>' . esc($actor) . '</strong> assigned this ticket to <strong>' . esc($recipient) . '</strong>. Please acknowledge and begin investigation.';
                 break;
             case 'state_changed':
-                $from = (string) (isset($context['from_state_name']) ? $context['from_state_name'] : '');
-                $to   = (string) (isset($context['to_state_name']) ? $context['to_state_name'] : $state);
+                $from = '';
+                if (isset($context['from_state_name'])) {
+                    $from = $context['from_state_name'];
+                }
+                $to   = $state;
+                if (isset($context['to_state_name'])) {
+                    $to   = $context['to_state_name'];
+                }
                 $headline = 'Workflow state changed';
                 $lead     = 'Ticket moved from <strong>' . esc($from) . '</strong> to <strong>' . esc($to) . '</strong> by ' . esc($actor) . '.';
                 break;
             case 'level_escalated':
-                $fromL = (int) (isset($context['from_level']) ? $context['from_level'] : ($level - 1));
-                $toL   = (int) (isset($context['to_level']) ? $context['to_level'] : $level);
+                $fromL = $level - 1;
+                if (isset($context['from_level'])) {
+                    $fromL = (int) $context['from_level'];
+                }
+                $toL   = $level;
+                if (isset($context['to_level'])) {
+                    $toL   = (int) $context['to_level'];
+                }
                 $headline = 'Escalation triggered (L' . $fromL . ' → L' . $toL . ')';
                 $lead     = 'TAT for level L' . $fromL . ' was breached. The ticket has been escalated to level <strong>L' . $toL . '</strong>. Immediate attention required.';
                 $bannerBg = '#B91C1C';
@@ -576,7 +685,10 @@ if (!function_exists('mail_html_body')) {
 
         $descBlock = '';
         if ($desc !== '') {
-            $short = mb_strlen($desc) > 600 ? mb_substr($desc, 0, 600) . '…' : $desc;
+            $short = $desc;
+            if (mb_strlen($desc) > 600) {
+                $short = mb_substr($desc, 0, 600) . '…';
+            }
             $descBlock = '<div style="margin-top:18px;padding:14px 16px;background:#F8FAFC;border-left:3px solid ' . $sevColor . ';border-radius:4px;font-size:14px;color:#334155;line-height:1.55;">'
                 . nl2br(esc($short)) . '</div>';
         }
@@ -586,68 +698,68 @@ if (!function_exists('mail_html_body')) {
         $title = esc($title);
 
         $html = '<!doctype html>
-<html lang="en">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<title>' . esc(mail_subject($event, $context)) . '</title>
-</head>
-<body style="margin:0;padding:0;background:#F1F5F9;font-family:-apple-system,BlinkMacSystemFont,\'Segoe UI\',Roboto,sans-serif;color:#0F172A;">
-<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="background:#F1F5F9;padding:24px 12px;">
-  <tr><td align="center">
-    <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="600" style="max-width:600px;background:#FFFFFF;border-radius:8px;overflow:hidden;box-shadow:0 4px 14px rgba(15,23,42,0.06);">
-      <!-- banner -->
-      <tr>
-        <td style="background:' . $bannerBg . ';padding:22px 28px;color:#FFFFFF;">
-          <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+        <html lang="en">
+        <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width,initial-scale=1">
+        <title>' . esc(mail_subject($event, $context)) . '</title>
+        </head>
+        <body style="margin:0;padding:0;background:#F1F5F9;font-family:-apple-system,BlinkMacSystemFont,\'Segoe UI\',Roboto,sans-serif;color:#0F172A;">
+        <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="background:#F1F5F9;padding:24px 12px;">
+        <tr><td align="center">
+            <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="600" style="max-width:600px;background:#FFFFFF;border-radius:8px;overflow:hidden;box-shadow:0 4px 14px rgba(15,23,42,0.06);">
+            <!-- banner -->
             <tr>
-              <td style="font-size:12px;letter-spacing:1.5px;text-transform:uppercase;opacity:0.85;">' . $brand . '</td>
-              <td align="right" style="font-size:11px;opacity:0.85;">' . esc(date('D, d M H:i')) . '</td>
+                <td style="background:' . $bannerBg . ';padding:22px 28px;color:#FFFFFF;">
+                <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+                    <tr>
+                    <td style="font-size:12px;letter-spacing:1.5px;text-transform:uppercase;opacity:0.85;">' . $brand . '</td>
+                    <td align="right" style="font-size:11px;opacity:0.85;">' . esc(date('D, d M H:i')) . '</td>
+                    </tr>
+                </table>
+                <div style="margin-top:6px;font-size:22px;font-weight:700;letter-spacing:-0.3px;">' . esc($headline) . '</div>
+                <div style="margin-top:6px;font-size:14px;opacity:0.95;line-height:1.5;">' . $lead . '</div>
+                </td>
             </tr>
-          </table>
-          <div style="margin-top:6px;font-size:22px;font-weight:700;letter-spacing:-0.3px;">' . esc($headline) . '</div>
-          <div style="margin-top:6px;font-size:14px;opacity:0.95;line-height:1.5;">' . $lead . '</div>
-        </td>
-      </tr>
-      <!-- title -->
-      <tr>
-        <td style="padding:22px 28px 4px 28px;">
-          <div style="font-size:13px;color:#94A3B8;letter-spacing:0.4px;text-transform:uppercase;">Ticket title</div>
-          <div style="font-size:18px;font-weight:600;color:#0F172A;margin-top:4px;line-height:1.35;">' . $title . '</div>
-          ' . $descBlock . '
-        </td>
-      </tr>
-      <!-- summary table -->
-      <tr>
-        <td style="padding:18px 28px 8px 28px;">
-          <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border:1px solid #E2E8F0;border-radius:6px;border-collapse:separate;border-spacing:0;">
-            ' . $rows . '
-          </table>
-        </td>
-      </tr>
-      <!-- action button -->
-      <tr>
-        <td align="center" style="padding:22px 28px 6px 28px;">
-          <a href="' . esc($url) . '" style="display:inline-block;padding:12px 28px;background:' . $sevDark . ';color:#FFFFFF;font-size:14px;font-weight:600;text-decoration:none;border-radius:6px;letter-spacing:0.3px;">View ticket →</a>
-        </td>
-      </tr>
-      <tr>
-        <td align="center" style="padding:0 28px 24px 28px;">
-          <div style="font-size:12px;color:#94A3B8;">If the button does not work, copy this link:<br><a href="' . esc($url) . '" style="color:#64748B;word-break:break-all;">' . esc($url) . '</a></div>
-        </td>
-      </tr>
-      <!-- footer -->
-      <tr>
-        <td style="background:#F8FAFC;padding:16px 28px;border-top:1px solid #E2E8F0;font-size:11px;color:#94A3B8;line-height:1.6;">
-          This is an automated notification from ' . $brand . '. Do not reply directly — use the application to respond or comment.<br>
-          &copy; ' . $year . ' ' . $brand . ' · Triggered by <strong>' . esc($actor) . '</strong> · ' . esc(strtoupper($event)) . '
-        </td>
-      </tr>
-    </table>
-  </td></tr>
-</table>
-</body>
-</html>';
+            <!-- title -->
+            <tr>
+                <td style="padding:22px 28px 4px 28px;">
+                <div style="font-size:13px;color:#94A3B8;letter-spacing:0.4px;text-transform:uppercase;">Ticket title</div>
+                <div style="font-size:18px;font-weight:600;color:#0F172A;margin-top:4px;line-height:1.35;">' . $title . '</div>
+                ' . $descBlock . '
+                </td>
+            </tr>
+            <!-- summary table -->
+            <tr>
+                <td style="padding:18px 28px 8px 28px;">
+                <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border:1px solid #E2E8F0;border-radius:6px;border-collapse:separate;border-spacing:0;">
+                    ' . $rows . '
+                </table>
+                </td>
+            </tr>
+            <!-- action button -->
+            <tr>
+                <td align="center" style="padding:22px 28px 6px 28px;">
+                <a href="' . esc($url) . '" style="display:inline-block;padding:12px 28px;background:' . $sevDark . ';color:#FFFFFF;font-size:14px;font-weight:600;text-decoration:none;border-radius:6px;letter-spacing:0.3px;">View ticket →</a>
+                </td>
+            </tr>
+            <tr>
+                <td align="center" style="padding:0 28px 24px 28px;">
+                <div style="font-size:12px;color:#94A3B8;">If the button does not work, copy this link:<br><a href="' . esc($url) . '" style="color:#64748B;word-break:break-all;">' . esc($url) . '</a></div>
+                </td>
+            </tr>
+            <!-- footer -->
+            <tr>
+                <td style="background:#F8FAFC;padding:16px 28px;border-top:1px solid #E2E8F0;font-size:11px;color:#94A3B8;line-height:1.6;">
+                This is an automated notification from ' . $brand . '. Do not reply directly — use the application to respond or comment.<br>
+                &copy; ' . $year . ' ' . $brand . ' · Triggered by <strong>' . esc($actor) . '</strong> · ' . esc(strtoupper($event)) . '
+                </td>
+            </tr>
+            </table>
+        </td></tr>
+        </table>
+        </body>
+        </html>';
         return $html;
     }
 }
@@ -733,13 +845,7 @@ if (!function_exists('parse_mentions')) {
             return [];
         }
         $excludeUserId = (string) $excludeUserId;
-        $db = \Config\Database::connect();
-        $rows = $db->table('users')
-            ->select('user_id, role')
-            ->whereIn('user_id', $candidates)
-            ->where('is_active', 1)
-            ->where('deleted_at', null)
-            ->get()->getResultArray();
+        $rows = model('Helper_model')->parseUsersByMentions($candidates);
         $out = [];
         foreach ($rows as $r) {
             $uid = (string) $r['user_id'];
@@ -790,10 +896,7 @@ if (!function_exists('user_notify_allowed')) {
         static $cache = [];
         if (!isset($cache[$user_id])) {
             try {
-                $db = \Config\Database::connect();
-                $rows = $db->table('user_notification_settings')
-                    ->where('user_id', $user_id)
-                    ->get()->getResultArray();
+                $rows = model('Helper_model')->getUserNotificationSettings($user_id);
                 $map = [];
                 foreach ($rows as $r) {
                     $key = (int) $r['project_id'] . '|' . (string) $r['severity'];
@@ -825,7 +928,6 @@ if (!function_exists('notify_users')) {
         if (empty($user_ids)) {
             return;
         }
-        $db = \Config\Database::connect();
 
         $ids = array_values(array_filter(array_map('strval', (array) $user_ids), function ($v) {
             return $v !== '';
@@ -837,25 +939,23 @@ if (!function_exists('notify_users')) {
         $project_id = 0;
         $severity   = '';
         if ((int) $ticket_id > 0) {
-            $ticket = $db->table('tickets')
-                ->select('project_id, alert_type')
-                ->where('id', (int) $ticket_id)
-                ->get()->getRowArray();
+            $ticket = model('Helper_model')->getTicketProjectAndSeverity($ticket_id);
             if (!empty($ticket)) {
                 $project_id = (int) $ticket['project_id'];
                 $severity   = (string) $ticket['alert_type'];
             }
         }
 
-        $rows = $db->table('users')->whereIn('user_id', $ids)->get()->getResultArray();
+        $rows = model('User_model')->getByIds($ids);
         $now  = date('Y-m-d H:i:s');
+        $helperModel = model('Helper_model');
         foreach ($rows as $u) {
             // Filter through the per-user matrix. Lenient default = allow.
             if ($severity !== '' && !user_notify_allowed($u['user_id'], $project_id, $severity)) {
                 log_message('debug', "pview alert >> notify_users SKIP (user opted out): user=[" . $u['user_id'] . "], ticket=[" . $ticket_id . "], severity=[" . $severity . "]");
                 continue;
             }
-            $db->table('notification_logs')->insert([
+            $helperModel->insertNotificationLog([
                 'ticket_id'       => $ticket_id,
                 'channel'         => 'email',
                 'recipient_email' => $u['email'],
@@ -871,9 +971,7 @@ if (!function_exists('notify_users')) {
         // Keep the notification logs table bounded. Prune entries older than 90 days.
         try {
             $cutoff = date('Y-m-d H:i:s', time() - (90 * 86400));
-            $db->table('notification_logs')
-                ->where('created_at <', $cutoff)
-                ->delete();
+            $helperModel->pruneNotificationLogs($cutoff);
         } catch (\Throwable $e) {
             // non-fatal
         }
@@ -903,12 +1001,8 @@ if (!function_exists('process_notification_queue')) {
             $maxAttempts = 5;
         }
 
-        $db = \Config\Database::connect();
-        $pending = $db->table('notification_logs')
-            ->where('status', 'pending')
-            ->orderBy('id', 'asc')
-            ->limit($batch)
-            ->get()->getResultArray();
+        $helperModel = model('Helper_model');
+        $pending = $helperModel->getPendingNotifications($batch);
 
         $sent    = 0;
         $failed  = 0;
@@ -956,17 +1050,14 @@ if (!function_exists('process_notification_queue')) {
 
         // Batch UPDATE all successfully sent rows in a single query.
         if (!empty($sentIds)) {
-            $db->table('notification_logs')
-                ->set(['status' => 'sent', 'sent_at' => date('Y-m-d H:i:s'), 'error_message' => null])
-                ->whereIn('id', $sentIds)
-                ->update();
+            $helperModel->updateNotificationStatusSent($sentIds, date('Y-m-d H:i:s'));
         }
         // Failed and retry rows each carry a distinct error_message, so update individually.
         foreach ($failedRows as $id => $msg) {
-            $db->table('notification_logs')->where('id', $id)->update(['status' => 'failed', 'error_message' => $msg]);
+            $helperModel->updateNotificationStatusSingle($id, 'failed', $msg);
         }
         foreach ($retryRows as $id => $msg) {
-            $db->table('notification_logs')->where('id', $id)->update(['error_message' => $msg]);
+            $helperModel->updateNotificationErrorMsg($id, $msg);
         }
 
         return ['sent' => $sent, 'failed' => $failed, 'retried' => $retried];
@@ -980,24 +1071,65 @@ if (!function_exists('notify_ticket_event')) {
         if (empty($userIds)) {
             return;
         }
+        $alarmIdVal = '';
+        if (isset($ticket['alarm_id'])) {
+            $alarmIdVal = (string) $ticket['alarm_id'];
+        }
+        $titleVal = '';
+        if (isset($ticket['title'])) {
+            $titleVal = (string) $ticket['title'];
+        }
+        $descVal = '';
+        if (isset($ticket['description'])) {
+            $descVal = (string) $ticket['description'];
+        }
+        $alertTypeVal = 'info';
+        if (isset($ticket['alert_type'])) {
+            $alertTypeVal = (string) $ticket['alert_type'];
+        }
+        $priorityVal = 'medium';
+        if (isset($ticket['priority'])) {
+            $priorityVal = (string) $ticket['priority'];
+        }
+        $projectNameVal = '';
+        if (isset($ticket['project_name'])) {
+            $projectNameVal = (string) $ticket['project_name'];
+        }
+        $flowNameVal = '';
+        if (isset($ticket['flow_name'])) {
+            $flowNameVal = (string) $ticket['flow_name'];
+        }
+        $stateNameVal = '';
+        if (isset($ticket['state_name'])) {
+            $stateNameVal = (string) $ticket['state_name'];
+        }
+        $levelVal = 1;
+        if (isset($ticket['current_level'])) {
+            $levelVal = (int) $ticket['current_level'];
+        }
+        $ticketUrlVal = site_url('tickets/detail/' . $alarmIdVal);
+
         $context = [
-            'alarm_id'       => isset($ticket['alarm_id'])     ? (string) $ticket['alarm_id']     : '',
-            'title'          => isset($ticket['title'])        ? (string) $ticket['title']        : '',
-            'description'    => isset($ticket['description'])  ? (string) $ticket['description']  : '',
-            'alert_type'     => isset($ticket['alert_type'])   ? (string) $ticket['alert_type']   : 'info',
-            'priority'       => isset($ticket['priority'])     ? (string) $ticket['priority']     : 'medium',
-            'project_name'   => isset($ticket['project_name']) ? (string) $ticket['project_name'] : '',
-            'flow_name'      => isset($ticket['flow_name'])    ? (string) $ticket['flow_name']    : '',
-            'state_name'     => isset($ticket['state_name'])   ? (string) $ticket['state_name']   : '',
-            'level'          => isset($ticket['current_level']) ? (int) $ticket['current_level']  : 1,
-            'ticket_url'     => site_url('tickets/detail/' . (isset($ticket['alarm_id']) ? $ticket['alarm_id'] : '')),
+            'alarm_id'       => $alarmIdVal,
+            'title'          => $titleVal,
+            'description'    => $descVal,
+            'alert_type'     => $alertTypeVal,
+            'priority'       => $priorityVal,
+            'project_name'   => $projectNameVal,
+            'flow_name'      => $flowNameVal,
+            'state_name'     => $stateNameVal,
+            'level'          => $levelVal,
+            'ticket_url'     => $ticketUrlVal,
         ];
         foreach ($extraContext as $k => $v) {
             $context[$k] = $v;
         }
         $subject = mail_subject($event, $context);
         $body    = mail_html_body($event, $context);
-        $ticketId = isset($ticket['id']) ? (int) $ticket['id'] : 0;
+        $ticketId = 0;
+        if (isset($ticket['id'])) {
+            $ticketId = (int) $ticket['id'];
+        }
         notify_users($userIds, $ticketId, $subject, $body);
     }
 }
@@ -1009,7 +1141,11 @@ if (!function_exists('tat_expires_at')) {
         if (empty($ticket)) {
             return '';
         }
-        $status = (string) (isset($ticket['status']) ? $ticket['status'] : '');
+        $rawStatus = '';
+        if (isset($ticket['status'])) {
+            $rawStatus = $ticket['status'];
+        }
+        $status = (string) $rawStatus;
         if ($status === 'resolved' || $status === 'closed') {
             return '';
         }
@@ -1037,7 +1173,11 @@ if (!function_exists('tat_expires_at')) {
         } else if (isset($ticket[$tatKey])) {
             $tat = (int) $ticket[$tatKey];
         }
-        $entered = strtotime((string) (isset($ticket['state_entered_at']) ? $ticket['state_entered_at'] : 'now'));
+        $rawEntered = 'now';
+        if (isset($ticket['state_entered_at'])) {
+            $rawEntered = $ticket['state_entered_at'];
+        }
+        $entered = strtotime((string) $rawEntered);
         if ($entered === false) {
             return '';
         }
@@ -1050,7 +1190,10 @@ if (!function_exists('tat_minutes_for_level')) {
     function tat_minutes_for_level($state, $level)
     {
         $tatKey = 'l' . (int) $level . '_tat_minutes';
-        return isset($state[$tatKey]) ? (int) $state[$tatKey] : 60;
+        if (isset($state[$tatKey])) {
+            return (int) $state[$tatKey];
+        }
+        return 60;
     }
 }
 
@@ -1061,7 +1204,11 @@ if (!function_exists('tat_total_minutes')) {
         if (empty($ticket)) {
             return 0;
         }
-        $status = (string) (isset($ticket['status']) ? $ticket['status'] : '');
+        $rawStatus = '';
+        if (isset($ticket['status'])) {
+            $rawStatus = $ticket['status'];
+        }
+        $status = (string) $rawStatus;
         if ($status === 'resolved' || $status === 'closed') {
             return 0;
         }
@@ -1267,14 +1414,21 @@ if (!function_exists('dt_parse_request')) {
         }
 
         $orderArr = $request->getGet('order');
-        $orderCol = isset($colMap[0]) ? $colMap[0] : 'id';
+        $orderCol = 'id';
+        if (isset($colMap[0])) {
+            $orderCol = $colMap[0];
+        }
         $orderDir = 'asc';
         if (is_array($orderArr) && isset($orderArr[0]['column'])) {
             $idx = (int) $orderArr[0]['column'];
             if (isset($colMap[$idx])) {
                 $orderCol = $colMap[$idx];
             }
-            $rawDir = isset($orderArr[0]['dir']) ? strtolower((string) $orderArr[0]['dir']) : 'asc';
+            $dirVal = 'asc';
+            if (isset($orderArr[0]['dir'])) {
+                $dirVal = $orderArr[0]['dir'];
+            }
+            $rawDir = strtolower((string) $dirVal);
             if ($rawDir === 'desc') {
                 $orderDir = 'desc';
             }
@@ -1513,12 +1667,37 @@ if (!function_exists('activity_log')) {
     function activity_log($module, $action, $entity_type = null, $entity_id = null, $summary = '', $meta = [], $overrides = [])
     {
         try {
-            $db = \Config\Database::connect();
-            $userId    = isset($overrides['user_id'])    ? (string) $overrides['user_id']    : (string) logged_user_id();
-            $userName  = isset($overrides['user_name'])  ? (string) $overrides['user_name']  : (string) logged_user_name();
-            $userRole  = isset($overrides['user_role'])  ? (string) $overrides['user_role']  : (string) logged_user_role();
-            $status    = isset($overrides['status'])     ? (string) $overrides['status']     : 'success';
-            $projectId = isset($overrides['project_id']) ? ((int) $overrides['project_id'] ?: null) : null;
+            if (isset($overrides['user_id'])) {
+                $userId = (string) $overrides['user_id'];
+            } else {
+                $userId = (string) logged_user_id();
+            }
+
+            if (isset($overrides['user_name'])) {
+                $userName = (string) $overrides['user_name'];
+            } else {
+                $userName = (string) logged_user_name();
+            }
+
+            if (isset($overrides['user_role'])) {
+                $userRole = (string) $overrides['user_role'];
+            } else {
+                $userRole = (string) logged_user_role();
+            }
+
+            if (isset($overrides['status'])) {
+                $status = (string) $overrides['status'];
+            } else {
+                $status = 'success';
+            }
+
+            $projectId = null;
+            if (isset($overrides['project_id'])) {
+                $rawProjId = (int) $overrides['project_id'];
+                if ($rawProjId !== 0) {
+                    $projectId = $rawProjId;
+                }
+            }
 
             $ip = '';
             if (isset($_SERVER['REMOTE_ADDR'])) {
@@ -1561,23 +1740,64 @@ if (!function_exists('activity_log')) {
                 }
             }
 
-            $db->table('activity_logs')->insert([
-                'user_id'     => ($userId === '') ? null : $userId,
-                'user_name'   => ($userName === '') ? null : substr($userName, 0, 160),
-                'user_role'   => ($userRole === '') ? null : $userRole,
+            $dbUserId = $userId;
+            if ($userId === '') {
+                $dbUserId = null;
+            }
+            $dbUserName = null;
+            if ($userName !== '') {
+                $dbUserName = substr($userName, 0, 160);
+            }
+            $dbUserRole = $userRole;
+            if ($userRole === '') {
+                $dbUserRole = null;
+            }
+            $dbEntityType = null;
+            if ($entity_type !== null && $entity_type !== '') {
+                $dbEntityType = substr((string) $entity_type, 0, 40);
+            }
+            $dbEntityId = null;
+            if ($entity_id !== null && $entity_id !== '') {
+                $dbEntityId = substr((string) $entity_id, 0, 64);
+            }
+            $dbIpAddress = null;
+            if ($ip !== '') {
+                $dbIpAddress = substr($ip, 0, 45);
+            }
+            $dbUserAgent = $ua;
+            if ($ua === '') {
+                $dbUserAgent = null;
+            }
+            $dbUrl = $url;
+            if ($url === '') {
+                $dbUrl = null;
+            }
+            $dbMethod = null;
+            if ($method !== '') {
+                $dbMethod = substr($method, 0, 10);
+            }
+            $dbStatus = null;
+            if ($status !== '') {
+                $dbStatus = substr($status, 0, 10);
+            }
+
+            model('Helper_model')->insertActivityLog([
+                'user_id'     => $dbUserId,
+                'user_name'   => $dbUserName,
+                'user_role'   => $dbUserRole,
                 'module'      => substr((string) $module, 0, 40),
                 'action'      => substr((string) $action, 0, 40),
-                'entity_type' => ($entity_type === null || $entity_type === '') ? null : substr((string) $entity_type, 0, 40),
-                'entity_id'   => ($entity_id === null || $entity_id === '') ? null : substr((string) $entity_id, 0, 64),
+                'entity_type' => $dbEntityType,
+                'entity_id'   => $dbEntityId,
                 'summary'     => substr((string) $summary, 0, 255),
                 'meta'        => $metaJson,
-                'ip_address'  => ($ip === '') ? null : substr($ip, 0, 45),
-                'user_agent'  => ($ua === '') ? null : $ua,
+                'ip_address'  => $dbIpAddress,
+                'user_agent'  => $dbUserAgent,
                 'browser'     => $browser,
                 'project_id'  => $projectId,
-                'url'         => ($url === '') ? null : $url,
-                'method'      => ($method === '') ? null : substr($method, 0, 10),
-                'status'      => ($status === '') ? null : substr($status, 0, 10),
+                'url'         => $dbUrl,
+                'method'      => $dbMethod,
+                'status'      => $dbStatus,
                 'created_at'  => date('Y-m-d H:i:s'),
             ]);
         } catch (\Throwable $e) {
@@ -1600,8 +1820,14 @@ if (!function_exists('activity_diff')) {
             if (!$hadBefore && !$hasAfter) {
                 continue;
             }
-            $oldVal = $hadBefore ? $before[$field] : null;
-            $newVal = $hasAfter  ? $after[$field]  : null;
+            $oldVal = null;
+            if ($hadBefore) {
+                $oldVal = $before[$field];
+            }
+            $newVal = null;
+            if ($hasAfter) {
+                $newVal = $after[$field];
+            }
             // Loose comparison — '1' vs 1 from POST should not show as a change.
             if ((string) $oldVal !== (string) $newVal) {
                 $diff[$field] = [$oldVal, $newVal];

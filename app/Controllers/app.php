@@ -10,12 +10,14 @@ class App extends BaseController
     public $app_model;
     public $user_model;
     public $api_key_row;
+    // Constructor to initialize dependencies and references.
     function __construct()
     {
         $this->app_model  = new app_model();
         $this->user_model = new user_model();
     }
 
+    // Renders the main dashboard page with tickets summary and trends.
     public function dashboard()
     {
         check_module_access('dashboard', 'view');
@@ -101,6 +103,7 @@ class App extends BaseController
         echo view('templates/footer');
     }
 
+    // Lists all projects and their configuration.
     public function projects()
     {
         check_module_access('projects', 'view');
@@ -116,6 +119,7 @@ class App extends BaseController
         echo view('templates/footer');
     }
 
+    // Renders the form to create a new project.
     public function project_add()
     {
         check_module_access('projects', 'add');
@@ -126,6 +130,7 @@ class App extends BaseController
         echo view('templates/footer');
     }
 
+    // Saves a new project to the database.
     public function project_save()
     {
         check_module_access('projects', 'add');
@@ -149,6 +154,7 @@ class App extends BaseController
         return redirect()->to(site_url('projects'));
     }
 
+    // Renders the edit form for an existing project.
     public function project_edit($id)
     {
         check_module_access('projects', 'edit');
@@ -163,6 +169,7 @@ class App extends BaseController
         echo view('templates/footer');
     }
 
+    // Updates project settings in the database.
     public function project_update($id)
     {
         check_module_access('projects', 'edit');
@@ -191,6 +198,7 @@ class App extends BaseController
         return redirect()->to(site_url('projects'));
     }
 
+    // Deletes a project from the database.
     public function project_delete($id)
     {
         check_module_access('projects', 'delete');
@@ -204,12 +212,16 @@ class App extends BaseController
         }
         $before = $this->app_model->projectGetById($id);
         $this->app_model->projectSoftDelete($id);
-        $name = isset($before['name']) ? (string) $before['name'] : '';
+        $name = '';
+        if (isset($before['name'])) {
+            $name = (string) $before['name'];
+        }
         activity_log('projects', 'delete', 'project', (string) $id, 'Removed project "' . $name . '"', ['name' => $name]);
         $this->session->setFlashdata('success', 'Project removed.');
         return redirect()->to(site_url('projects'));
     }
 
+    // Lists all workflow paths.
     public function flows()
     {
         check_module_access('flows', 'view');
@@ -226,6 +238,7 @@ class App extends BaseController
         echo view('templates/footer');
     }
 
+    // Renders the form to add a new workflow flow.
     public function flow_add()
     {
         check_module_access('flows', 'add');
@@ -241,6 +254,7 @@ class App extends BaseController
         echo view('templates/footer');
     }
 
+    // Saves a new workflow flow to the database.
     public function flow_save()
     {
         check_module_access('flows', 'add');
@@ -273,6 +287,7 @@ class App extends BaseController
         return redirect()->to(site_url('flows'));
     }
 
+    // Renders the edit form for a workflow flow.
     public function flow_edit($id)
     {
         check_module_access('flows', 'edit');
@@ -292,10 +307,11 @@ class App extends BaseController
         echo view('templates/footer');
     }
 
+    // Updates workflow flow details in the database.
     public function flow_update($id)
     {
         check_module_access('flows', 'edit');
-        $name       = trim((string) $this->request->getPost('name'));
+        $name = trim((string) $this->request->getPost('name'));
         $project_id = (int) $this->request->getPost('project_id');
         if ($name === '' || $project_id === 0) {
             $this->session->setFlashdata('error', 'Name and project are required.');
@@ -329,6 +345,7 @@ class App extends BaseController
         return redirect()->to(site_url('flows'));
     }
 
+    // Deletes a workflow flow from the database.
     public function flow_delete($id)
     {
         check_module_access('flows', 'delete');
@@ -342,12 +359,16 @@ class App extends BaseController
         }
         $before = $this->app_model->flowGetById($id);
         $this->app_model->flowSoftDelete($id);
-        $name = isset($before['name']) ? (string) $before['name'] : '';
+        $name = '';
+        if (isset($before['name'])) {
+            $name = (string) $before['name'];
+        }
         activity_log('flows', 'delete', 'flow', (string) $id, 'Removed flow "' . $name . '"', ['name' => $name]);
         $this->session->setFlashdata('success', 'Flow removed.');
         return redirect()->to(site_url('flows'));
     }
 
+    // Renders the state configuration page for a workflow flow.
     public function flow_states($flow_id)
     {
         check_module_access('flows', 'edit');
@@ -399,6 +420,7 @@ class App extends BaseController
         echo view('templates/footer');
     }
 
+    // Saves or updates a workflow state.
     public function state_save()
     {
         check_module_access('flows', 'edit');
@@ -521,12 +543,19 @@ class App extends BaseController
         }
 
         $isCreate = ($id <= 0);
-        activity_log('flows', $isCreate ? 'create_state' : 'update_state', 'state', (string) $savedId, ($isCreate ? 'Added' : 'Updated') . ' state "' . $name . '" in flow #' . $flow_id, ['flow_id' => $flow_id, 'name' => $name, 'is_initial' => $isInitial, 'is_final' => $isFinal]);
+                $stateAction = 'update_state';
+        $stateMsgPrefix = 'Updated';
+        if ($isCreate) {
+            $stateAction = 'create_state';
+            $stateMsgPrefix = 'Added';
+        }
+        activity_log('flows', $stateAction, 'state', (string) $savedId, $stateMsgPrefix . ' state "' . $name . '" in flow #' . $flow_id, ['flow_id' => $flow_id, 'name' => $name, 'is_initial' => $isInitial, 'is_final' => $isFinal]);
 
         $this->session->setFlashdata('success', 'State saved.');
         return redirect()->to(site_url('flows/states/' . $flow_id));
     }
 
+    // Deletes a workflow state.
     public function state_delete($id)
     {
         check_module_access('flows', 'edit');
@@ -537,7 +566,10 @@ class App extends BaseController
         }
         $result = $this->app_model->stateDelete($id);
         if (!empty($result['ok'])) {
-            $stateName = isset($state['name']) ? (string) $state['name'] : '';
+            $stateName = '';
+            if (isset($state['name'])) {
+                $stateName = (string) $state['name'];
+            }
             activity_log('flows', 'delete_state', 'state', (string) $id, 'Removed state "' . $stateName . '" from flow #' . $flow_id, ['flow_id' => $flow_id, 'name' => $stateName]);
             $this->session->setFlashdata('success', 'State removed.');
         } else {
@@ -550,11 +582,15 @@ class App extends BaseController
         return redirect()->to(site_url('flows/states/' . $flow_id));
     }
 
+    // Reorders workflow states sequence.
     public function state_reorder()
     {
         check_module_access('flows', 'edit');
         try {
-            $payload = $this->request->getJSON(true) ?: [];
+            $payload = $this->request->getJSON(true);
+            if (!$payload) {
+                $payload = [];
+            }
         } catch (\Exception $e) {
             log_message('warning', 'state_reorder: request body parse failed — {msg}', ['msg' => $e->getMessage()]);
             $payload = [];
@@ -562,8 +598,14 @@ class App extends BaseController
         if (empty($payload)) {
             $payload = $this->request->getPost();
         }
-        $flow_id = isset($payload['flow_id']) ? (int) $payload['flow_id'] : 0;
-        $order   = isset($payload['order']) ? $payload['order'] : [];
+        $flow_id = 0;
+        if (isset($payload['flow_id'])) {
+            $flow_id = (int) $payload['flow_id'];
+        }
+        $order = [];
+        if (isset($payload['order'])) {
+            $order = $payload['order'];
+        }
         if ($flow_id <= 0 || !is_array($order) || empty($order)) {
             return json_fail('Flow id and order are required');
         }
@@ -608,8 +650,12 @@ class App extends BaseController
                 return json_fail('This forward transition would create a cycle.');
             }
         }
+        $dbId = null;
+        if ($id !== '' && $id !== null && $id !== 0) {
+            $dbId = $id;
+        }
         $newId = $this->app_model->stateTransitionSave([
-            'id'              => $id ?: null,
+            'id'              => $dbId,
             'flow_id'         => $flow_id,
             'from_state_id'   => $from_state_id,
             'to_state_id'     => $to_state_id,
@@ -617,7 +663,11 @@ class App extends BaseController
             'requires_comment' => $requires_comment,
             'created_by'      => (string) logged_user_id(),
         ]);
-        activity_log('flows', 'transition_save', 'flow', (string) $flow_id, ($id ? 'Updated' : 'Added') . ' ' . $type . ' transition in flow #' . $flow_id);
+                $transActionText = 'Added';
+        if ($id) {
+            $transActionText = 'Updated';
+        }
+        activity_log('flows', 'transition_save', 'flow', (string) $flow_id, $transActionText . ' ' . $type . ' transition in flow #' . $flow_id);
         return json_ok(['id' => $newId], 'Transition saved');
     }
 
@@ -633,6 +683,7 @@ class App extends BaseController
         return json_ok([], 'Transition deleted');
     }
 
+    // Lists all configured alerts and filters.
     public function alerts()
     {
         check_module_access('alerts', 'view');
@@ -651,6 +702,7 @@ class App extends BaseController
         echo view('templates/footer');
     }
 
+    // Renders the form to define a new alert.
     public function alert_add()
     {
         check_module_access('alerts', 'add');
@@ -668,6 +720,7 @@ class App extends BaseController
         echo view('templates/footer');
     }
 
+    // Saves a new alert configuration.
     public function alert_save()
     {
         check_module_access('alerts', 'add');
@@ -701,6 +754,7 @@ class App extends BaseController
         return redirect()->to(site_url('alerts'));
     }
 
+    // Renders the edit form for an alert configuration.
     public function alert_edit($id)
     {
         check_module_access('alerts', 'edit');
@@ -722,6 +776,7 @@ class App extends BaseController
         echo view('templates/footer');
     }
 
+    // Updates an alert configuration.
     public function alert_update($id)
     {
         check_module_access('alerts', 'edit');
@@ -757,17 +812,22 @@ class App extends BaseController
         return redirect()->to(site_url('alerts'));
     }
 
+    // Deletes an alert configuration.
     public function alert_delete($id)
     {
         check_module_access('alerts', 'delete');
         $before = $this->app_model->alertGetById($id);
         $this->app_model->alertDeactivate($id);
-        $alertName = isset($before['name']) ? (string) $before['name'] : '';
+        $alertName = '';
+        if (isset($before['name'])) {
+            $alertName = (string) $before['name'];
+        }
         activity_log('alerts', 'delete', 'alert', (string) $id, 'Deactivated alert "' . $alertName . '"', ['name' => $alertName]);
         $this->session->setFlashdata('success', 'Alert deactivated.');
         return redirect()->to(site_url('alerts'));
     }
 
+    // Lists all defined escalation rules.
     public function escalation()
     {
         check_module_access('escalation', 'view');
@@ -784,6 +844,7 @@ class App extends BaseController
         echo view('templates/footer');
     }
 
+    // Saves or updates an escalation rule.
     public function escalation_save()
     {
         check_module_access('escalation', 'edit');
@@ -814,6 +875,7 @@ class App extends BaseController
         return redirect()->to(site_url('escalation'));
     }
 
+    // Deletes an escalation rule.
     public function escalation_delete($id)
     {
         check_module_access('escalation', 'delete');
@@ -823,6 +885,7 @@ class App extends BaseController
         return redirect()->to(site_url('escalation'));
     }
 
+    // Lists and manages API keys.
     public function api_keys()
     {
         check_module_access('api_keys', 'view');
@@ -839,6 +902,7 @@ class App extends BaseController
         echo view('templates/footer');
     }
 
+    // Generates a new API key.
     public function api_key_generate()
     {
         check_module_access('api_keys', 'add');
@@ -855,6 +919,7 @@ class App extends BaseController
         return redirect()->to(site_url('api_keys'));
     }
 
+    // Enables or disables an API key.
     public function api_key_toggle($id)
     {
         check_module_access('api_keys', 'edit');
@@ -863,6 +928,7 @@ class App extends BaseController
         return redirect()->to(site_url('api_keys'));
     }
 
+    // Lists tickets assigned to the logged-in user.
     public function tickets_my()
     {
         check_module_access('tickets', 'view');
@@ -890,6 +956,7 @@ class App extends BaseController
         echo view('templates/footer');
     }
 
+    // Lists all tickets in the system.
     public function tickets_all()
     {
         check_module_access('tickets_all', 'view');
@@ -919,6 +986,7 @@ class App extends BaseController
         echo view('templates/footer');
     }
 
+    // Renders the form to create a new ticket.
     public function ticket_create()
     {
         check_module_access('tickets', 'add');
@@ -933,6 +1001,7 @@ class App extends BaseController
         echo view('templates/footer');
     }
 
+    // Saves a new ticket and triggers initial workflow flow.
     public function ticket_save()
     {
         check_module_access('tickets', 'add');
@@ -985,14 +1054,25 @@ class App extends BaseController
 
         $actualStart = trim((string) $this->request->getPost('actual_start_date'));
         $actualEnd   = trim((string) $this->request->getPost('actual_end_date'));
-        $actualStart = preg_match('/^\d{4}-\d{2}-\d{2}$/', $actualStart) ? $actualStart : null;
-        $actualEnd   = preg_match('/^\d{4}-\d{2}-\d{2}$/', $actualEnd)   ? $actualEnd   : null;
+        if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $actualStart)) {
+            $actualStart = null;
+        }
+        if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $actualEnd)) {
+            $actualEnd = null;
+        }
         if ($actualStart !== null && $actualEnd !== null && $actualEnd < $actualStart) {
             $this->session->setFlashdata('error', 'End Date cannot be earlier than Start Date.');
             return redirect()->to(site_url('tickets/create'));
         }
 
         $alarmId = generate_alarm_id();
+
+        $currentAssignee = null;
+        $statusVal = 'open';
+        if ($assigneeUserId !== '') {
+            $currentAssignee = $assigneeUserId;
+            $statusVal = 'in_progress';
+        }
 
         $this->db->transStart();
         $ticket_id = $this->app_model->ticketSave([
@@ -1007,8 +1087,8 @@ class App extends BaseController
             'actual_end_date'   => $actualEnd,
             'current_state_id'  => (int) $initial['id'],
             'current_level'     => 1,
-            'current_assignee'  => $assigneeUserId !== '' ? $assigneeUserId : null,
-            'status'            => $assigneeUserId !== '' ? 'in_progress' : 'open',
+            'current_assignee'  => $currentAssignee,
+            'status'            => $statusVal,
             'source'            => 'ui',
             'raised_by'         => logged_user_id(),
         ]);
@@ -1038,7 +1118,11 @@ class App extends BaseController
             }
         }
 
-        $notifyUsers = $assigneeUserId !== '' ? [$assigneeUserId] : $this->app_model->stateLevelUsers($initial, 1);
+                if ($assigneeUserId !== '') {
+            $notifyUsers = [$assigneeUserId];
+        } else {
+            $notifyUsers = $this->app_model->stateLevelUsers($initial, 1);
+        }
         try {
             if (!empty($notifyUsers)) {
                 notify_ticket_event('created', [
@@ -1191,6 +1275,7 @@ class App extends BaseController
         return $ticket;
     }
 
+    // Renders the detail view for a specific ticket.
     public function ticket_detail($alarm_id)
     {
         check_module_access('tickets', 'view');
@@ -1257,6 +1342,7 @@ class App extends BaseController
         echo view('templates/footer');
     }
 
+    // Processes a workflow transition action on a ticket.
     public function ticket_action($alarm_id)
     {
         check_module_access('tickets', 'edit');
@@ -1713,6 +1799,7 @@ class App extends BaseController
         return json_ok([], 'Closed');
     }
 
+    // Handles file uploads and attachments for a ticket.
     public function ticket_attach($alarm_id)
     {
         check_module_access('tickets', 'edit');
@@ -1827,6 +1914,7 @@ class App extends BaseController
         return json_ok(['path' => $rel], 'File attached');
     }
 
+    // Downloads a ticket attachment file.
     public function ticket_download($alarm_id, $action_id)
     {
         check_module_access('tickets', 'view');
@@ -1891,7 +1979,10 @@ class App extends BaseController
             return json_ok([]);
         }
         $pool  = $this->app_model->stateLevelUsers($initial, 1);
-        $users = empty($pool) ? [] : $this->user_model->getByIds($pool);
+        $users = [];
+        if (!empty($pool)) {
+            $users = $this->user_model->getByIds($pool);
+        }
         $out   = [];
         foreach ($users as $u) {
             $out[] = ['id' => (string) $u['user_id'], 'name' => (string) $u['name']];
@@ -1991,7 +2082,10 @@ class App extends BaseController
 
         $data = [];
         foreach ($page['rows'] as $t) {
-            $level   = isset($t['current_level']) ? (int) $t['current_level'] : 1;
+            $level = 1;
+            if (isset($t['current_level'])) {
+                $level = (int) $t['current_level'];
+            }
             $expires = tat_expires_at($t);
             $assignee = '-';
             if (!empty($t['assignee_name'])) {
@@ -2024,13 +2118,26 @@ class App extends BaseController
             if (isset($t['status']) && $t['status'] === 'resolved' && $canReopen) {
                 $actions = '<button class="btn btn-sm btn-outline-warning list-reopen-btn" data-url="' . site_url('tickets/reopen/' . esc($t['alarm_id'])) . '" aria-label="Reopen ticket"><i class="bi bi-arrow-counterclockwise"></i> Reopen</button>';
             }
+            $rawAlertType = '';
+            if (isset($t['alert_type'])) {
+                $rawAlertType = $t['alert_type'];
+            }
+            $rawPriority = '';
+            if (isset($t['priority'])) {
+                $rawPriority = $t['priority'];
+            }
+            $rawStateName = '-';
+            if (isset($t['state_name'])) {
+                $rawStateName = $t['state_name'];
+            }
+
             $data[] = [
                 'select'        => $checkbox,
                 'alarm_id_html' => '<a href="' . site_url('tickets/detail/' . esc($t['alarm_id'])) . '" class="alarm-id">' . esc($t['alarm_id']) . '</a>',
                 'title_html'    => '<div class="ticket-cell-title" title="' . esc($t['title']) . '">' . esc($t['title']) . '</div>',
-                'severity'      => alert_badge(isset($t['alert_type']) ? $t['alert_type'] : ''),
-                'priority'      => priority_badge(isset($t['priority']) ? $t['priority'] : ''),
-                'state'         => '<span class="state-text">' . esc(isset($t['state_name']) ? $t['state_name'] : '-') . '</span>',
+                'severity'      => alert_badge($rawAlertType),
+                'priority'      => priority_badge($rawPriority),
+                'state'         => '<span class="state-text">' . esc($rawStateName) . '</span>',
                 'level'         => level_badge($level),
                 'assignee'      => esc($assignee),
                 'tat'           => '<span class="tat-countdown" data-tat-expires="' . esc($expires) . '" data-tat-total-ms="' . (tat_total_minutes($t) * 60000) . '"></span>',
@@ -2252,6 +2359,7 @@ class App extends BaseController
         export_csv_data($filename, 'tickets', $rows, $userSelectedCols);
     }
 
+    // Authenticates external API requests using API keys.
     private function apiAuthenticate()
     {
         $key = $this->request->getHeaderLine('X-API-KEY');
@@ -2267,6 +2375,7 @@ class App extends BaseController
         return true;
     }
 
+    // Returns standard access denied response for API requests.
     private function apiDeny()
     {
         return service('response')->setStatusCode(401)->setJSON([
@@ -2286,7 +2395,10 @@ class App extends BaseController
         if (!empty($check['allowed'])) {
             return null;
         }
-        $retry = isset($check['retry_after_seconds']) ? (int) $check['retry_after_seconds'] : 60;
+        $retry = 60;
+        if (isset($check['retry_after_seconds'])) {
+            $retry = (int) $check['retry_after_seconds'];
+        }
         log_message('warning', 'pview alert >> API rate-limited: api_key_id=[' . $this->api_key_row['id'] . '], endpoint=[' . $endpoint . '], retry_after=[' . $retry . ']');
         return service('response')
             ->setStatusCode(429)
@@ -2309,7 +2421,10 @@ class App extends BaseController
             return $rate;
         }
         try {
-            $body = $this->request->getJSON(true) ?: [];
+            $body = $this->request->getJSON(true);
+            if (!$body) {
+                $body = [];
+            }
         } catch (\Exception $e) {
             log_message('warning', 'api_raise: request body parse failed — {msg} — IP: {ip}', [
                 'msg' => $e->getMessage(),
@@ -2320,9 +2435,19 @@ class App extends BaseController
         if (empty($body)) {
             $body = $this->request->getPost();
         }
-        $project_id = isset($body['project_id']) ? (int) $body['project_id'] : 0;
-        $flow_id    = isset($body['flow_id'])    ? (int) $body['flow_id']    : 0;
-        $title      = trim((string) (isset($body['title']) ? $body['title'] : ''));
+        $project_id = 0;
+        if (isset($body['project_id'])) {
+            $project_id = (int) $body['project_id'];
+        }
+        $flow_id = 0;
+        if (isset($body['flow_id'])) {
+            $flow_id = (int) $body['flow_id'];
+        }
+                $rawTitle = '';
+        if (isset($body['title'])) {
+            $rawTitle = $body['title'];
+        }
+        $title      = trim((string) $rawTitle);
         if ($project_id === 0 || $flow_id === 0 || $title === '') {
             return service('response')->setStatusCode(400)->setJSON([
                 'success' => false,
@@ -2346,11 +2471,19 @@ class App extends BaseController
             ]);
         }
 
-        $alertType = strtolower((string) (isset($body['alert_type']) ? $body['alert_type'] : 'info'));
+                $rawAlertType = 'info';
+        if (isset($body['alert_type'])) {
+            $rawAlertType = $body['alert_type'];
+        }
+        $alertType = strtolower((string) $rawAlertType);
         if (!in_array($alertType, ['info', 'major', 'critical'], true)) {
             $alertType = 'info';
         }
-        $priority = strtolower((string) (isset($body['priority']) ? $body['priority'] : 'medium'));
+                $rawPriority = 'medium';
+        if (isset($body['priority'])) {
+            $rawPriority = $body['priority'];
+        }
+        $priority = strtolower((string) $rawPriority);
         if (!in_array($priority, ['low', 'medium', 'high', 'urgent'], true)) {
             $priority = 'medium';
         }
@@ -2364,42 +2497,71 @@ class App extends BaseController
         }
 
         $alarmId   = generate_alarm_id();
+
+        $alertDefId = null;
+        if (isset($body['alert_def_id'])) {
+            $alertDefId = $body['alert_def_id'];
+        }
+
+        $rawDescription = '';
+        if (isset($body['description'])) {
+            $rawDescription = $body['description'];
+        }
+        $description = mb_substr((string) $rawDescription, 0, 10000);
+
+        $rawSourceSystem = '';
+        if (isset($body['source_system'])) {
+            $rawSourceSystem = $body['source_system'];
+        }
+        $sourceSystem = mb_substr((string) $rawSourceSystem, 0, 100);
+
         $ticket_id = $this->app_model->ticketSave([
             'alarm_id'         => $alarmId,
             'project_id'       => $project_id,
             'flow_id'          => $flow_id,
-            'alert_def_id'     => isset($body['alert_def_id']) ? $body['alert_def_id'] : null,
+            'alert_def_id'     => $alertDefId,
             'title'            => mb_substr($title, 0, 300),
-            'description'      => mb_substr((string) (isset($body['description']) ? $body['description'] : ''), 0, 10000),
+            'description'      => $description,
             'alert_type'       => $alertType,
             'priority'         => $priority,
             'current_state_id' => (int) $initial['id'],
             'current_level'    => 1,
             'status'           => 'open',
             'source'           => 'api',
-            'source_system'    => mb_substr((string) (isset($body['source_system']) ? $body['source_system'] : ''), 0, 100),
+            'source_system'    => $sourceSystem,
         ]);
+
+        $actorName = 'system';
+        if (isset($body['source_system'])) {
+            $actorName = $body['source_system'];
+        }
+
         $this->app_model->ticketLogAction($ticket_id, 'created', [
-            'comment'             => 'API raised by ' . (isset($body['source_system']) ? $body['source_system'] : 'system'),
+            'comment'             => 'API raised by ' . $actorName,
             'to_state_id'         => (int) $initial['id'],
             'to_level'            => 1,
-            'performed_by_system' => (string) (isset($body['source_system']) ? $body['source_system'] : ''),
+            'performed_by_system' => (string) $actorName,
         ]);
 
         $emails = [];
         try {
             $level_users = $this->app_model->stateLevelUsers($initial, 1);
             if (!empty($level_users)) {
+                $eventDesc = '';
+                if (isset($body['description'])) {
+                    $eventDesc = $body['description'];
+                }
+
                 notify_ticket_event('created', [
                     'id'            => $ticket_id,
                     'alarm_id'      => $alarmId,
                     'title'         => $title,
-                    'description'   => isset($body['description']) ? $body['description'] : '',
+                    'description'   => $eventDesc,
                     'alert_type'    => $alertType,
                     'priority'      => $priority,
                     'state_name'    => $initial['name'],
                     'current_level' => 1,
-                ], ['actor_name' => isset($body['source_system']) ? $body['source_system'] : 'system'], $level_users);
+                ], ['actor_name' => $actorName], $level_users);
                 $rows = $this->user_model->getByIds($level_users);
                 foreach ($rows as $r) {
                     $emails[] = $r['email'];
@@ -2451,7 +2613,10 @@ class App extends BaseController
 
         $entered = strtotime((string) $t['state_entered_at']);
         $tatKey2 = 'l' . (int) $t['current_level'] . '_tat_minutes';
-        $tat     = isset($t[$tatKey2]) ? (int) $t[$tatKey2] : 60;
+        $tat = 60;
+        if (isset($t[$tatKey2])) {
+            $tat = (int) $t[$tatKey2];
+        }
         $remaining = max(0, intval(($entered + $tat * 60 - time()) / 60));
 
         return service('response')->setJSON([
@@ -2484,7 +2649,10 @@ class App extends BaseController
             return service('response')->setStatusCode(400)->setJSON(['success' => false, 'message' => 'Invalid alarm_id']);
         }
         try {
-            $body = $this->request->getJSON(true) ?: [];
+            $body = $this->request->getJSON(true);
+            if (!$body) {
+                $body = [];
+            }
         } catch (\Exception $e) {
             log_message('warning', 'api_update: request body parse failed — {msg} — IP: {ip}', [
                 'msg' => $e->getMessage(),
@@ -2507,9 +2675,21 @@ class App extends BaseController
             ]);
         }
 
-        $action  = (string) (isset($body['action']) ? $body['action'] : '');
-        $comment = (string) (isset($body['comment']) ? $body['comment'] : '');
-        $sys     = (string) (isset($body['performed_by_system']) ? $body['performed_by_system'] : '');
+                $rawAction = '';
+        if (isset($body['action'])) {
+            $rawAction = $body['action'];
+        }
+        $action  = (string) $rawAction;
+                $rawComment = '';
+        if (isset($body['comment'])) {
+            $rawComment = $body['comment'];
+        }
+        $comment = (string) $rawComment;
+                $rawSys = '';
+        if (isset($body['performed_by_system'])) {
+            $rawSys = $body['performed_by_system'];
+        }
+        $sys     = (string) $rawSys;
 
         if ($this->ticketIsTerminal($t)) {
             return service('response')->setStatusCode(400)->setJSON(['success' => false, 'message' => 'Ticket is already ' . $t['status']]);
@@ -2602,6 +2782,7 @@ class App extends BaseController
         return service('response')->setJSON(['success' => true, 'data' => $rows]);
     }
 
+    // Returns JSON dataset for the dashboard ticket trend chart.
     public function dashboard_trend()
     {
         check_module_access('dashboard', 'view');
@@ -2635,6 +2816,7 @@ class App extends BaseController
         ]);
     }
 
+    // Returns the number of actionable tickets for polling.
     public function actionable_count()
     {
         check_isvalidated();
@@ -2760,6 +2942,7 @@ class App extends BaseController
         }
     }
 
+    // Renders the Module Permissions Control Panel.
     public function module_control_panel()
     {
         check_module_access('module_control_panel', 'view');
@@ -2836,6 +3019,7 @@ class App extends BaseController
         echo view('templates/footer');
     }
 
+    // Saves updated module permissions for roles.
     public function module_control_panel_save()
     {
         check_module_access('module_control_panel', 'edit');
@@ -3105,6 +3289,7 @@ class App extends BaseController
         echo view('templates/footer');
     }
 
+    // Server-side source for cron execution logs data table.
     public function cron_panel_data_table()
     {
         check_module_access('cron_panel', 'view');
@@ -3175,12 +3360,17 @@ class App extends BaseController
             $tmp['duration'] = esc($durSec) . 's';
             $tmp['tickets']  = (int) ($r['tickets_checked'] ?? 0);
             $tmp['sent']     = (int) ($r['notifs_sent'] ?? 0);
-            $tmp['failed']   = $failed > 0
-                ? '<span class="text-danger fw-bold">' . $failed . '</span>'
-                : '0';
-            $tmp['status']   = $isOk
-                ? '<span class="badge bg-success">OK</span>'
-                : '<span class="badge bg-danger">FAILED</span>';
+            $failedHtml = '0';
+            if ($failed > 0) {
+                $failedHtml = '<span class="text-danger fw-bold">' . $failed . '</span>';
+            }
+            $tmp['failed']   = $failedHtml;
+
+            $statusHtml = '<span class="badge bg-danger">FAILED</span>';
+            if ($isOk) {
+                $statusHtml = '<span class="badge bg-success">OK</span>';
+            }
+            $tmp['status']   = $statusHtml;
             $tmp['summary']  = esc($r['output_summary'] ?? '-');
             $out[] = $tmp;
         }
@@ -3193,6 +3383,7 @@ class App extends BaseController
         ]);
     }
 
+    // Renders the global administration settings page.
     public function settings()
     {
         check_isvalidated();
@@ -3216,6 +3407,7 @@ class App extends BaseController
         echo view('templates/footer');
     }
 
+    // Updates global application settings in the database.
     public function settings_save()
     {
         check_isvalidated();
@@ -3952,7 +4144,11 @@ class App extends BaseController
             if (!isset($userSessions[$uid])) {
                 $userSessions[$uid] = ['name' => (string) $s['user_name'], 'logins' => [], 'logouts' => []];
             }
-            $userSessions[$uid][$s['action'] === 'login' ? 'logins' : 'logouts'][] = strtotime($s['created_at']);
+                            $sessKey = 'logouts';
+                if ($s['action'] === 'login') {
+                    $sessKey = 'logins';
+                }
+                $userSessions[$uid][$sessKey][] = strtotime($s['created_at']);
         }
 
         $sessionAvg = [];
@@ -4024,8 +4220,14 @@ class App extends BaseController
             if ($p['status'] === 'active') {
                 $statusBadge = '<span class="badge bg-success">ACTIVE</span>';
             }
-            $desc    = isset($p['description']) ? (string) $p['description'] : '';
-            $creator = isset($p['created_by_name']) ? (string) $p['created_by_name'] : '-';
+            $desc = '';
+            if (isset($p['description'])) {
+                $desc = (string) $p['description'];
+            }
+            $creator = '-';
+            if (isset($p['created_by_name'])) {
+                $creator = (string) $p['created_by_name'];
+            }
 
             $actionsHtml = '';
             if ($canEdit) {
@@ -4038,11 +4240,20 @@ class App extends BaseController
                 $actionsHtml = '<span class="text-muted small">—</span>';
             }
 
+            $descVal = '-';
+            if ($desc !== '') {
+                $descVal = $desc;
+            }
+            $creatorVal = '-';
+            if ($creator !== '') {
+                $creatorVal = $creator;
+            }
+
             $data[] = [
                 'name'        => '<strong>' . esc($p['name']) . '</strong>',
-                'description' => esc($desc !== '' ? $desc : '-'),
+                'description' => esc($descVal),
                 'status'      => $statusBadge,
-                'created_by'  => esc($creator !== '' ? $creator : '-'),
+                'created_by'  => esc($creatorVal),
                 'created_at'  => '<span class="text-muted small">' . esc($p['created_at']) . '</span>',
                 'actions'     => $actionsHtml,
             ];
@@ -4077,8 +4288,14 @@ class App extends BaseController
                 $statusBadge = '<span class="badge bg-success">ACTIVE</span>';
             }
             $stateCount  = '<span class="badge bg-info text-dark">' . (int) $f['state_count'] . '</span>';
-            $projectName = isset($f['project_name']) ? (string) $f['project_name'] : '-';
-            $creator     = isset($f['created_by_name']) ? (string) $f['created_by_name'] : '-';
+            $projectName = '-';
+            if (isset($f['project_name'])) {
+                $projectName = (string) $f['project_name'];
+            }
+            $creator = '-';
+            if (isset($f['created_by_name'])) {
+                $creator = (string) $f['created_by_name'];
+            }
 
             $actionsHtml = '<a class="btn btn-sm btn-primary" href="' . site_url('flows/states/' . $f['id']) . '" title="States"><i class="bi bi-diagram-3"></i></a> ';
             if ($canEdit) {
@@ -4088,12 +4305,21 @@ class App extends BaseController
                 $actionsHtml .= '<a class="btn btn-sm btn-outline-danger" href="' . site_url('flows/delete/' . $f['id']) . '" data-method="post" data-confirm-message="Remove this flow?"><i class="bi bi-trash"></i></a>';
             }
 
+            $projectVal = '-';
+            if ($projectName !== '') {
+                $projectVal = $projectName;
+            }
+            $creatorVal = '-';
+            if ($creator !== '') {
+                $creatorVal = $creator;
+            }
+
             $data[] = [
                 'name'        => '<strong>' . esc($f['name']) . '</strong>',
-                'project'     => esc($projectName !== '' ? $projectName : '-'),
+                'project'     => esc($projectVal),
                 'state_count' => $stateCount,
                 'status'      => $statusBadge,
-                'created_by'  => esc($creator !== '' ? $creator : '-'),
+                'created_by'  => esc($creatorVal),
                 'created_at'  => '<span class="text-muted small">' . esc($f['created_at']) . '</span>',
                 'actions'     => $actionsHtml,
             ];
@@ -4127,13 +4353,32 @@ class App extends BaseController
             if (!empty($a['is_active'])) {
                 $activeBadge = '<span class="badge bg-success">YES</span>';
             }
-            $tval     = isset($a['threshold_value']) ? $a['threshold_value'] : '';
-            $tunit    = isset($a['threshold_unit'])  ? $a['threshold_unit']  : '';
-            $proj     = isset($a['project_name'])    ? (string) $a['project_name'] : '-';
-            $flow     = isset($a['flow_name'])       ? (string) $a['flow_name']    : '-';
-            $desc     = isset($a['description'])     ? (string) $a['description']  : '';
+            $tval = '';
+            if (isset($a['threshold_value'])) {
+                $tval = $a['threshold_value'];
+            }
+            $tunit = '';
+            if (isset($a['threshold_unit'])) {
+                $tunit = $a['threshold_unit'];
+            }
+            $proj = '-';
+            if (isset($a['project_name'])) {
+                $proj = (string) $a['project_name'];
+            }
+            $flow = '-';
+            if (isset($a['flow_name'])) {
+                $flow = (string) $a['flow_name'];
+            }
+            $desc = '';
+            if (isset($a['description'])) {
+                $desc = (string) $a['description'];
+            }
 
-            $threshold = esc($tval !== '' ? $tval : '-');
+                    $rawThreshold = '-';
+        if ($tval !== '') {
+            $rawThreshold = $tval;
+        }
+        $threshold = esc($rawThreshold);
             if ($tunit !== '') {
                 $threshold .= ' <small class="text-muted">' . esc($tunit) . '</small>';
             }
@@ -4149,10 +4394,23 @@ class App extends BaseController
                 $actionsHtml = '<span class="text-muted small">—</span>';
             }
 
+            $descSub = '';
+            if ($desc !== '') {
+                $descSub = '<br><small class="text-muted">' . esc($desc) . '</small>';
+            }
+            $projVal = '-';
+            if ($proj !== '') {
+                $projVal = $proj;
+            }
+            $flowVal = '-';
+            if ($flow !== '') {
+                $flowVal = $flow;
+            }
+
             $data[] = [
-                'name'      => '<strong>' . esc($a['name']) . '</strong>' . ($desc !== '' ? '<br><small class="text-muted">' . esc($desc) . '</small>' : ''),
-                'project'   => esc($proj !== '' ? $proj : '-'),
-                'flow'      => esc($flow !== '' ? $flow : '-'),
+                'name'      => '<strong>' . esc($a['name']) . '</strong>' . $descSub,
+                'project'   => esc($projVal),
+                'flow'      => esc($flowVal),
                 'severity'  => alert_badge($a['alert_type']),
                 'threshold' => $threshold,
                 'active'    => $activeBadge,

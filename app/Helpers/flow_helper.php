@@ -47,7 +47,10 @@ if (!function_exists('flow_ticket_ancestor_ids')) {
         $guard     = 0;
         while ($cursor > 0 && isset($byId[$cursor]) && $guard < 100) {
             $row    = $byId[$cursor];
-            $parent = isset($row['parent_state_id']) ? (int) $row['parent_state_id'] : 0;
+            $parent = 0;
+            if (isset($row['parent_state_id'])) {
+                $parent = (int) $row['parent_state_id'];
+            }
             if ($parent <= 0 || !isset($byId[$parent])) {
                 break;
             }
@@ -86,7 +89,10 @@ if (!function_exists('flow_vis_edges')) {
         $hasParentLinks = false;
         $parentSet      = []; // IDs that ARE a parent of at least one other state
         foreach ($states as $s) {
-            $pid = isset($s['parent_state_id']) ? (int) $s['parent_state_id'] : 0;
+            $pid = 0;
+            if (isset($s['parent_state_id'])) {
+                $pid = (int) $s['parent_state_id'];
+            }
             if ($pid > 0 && in_array($pid, $stateIds, true)) {
                 $fwdEdges[]      = ['from' => $pid, 'to' => (int) $s['id'], 'transition_type' => 'forward'];
                 $parentSet[$pid] = true;
@@ -218,9 +224,18 @@ if (!function_exists('flow_widget_html')) {
     // Wraps vis-network node/edge data in the standard widget chrome (toolbar + canvas + legend).
     function flow_widget_html($visData, $opts = [])
     {
-        $subtitle   = isset($opts['subtitle']) ? (string) $opts['subtitle'] : 'How tickets travel through this flow';
-        $showLegend = isset($opts['legend']) ? (bool) $opts['legend'] : true;
-        $variant    = isset($opts['variant']) ? (string) $opts['variant'] : 'designer';
+        $subtitle = 'How tickets travel through this flow';
+        if (isset($opts['subtitle'])) {
+            $subtitle = (string) $opts['subtitle'];
+        }
+        $showLegend = true;
+        if (isset($opts['legend'])) {
+            $showLegend = (bool) $opts['legend'];
+        }
+        $variant = 'designer';
+        if (isset($opts['variant'])) {
+            $variant = (string) $opts['variant'];
+        }
 
         // JSON_HEX_TAG prevents </script> from breaking the embedded JSON block.
         $dataJson = json_encode($visData, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG);

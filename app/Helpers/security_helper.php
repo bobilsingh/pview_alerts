@@ -6,7 +6,10 @@ if (!function_exists('client_ip')) {
     // Returns REMOTE_ADDR only — does not trust X-Forwarded-For.
     function client_ip()
     {
-        $ip = isset($_SERVER['REMOTE_ADDR']) ? (string) $_SERVER['REMOTE_ADDR'] : '';
+        $ip = '';
+        if (isset($_SERVER['REMOTE_ADDR'])) {
+            $ip = (string) $_SERVER['REMOTE_ADDR'];
+        }
         if ($ip === '') {
             return '0.0.0.0';
         }
@@ -16,11 +19,11 @@ if (!function_exists('client_ip')) {
 }
 
 if (!function_exists('security_table_exists')) {
+    // Checks if security tables exist in the database.
     function security_table_exists($table)
     {
         try {
-            $db = \Config\Database::connect();
-            return $db->tableExists($table);
+            return model('Helper_model')->tableExists($table);
         } catch (\Throwable $e) {
             return false;
         }
@@ -41,27 +44,17 @@ if (!function_exists('login_is_locked')) {
             return ['locked' => false, 'remaining_seconds' => 0, 'attempts' => 0];
         }
 
-        $db     = \Config\Database::connect();
+        $helperModel = model('Helper_model');
         $cutoff = date('Y-m-d H:i:s', time() - ($windowMin * 60));
 
-        $userFails = (int) $db->table('login_attempts')
-            ->where('success', 0)
-            ->where('attempted_at >=', $cutoff)
-            ->where('login_identifier', $login)
-            ->countAllResults();
+        $userFails = $helperModel->countFailedLoginAttempts($login, $cutoff);
 
         if ($userFails < $maxAttempts) {
             return ['locked' => false, 'remaining_seconds' => 0, 'attempts' => $userFails];
         }
 
         // Expires after the oldest failure so a slow drip doesn't produce a perpetually-rolling lock.
-        $oldest = $db->table('login_attempts')
-            ->where('success', 0)
-            ->where('attempted_at >=', $cutoff)
-            ->where('login_identifier', $login)
-            ->orderBy('attempted_at', 'asc')
-            ->limit(1)
-            ->get()->getRowArray();
+        $oldest = $helperModel->getOldestFailedLoginAttempt($login, $cutoff);
         $remaining = $windowMin * 60;
         if (!empty($oldest['attempted_at'])) {
             $remaining = max(0, ($windowMin * 60) - (time() - strtotime($oldest['attempted_at'])));
@@ -71,18 +64,19 @@ if (!function_exists('login_is_locked')) {
 }
 
 if (!function_exists('login_attempt_record')) {
+    // Records a login attempt status in the database.
     function login_attempt_record($ip, $login, $success)
     {
         if (!security_table_exists('login_attempts')) {
             return;
         }
         try {
-            $db = \Config\Database::connect();
             $successInt = 0;
             if ($success) {
                 $successInt = 1;
             }
-            $db->table('login_attempts')->insert([
+            $helperModel = model('Helper_model');
+            $helperModel->insertLoginAttempt([
                 'ip'               => $ip,
                 'login_identifier' => substr($login, 0, 150),
                 'success'          => $successInt,
@@ -90,9 +84,7 @@ if (!function_exists('login_attempt_record')) {
             ]);
             // Trim rows older than 7 days to keep the table bounded.
             $cutoff = date('Y-m-d H:i:s', time() - (7 * 86400));
-            $db->table('login_attempts')
-                ->where('attempted_at <', $cutoff)
-                ->delete();
+            $helperModel->pruneLoginAttempts($cutoff);
         } catch (\Throwable $e) {
             log_message('error', 'pview alert >> login_attempt_record failed: ' . $e->getMessage());
         }
@@ -107,11 +99,7 @@ if (!function_exists('login_attempts_clear')) {
             return;
         }
         try {
-            $db = \Config\Database::connect();
-            $db->table('login_attempts')
-                ->where('success', 0)
-                ->where('login_identifier', $login)
-                ->delete();
+            model('Helper_model')->clearFailedLoginAttempts($login);
         } catch (\Throwable $e) {
             // non-fatal
         }
@@ -130,30 +118,24 @@ if (!function_exists('api_rate_check')) {
         if (!security_table_exists('api_request_log')) {
             return ['allowed' => true, 'retry_after_seconds' => 0];
         }
-        $db = \Config\Database::connect();
+        $helperModel = model('Helper_model');
         $now = time();
         if ($perMin > 0) {
             $minCutoff = date('Y-m-d H:i:s', $now - 60);
-            $minCount = (int) $db->table('api_request_log')
-                ->where('api_key_id', $apiKeyId)
-                ->where('requested_at >=', $minCutoff)
-                ->countAllResults();
+            $minCount = $helperModel->countApiRequests($apiKeyId, $minCutoff);
             if ($minCount >= $perMin) {
                 return ['allowed' => false, 'retry_after_seconds' => 60];
             }
         }
         if ($perHour > 0) {
             $hourCutoff = date('Y-m-d H:i:s', $now - 3600);
-            $hourCount = (int) $db->table('api_request_log')
-                ->where('api_key_id', $apiKeyId)
-                ->where('requested_at >=', $hourCutoff)
-                ->countAllResults();
+            $hourCount = $helperModel->countApiRequests($apiKeyId, $hourCutoff);
             if ($hourCount >= $perHour) {
                 return ['allowed' => false, 'retry_after_seconds' => 3600];
             }
         }
         try {
-            $db->table('api_request_log')->insert([
+            $helperModel->insertApiRequestLog([
                 'api_key_id'   => $apiKeyId,
                 'endpoint'     => substr($endpoint, 0, 100),
                 'requested_at' => date('Y-m-d H:i:s'),

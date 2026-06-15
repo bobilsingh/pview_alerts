@@ -5,6 +5,7 @@ namespace App\Models;
 class App_model
 {
     public $db;
+    // Constructor to initialize dependencies and references.
     function __construct()
     {
         $this->db = \Config\Database::connect();
@@ -32,7 +33,11 @@ class App_model
         }
         $out = [];
         foreach ($ids as $id) {
-            $out[$id] = isset($cache[$id]) ? $cache[$id] : '';
+            $cacheVal = '';
+            if (isset($cache[$id])) {
+                $cacheVal = $cache[$id];
+            }
+            $out[$id] = $cacheVal;
         }
         return $out;
     }
@@ -52,6 +57,7 @@ class App_model
         return $cache;
     }
 
+    // Returns a map of project IDs to names.
     private function projectNameMap()
     {
         static $cache = null;
@@ -66,6 +72,7 @@ class App_model
         return $cache;
     }
 
+    // Returns a map of flow IDs to names.
     private function flowNameMap()
     {
         static $cache = null;
@@ -80,6 +87,7 @@ class App_model
         return $cache;
     }
 
+    // Returns a map of state IDs to names.
     private function stateNameMap()
     {
         static $cache = null;
@@ -94,6 +102,7 @@ class App_model
         return $cache;
     }
 
+    // Calculates ticket counts per state for a flow.
     private function flowStateCounts()
     {
         static $cache = null;
@@ -123,6 +132,7 @@ class App_model
         }
     }
 
+    // Fetches all projects from the database.
     public function projectGetAll($userPk = null, $isAdmin = false)
     {
         $q = $this->db->table('projects p')->select('p.*')->where('p.deleted_at', null);
@@ -140,11 +150,13 @@ class App_model
         return $out;
     }
 
+    // Fetches a single project by ID.
     public function projectGetById($id)
     {
         return $this->db->table('projects')->where('id', (int) $id)->where('deleted_at', null)->get()->getRowArray();
     }
 
+    // Fetches all active projects.
     public function projectGetActive($userPk = null, $isAdmin = false)
     {
         $q = $this->db->table('projects p')->select('p.*')->where('p.status', 'active')->where('p.deleted_at', null);
@@ -152,6 +164,7 @@ class App_model
         return $q->orderBy('p.name', 'asc')->get()->getResultArray();
     }
 
+    // Inserts a new project into the database.
     public function projectSave($data)
     {
         $data['created_at'] = date('Y-m-d H:i:s');
@@ -161,6 +174,7 @@ class App_model
         return $id;
     }
 
+    // Updates project details in the database.
     public function projectUpdate($id, $data)
     {
         $ok = $this->db->table('projects')->where('id', (int) $id)->update($data);
@@ -168,6 +182,7 @@ class App_model
         return $ok;
     }
 
+    // Marks a project as deleted.
     public function projectSoftDelete($id)
     {
         $id = (int) $id;
@@ -194,6 +209,7 @@ class App_model
         return $ok;
     }
 
+    // Counts the number of active projects.
     public function projectCountActive($userPk = null, $isAdmin = false)
     {
         $q = $this->db->table('projects p')->where('p.status', 'active')->where('p.deleted_at', null);
@@ -211,6 +227,7 @@ class App_model
         return $q->countAllResults() > 0;
     }
 
+    // Fetches all workflow paths.
     public function flowGetAll()
     {
         $rows        = $this->db->table('flows')->where('deleted_at', null)->orderBy('created_at', 'desc')->get()->getResultArray();
@@ -237,21 +254,25 @@ class App_model
         return $out;
     }
 
+    // Fetches a single workflow by ID.
     public function flowGetById($id)
     {
         return $this->db->table('flows')->where('id', (int) $id)->where('deleted_at', null)->get()->getRowArray();
     }
 
+    // Fetches all active workflows.
     public function flowGetActive()
     {
         return $this->db->table('flows')->where('status', 'active')->where('deleted_at', null)->orderBy('name', 'asc')->get()->getResultArray();
     }
 
+    // Fetches workflows configured for a specific project.
     public function flowGetByProject($project_id)
     {
         return $this->db->table('flows')->where('project_id', (int) $project_id)->where('status', 'active')->where('deleted_at', null)->orderBy('name', 'asc')->get()->getResultArray();
     }
 
+    // Saves a new workflow to the database.
     public function flowSave($data)
     {
         $data['created_at'] = date('Y-m-d H:i:s');
@@ -261,6 +282,7 @@ class App_model
         return $id;
     }
 
+    // Updates workflow details in the database.
     public function flowUpdate($id, $data)
     {
         $ok = $this->db->table('flows')->where('id', (int) $id)->update($data);
@@ -268,6 +290,7 @@ class App_model
         return $ok;
     }
 
+    // Marks a workflow as deleted.
     public function flowSoftDelete($id)
     {
         $id = (int) $id;
@@ -286,6 +309,7 @@ class App_model
         return $ok;
     }
 
+    // Counts active workflows.
     public function flowCountActive()
     {
         return (int) $this->db->table('flows')->where('status', 'active')->where('deleted_at', null)->countAllResults();
@@ -301,11 +325,13 @@ class App_model
         return $q->countAllResults() > 0;
     }
 
+    // Fetches all states for a workflow.
     public function stateGetAll($flow_id)
     {
         return $this->db->table('states')->where('flow_id', (int) $flow_id)->orderBy('sort_order', 'asc')->orderBy('id', 'asc')->get()->getResultArray();
     }
 
+    // Fetches a specific state by ID.
     public function stateGetById($id)
     {
         return $this->db->table('states')->where('id', (int) $id)->get()->getRowArray();
@@ -354,7 +380,10 @@ class App_model
         $data['flow_id']       = (int) ($data['flow_id']       ?? 0);
         $data['from_state_id'] = (int) ($data['from_state_id'] ?? 0);
         $data['to_state_id']   = (int) ($data['to_state_id']   ?? 0);
-        $transType = isset($data['transition_type']) ? (string) $data['transition_type'] : '';
+        $transType = '';
+        if (isset($data['transition_type'])) {
+            $transType = (string) $data['transition_type'];
+        }
         if (!in_array($transType, ['forward', 'backward', 'rework'], true)) {
             $transType = 'forward';
         }
@@ -372,6 +401,7 @@ class App_model
         return $this->db->insertID();
     }
 
+    // Deletes a transition path between states.
     public function stateTransitionDelete($id)
     {
         $this->db->table('state_transitions')->where('id', (int) $id)->delete();
@@ -399,6 +429,7 @@ class App_model
             ->delete();
     }
 
+    // Fetches sub-states or child states.
     public function stateGetChildren($flow_id, $parent_state_id)
     {
         $rows = $this->db->table('state_transitions st')
@@ -471,6 +502,7 @@ class App_model
         return [];
     }
 
+    // Saves a state configuration to the database.
     public function stateSave($data)
     {
         foreach (['l1_user_ids', 'l2_user_ids', 'l3_user_ids', 'l4_user_ids'] as $f) {
@@ -563,7 +595,10 @@ class App_model
             ->where('flow_id', $flow_id)
             ->get()->getResultArray();
         foreach ($allStates as $row) {
-            $pid = isset($row['parent_state_id']) ? (int) $row['parent_state_id'] : 0;
+            $pid = 0;
+            if (isset($row['parent_state_id'])) {
+                $pid = (int) $row['parent_state_id'];
+            }
             if ($pid > 0 && !isset($fwdMap[$pid])) {
                 $fwdMap[$pid][] = (int) $row['id'];
             }
@@ -609,6 +644,7 @@ class App_model
         $q->update(['is_final' => 0]);
     }
 
+    // Updates state sequence order.
     public function stateReorder($flow_id, $id_list)
     {
         $flow_id = (int) $flow_id;
@@ -653,6 +689,7 @@ class App_model
         return array_values(array_map('strval', $arr));
     }
 
+    // Fetches all alerts.
     public function alertGetAll()
     {
         $rows = $this->db->table('alert_definitions')
@@ -676,11 +713,13 @@ class App_model
         return $out;
     }
 
+    // Fetches an alert by ID.
     public function alertGetById($id)
     {
         return $this->db->table('alert_definitions')->where('id', (int) $id)->get()->getRowArray();
     }
 
+    // Saves a new alert configuration.
     public function alertSave($data)
     {
         if (isset($data['notify_user_ids']) && is_array($data['notify_user_ids'])) {
@@ -701,6 +740,7 @@ class App_model
         return $id;
     }
 
+    // Updates alert configuration.
     public function alertUpdate($id, $data)
     {
         if (isset($data['notify_user_ids']) && is_array($data['notify_user_ids'])) {
@@ -718,6 +758,7 @@ class App_model
         return $ok;
     }
 
+    // Deactivates an alert.
     public function alertDeactivate($id)
     {
         $ok = $this->db->table('alert_definitions')->where('id', (int) $id)->update(['is_active' => 0]);
@@ -725,6 +766,7 @@ class App_model
         return $ok;
     }
 
+    // Fetches all escalation configurations.
     public function escalationGetAll()
     {
         $rows = $this->db->table('escalation_matrix')
@@ -750,6 +792,7 @@ class App_model
         return $out;
     }
 
+    // Saves or updates an escalation rule.
     public function escalationSave($data)
     {
         if (isset($data['notify_user_ids']) && is_array($data['notify_user_ids'])) {
@@ -782,6 +825,7 @@ class App_model
         return $id;
     }
 
+    // Deletes an escalation rule.
     public function escalationDelete($id)
     {
         $ok = $this->db->table('escalation_matrix')->where('id', (int) $id)->delete();
@@ -789,6 +833,7 @@ class App_model
         return $ok;
     }
 
+    // Fetches all API keys.
     public function apiKeyGetAll()
     {
         $rows = $this->db->table('api_keys')
@@ -812,6 +857,7 @@ class App_model
         return $out;
     }
 
+    // Fetches an API key by ID.
     public function apiKeyGetById($id)
     {
         return $this->db->table('api_keys')->where('id', (int) $id)->get()->getRowArray();
@@ -830,6 +876,7 @@ class App_model
             ->get()->getRowArray();
     }
 
+    // Generates a new API key.
     public function apiKeyGenerate($project_id, $name)
     {
         $key = bin2hex(random_bytes(24));
@@ -845,6 +892,7 @@ class App_model
         return $key;
     }
 
+    // Enables or disables an API key.
     public function apiKeyToggle($id)
     {
         $row = $this->apiKeyGetById($id);
@@ -861,6 +909,7 @@ class App_model
         return true;
     }
 
+    // Updates the last used timestamp for an API key.
     public function apiKeyTouchLastUsed($id)
     {
         $this->db->table('api_keys')->where('id', (int) $id)->update(['last_used' => date('Y-m-d H:i:s')]);
@@ -877,11 +926,13 @@ class App_model
             ->join('users ur',   'ur.user_id = t.raised_by', 'left');
     }
 
+    // Fetches a ticket by its alarm ID.
     public function ticketGetByAlarm($alarm_id)
     {
         return $this->ticketSelect()->where('t.alarm_id', $alarm_id)->get()->getRowArray();
     }
 
+    // Fetches recent tickets.
     public function ticketRecent($limit = 5, $userPk = null, $isAdmin = false, $projectId = 0)
     {
         $q = $this->ticketSelect();
@@ -925,6 +976,7 @@ class App_model
             ->groupEnd();
     }
 
+    // Applies search and filter conditions to ticket queries.
     private function ticketApplyFilters($q, $filters)
     {
         if (!empty($filters['project_id'])) {
@@ -993,6 +1045,7 @@ class App_model
         return false;
     }
 
+    // Fetches all tickets matching filters.
     public function ticketGetAll($filters = [])
     {
         $q = $this->ticketSelect();
@@ -1003,6 +1056,7 @@ class App_model
         return $q->orderBy('t.created_at', 'desc')->get()->getResultArray();
     }
 
+    // Fetches paginated tickets for server-side DataTable.
     public function ticketListForDataTables($args)
     {
         $filters = [];
@@ -1093,6 +1147,7 @@ class App_model
         return (int) $q->countAllResults();
     }
 
+    // Counts filtered tickets for pagination.
     public function ticketCountFiltered($filters, $search = '', $userPk = null, $isAdmin = false)
     {
         $q = $this->db->table('tickets t')
@@ -1108,6 +1163,7 @@ class App_model
         return (int) $q->countAllResults();
     }
 
+    // Counts tickets grouped by status.
     public function ticketCountByStatus($userPk = null, $isAdmin = false, $projectId = 0)
     {
         $q = $this->db->table('tickets')->select('tickets.status, COUNT(*) AS n');
@@ -1123,6 +1179,7 @@ class App_model
         return $out;
     }
 
+    // Counts active tickets grouped by alert type.
     public function ticketCountByAlertTypeActive($userPk = null, $isAdmin = false, $projectId = 0)
     {
         $q = $this->db->table('tickets')
@@ -1140,6 +1197,7 @@ class App_model
         return $out;
     }
 
+    // Fetches ticket creation counts over a day range for trend charts.
     public function ticketTrendByRange($days, $userPk = null, $isAdmin = false, $projectId = 0)
     {
         $days = (int) $days;
@@ -1152,7 +1210,10 @@ class App_model
 
         $labels  = [];
         $buckets = [];
-        $fmt     = $days <= 14 ? 'D' : 'd-M';
+        $fmt = 'd-M';
+        if ($days <= 14) {
+            $fmt = 'D';
+        }
         $today   = new \DateTime();
         for ($i = $days - 1; $i >= 0; $i--) {
             $date   = clone $today;
@@ -1186,6 +1247,7 @@ class App_model
         ];
     }
 
+    // Counts tickets that have breached their Turnaround Time.
     public function ticketCountTatBreached($userPk = null, $isAdmin = false, $projectId = 0)
     {
         $q = $this->db->table('tickets')->where('tickets.status', 'escalated');
@@ -1232,23 +1294,38 @@ class App_model
             return ['total' => 0, 'escalated' => 0, 'critical_open' => 0];
         }
 
+        $totalVal = 0;
+        $escalatedVal = 0;
+        $criticalOpenVal = 0;
+        if ($row) {
+            $totalVal = (int) $row->total;
+            $escalatedVal = (int) $row->escalated;
+            $criticalOpenVal = (int) $row->critical_open;
+        }
+
         return [
-            'total'         => $row ? (int) $row->total : 0,
-            'escalated'     => $row ? (int) $row->escalated : 0,
-            'critical_open' => $row ? (int) $row->critical_open : 0,
+            'total'         => $totalVal,
+            'escalated'     => $escalatedVal,
+            'critical_open' => $criticalOpenVal,
         ];
     }
 
+    // Saves a new ticket.
     public function ticketSave($data)
     {
         $data['created_at']       = date('Y-m-d H:i:s');
         $data['state_entered_at'] = date('Y-m-d H:i:s');
         $this->db->table('tickets')->insert($data);
         $id = $this->db->insertID();
-        log_message('debug', "pview alert >> ticket save: query=[" . $this->db->getLastQuery() . "], new_id=[" . $id . "], alarm_id=[" . (isset($data["alarm_id"]) ? $data["alarm_id"] : "") . "]");
+        $alarmIdVal = '';
+        if (isset($data['alarm_id'])) {
+            $alarmIdVal = $data['alarm_id'];
+        }
+        log_message('debug', "pview alert >> ticket save: query=[" . $this->db->getLastQuery() . "], new_id=[" . $id . "], alarm_id=[" . $alarmIdVal . "]");
         return $id;
     }
 
+    // Updates ticket details.
     public function ticketUpdate($id, $data)
     {
         $ok = $this->db->table('tickets')->where('id', (int) $id)->update($data);
@@ -1256,6 +1333,7 @@ class App_model
         return $ok;
     }
 
+    // Transition a ticket to another workflow state.
     public function ticketMoveToState($ticket_id, $new_state_id)
     {
         $this->db->transStart();
@@ -1264,7 +1342,10 @@ class App_model
             'SELECT id, status FROM tickets WHERE id = ? FOR UPDATE',
             [(int) $ticket_id]
         )->getRowArray();
-        $newStatus = ($current && (string) $current['status'] === 'escalated') ? 'escalated' : 'in_progress';
+        $newStatus = 'in_progress';
+        if ($current && (string) $current['status'] === 'escalated') {
+            $newStatus = 'escalated';
+        }
         $this->db->table('tickets')->where('id', (int) $ticket_id)->update([
             'current_state_id'   => (int) $new_state_id,
             'current_level'      => 1,
@@ -1278,6 +1359,7 @@ class App_model
         log_message('debug', "pview alert >> ticket moveToState: ticket_id=[{$ticket_id}], new_state_id=[{$new_state_id}]");
     }
 
+    // Escalates a ticket's level.
     public function ticketEscalateLevel($ticket_id, $new_level)
     {
         if ($new_level >= 5) {
@@ -1325,13 +1407,18 @@ class App_model
                 $users = array_values(array_map('strval', $decoded));
             }
         }
+        $alertTypeVal = 'major';
+        if (isset($row['alert_type'])) {
+            $alertTypeVal = (string) $row['alert_type'];
+        }
         return [
             'tat_minutes'  => (int) $row['escalate_after'],
             'notify_users' => $users,
-            'alert_type'   => isset($row['alert_type']) ? (string) $row['alert_type'] : 'major',
+            'alert_type'   => $alertTypeVal,
         ];
     }
 
+    // Logs a user action in the ticket timeline.
     public function ticketLogAction($ticket_id, $action_type, $extra = [])
     {
         $row = array_merge([
@@ -1344,6 +1431,7 @@ class App_model
         log_message('debug', "pview alert >> ticket action logged: ticket_id=[" . $ticket_id . "], action=[" . $action_type . "]");
     }
 
+    // Fetches the history timeline for a ticket.
     public function ticketTimeline($ticket_id)
     {
         $sql = "SELECT ta.*, u.name AS performer_name, u.user_id AS performer_uid,"
@@ -1357,11 +1445,13 @@ class App_model
         return $this->db->query($sql, [(int) $ticket_id])->getResultArray();
     }
 
+    // Fetches recent notifications for a ticket.
     public function ticketRecentNotifications($ticket_id, $limit = 5)
     {
         return $this->db->table('notification_logs')->where('ticket_id', (int) $ticket_id)->orderBy('id', 'desc')->limit((int) $limit)->get()->getResultArray();
     }
 
+    // Counts attachments for a ticket.
     public function ticketAttachmentCount($ticket_id)
     {
         return (int) $this->db->table('ticket_actions')
@@ -1370,6 +1460,7 @@ class App_model
             ->countAllResults();
     }
 
+    // Fetches an attachment record by ID.
     public function ticketGetAttachment($ticket_id, $action_id)
     {
         return $this->db->table('ticket_actions')
@@ -1379,6 +1470,7 @@ class App_model
             ->get()->getRowArray();
     }
 
+    // Fetches notification mentions for a user.
     public function notificationMentionsForUser($email, $cutoff, $limit = 50)
     {
         return $this->db->table('notification_logs nl')
@@ -1412,6 +1504,7 @@ class App_model
         return $out;
     }
 
+    // Fetches projects list for filtering activity logs.
     public function activityLogsProjectsForFilter()
     {
         return $this->db->table('projects')
@@ -1494,6 +1587,7 @@ class App_model
         return $rows;
     }
 
+    // Fetches all global settings.
     public function settingGetAll()
     {
         try {
@@ -1515,6 +1609,7 @@ class App_model
         }
     }
 
+    // Saves or updates a global setting.
     public function settingSet($key, $value, $userId = null)
     {
         // updated_by is a user_id string after migration; empty becomes NULL.
@@ -1541,6 +1636,7 @@ class App_model
         log_message('debug', "pview alert >> setting saved: key=[" . $key . "], len=[" . strlen((string) $value) . "]");
     }
 
+    // Fetches projects formatted for server-side DataTable.
     public function projectsForDT($args)
     {
         $allowedCols = [
@@ -1559,11 +1655,26 @@ class App_model
             $orderDir = 'ASC';
         }
 
-        $start  = isset($args['start'])  ? (int) $args['start']  : 0;
-        $length = isset($args['length']) ? (int) $args['length'] : 25;
-        $search = isset($args['search']) ? (string) $args['search'] : '';
-        $scopeUserPk  = isset($args['scope_user_pk']) ? $args['scope_user_pk'] : null;
-        $scopeIsAdmin = isset($args['scope_is_admin']) ? (bool) $args['scope_is_admin'] : false;
+        $start = 0;
+        if (isset($args['start'])) {
+            $start = (int) $args['start'];
+        }
+        $length = 25;
+        if (isset($args['length'])) {
+            $length = (int) $args['length'];
+        }
+        $search = '';
+        if (isset($args['search'])) {
+            $search = (string) $args['search'];
+        }
+        $scopeUserPk = null;
+        if (isset($args['scope_user_pk'])) {
+            $scopeUserPk = $args['scope_user_pk'];
+        }
+        $scopeIsAdmin = false;
+        if (isset($args['scope_is_admin'])) {
+            $scopeIsAdmin = (bool) $args['scope_is_admin'];
+        }
 
         $total = (int) $this->db->table('projects')->where('deleted_at', null)->countAllResults();
 
@@ -1586,7 +1697,10 @@ class App_model
         }
 
         $countRow = $this->db->query("SELECT COUNT(*) AS cnt " . $baseFrom, $params)->getRow();
-        $filtered = isset($countRow->cnt) ? (int) $countRow->cnt : 0;
+        $filtered = 0;
+        if (isset($countRow->cnt)) {
+            $filtered = (int) $countRow->cnt;
+        }
 
         $dataSql = "SELECT p.id, p.name, p.description, p.status, p.created_at, p.created_by"
             . " " . $baseFrom
@@ -1607,6 +1721,7 @@ class App_model
         return ['total' => $total, 'filtered' => $filtered, 'rows' => $out];
     }
 
+    // Fetches workflows formatted for server-side DataTable.
     public function flowsForDT($args)
     {
         $allowedCols = [
@@ -1626,9 +1741,18 @@ class App_model
             $orderDir = 'ASC';
         }
 
-        $start  = isset($args['start'])  ? (int) $args['start']  : 0;
-        $length = isset($args['length']) ? (int) $args['length'] : 25;
-        $search = isset($args['search']) ? (string) $args['search'] : '';
+        $start = 0;
+        if (isset($args['start'])) {
+            $start = (int) $args['start'];
+        }
+        $length = 25;
+        if (isset($args['length'])) {
+            $length = (int) $args['length'];
+        }
+        $search = '';
+        if (isset($args['search'])) {
+            $search = (string) $args['search'];
+        }
 
         $total = (int) $this->db->table('flows')->where('deleted_at', null)->countAllResults();
 
@@ -1643,7 +1767,10 @@ class App_model
         }
 
         $countRow = $this->db->query("SELECT COUNT(*) AS cnt " . $baseJoin, $params)->getRow();
-        $filtered = isset($countRow->cnt) ? (int) $countRow->cnt : 0;
+        $filtered = 0;
+        if (isset($countRow->cnt)) {
+            $filtered = (int) $countRow->cnt;
+        }
 
         $dataSql = "SELECT f.id, f.name, f.status, f.created_at, f.created_by,"
             . " p.name AS project_name"
@@ -1670,6 +1797,7 @@ class App_model
         return ['total' => $total, 'filtered' => $filtered, 'rows' => $out];
     }
 
+    // Fetches alerts formatted for server-side DataTable.
     public function alertsForDT($args)
     {
         $allowedCols = [
@@ -1690,9 +1818,18 @@ class App_model
             $orderDir = 'ASC';
         }
 
-        $start  = isset($args['start'])  ? (int) $args['start']  : 0;
-        $length = isset($args['length']) ? (int) $args['length'] : 25;
-        $search = isset($args['search']) ? (string) $args['search'] : '';
+        $start = 0;
+        if (isset($args['start'])) {
+            $start = (int) $args['start'];
+        }
+        $length = 25;
+        if (isset($args['length'])) {
+            $length = (int) $args['length'];
+        }
+        $search = '';
+        if (isset($args['search'])) {
+            $search = (string) $args['search'];
+        }
 
         $total = (int) $this->db->table('alert_definitions')->countAllResults();
 
@@ -1707,7 +1844,10 @@ class App_model
         }
 
         $countRow = $this->db->query("SELECT COUNT(*) AS cnt " . $baseJoin, $params)->getRow();
-        $filtered = isset($countRow->cnt) ? (int) $countRow->cnt : 0;
+        $filtered = 0;
+        if (isset($countRow->cnt)) {
+            $filtered = (int) $countRow->cnt;
+        }
 
         $dataSql = "SELECT a.id, a.name, a.description, a.alert_type,"
             . " a.threshold_value, a.threshold_unit, a.is_active, a.created_at, a.flow_id,"
@@ -1730,6 +1870,7 @@ class App_model
         return ['total' => $total, 'filtered' => $filtered, 'rows' => $out];
     }
 
+    // Checks if module permissions database table exists.
     public function modulePermissionsTableExists()
     {
         $rows = $this->db->query("SHOW TABLES LIKE 'module_permissions'")->getResultArray();
@@ -1739,6 +1880,7 @@ class App_model
         return true;
     }
 
+    // Fetches all module permissions.
     public function modulePermissionsGetAll()
     {
         return $this->db->table('module_permissions')
@@ -1747,6 +1889,7 @@ class App_model
             ->get()->getResultArray();
     }
 
+    // Saves module permissions.
     public function modulePermissionsSave($role, $permissions)
     {
         foreach ($permissions as $module_key => $actions) {
