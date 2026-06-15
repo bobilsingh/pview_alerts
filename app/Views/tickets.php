@@ -268,13 +268,14 @@ if (!function_exists('ticket_activity_icon')) {
         <!-- Date range — left of Apply -->
         <span class="filter-bar-sep"></span>
         <div class="filter-bar-date">
-          <?= view('filters/date_range_widget', [
-            'drFromName' => 'f_from',
-            'drToName'   => 'f_to',
-            'drFrom'     => $drInitFrom,
-            'drTo'       => $drInitTo,
-            'drDefault'  => 'today',
-            'drInline'   => true,
+          <?= view('filters/filter_bar', [
+            'only_widget' => true,
+            'drFromName'  => 'f_from',
+            'drToName'    => 'f_to',
+            'drFrom'      => $drInitFrom,
+            'drTo'        => $drInitTo,
+            'drDefault'   => 'today',
+            'drInline'    => true,
           ]); ?>
         </div>
 

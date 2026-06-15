@@ -43,19 +43,18 @@ $today        = date('Y-m-d');
 
     <!-- Filter bar -->
     <div class="card mb-3">
-      <?= view('filters/filter_bar_header', [
-        'fbTitle'      => 'Filters',
-        'fbCountId'    => 'activityFilterBadge',
-        'fbApplyId'    => 'activityApplyBtn',
-        'fbResetId'    => 'activityResetBtn',
-        'fbDateWidget' => view('filters/date_range_widget', [
-          'drFromId'  => 'filterFrom',
-          'drToId'    => 'filterTo',
-          'drFrom'    => $today,
-          'drTo'      => $today,
-          'drDefault' => 'today',
-          'drInline'  => true,
-        ]),
+      <?= view('filters/filter_bar', [
+        'fbTitle'          => 'Filters',
+        'fbCountId'        => 'activityFilterBadge',
+        'fbApplyId'        => 'activityApplyBtn',
+        'fbResetId'        => 'activityResetBtn',
+        'show_date_widget' => true,
+        'drFromId'         => 'filterFrom',
+        'drToId'           => 'filterTo',
+        'drFrom'           => $today,
+        'drTo'             => $today,
+        'drDefault'        => 'today',
+        'drInline'         => true,
       ]); ?>
       <div class="filter-bar-body">
         <form id="activityFilterForm">
@@ -161,12 +160,13 @@ $today        = date('Y-m-d');
       <!-- Analytics date range + refresh controls -->
       <div class="d-flex flex-wrap align-items-center gap-2 mb-3">
         <label class="form-label small mb-0 fw-semibold">Period:</label>
-        <?= view('filters/date_range_widget', [
-          'drFromId'  => 'analyticsFrom',
-          'drToId'    => 'analyticsTo',
-          'drFrom'    => date('Y-m-d', strtotime('-30 days')),
-          'drTo'      => $today,
-          'drDefault' => '30d',
+        <?= view('filters/filter_bar', [
+          'only_widget' => true,
+          'drFromId'    => 'analyticsFrom',
+          'drToId'      => 'analyticsTo',
+          'drFrom'      => date('Y-m-d', strtotime('-30 days')),
+          'drTo'        => $today,
+          'drDefault'   => '30d',
         ]); ?>
         <button type="button" id="analyticsApplyBtn" class="btn btn-sm btn-primary">
           <i class="bi bi-funnel"></i> Apply
