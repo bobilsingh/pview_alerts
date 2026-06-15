@@ -19,16 +19,43 @@
  *     fbResetClass — extra CSS classes on the reset anchor (default: '')
  */
 
-$fbTitle      = isset($fbTitle)      ? (string) $fbTitle      : 'Filters';
-$fbCountId    = isset($fbCountId)    ? (string) $fbCountId    : '';
-$fbCountStart = isset($fbCountStart) ? (int)    $fbCountStart : 0;
-$fbApplyId    = isset($fbApplyId)    ? (string) $fbApplyId    : '';
-$fbSubmit     = isset($fbSubmit)     ? (bool)   $fbSubmit     : false;
-$fbResetId    = isset($fbResetId)    ? (string) $fbResetId    : '';
-$fbResetHref  = isset($fbResetHref)  ? (string) $fbResetHref  : '';
-$fbResetClass = isset($fbResetClass) ? (string) $fbResetClass : '';
+$fbTitle = 'Filters';
+if (isset($fbTitle)) {
+    $fbTitle = (string) $fbTitle;
+}
+$fbCountId = '';
+if (isset($fbCountId)) {
+    $fbCountId = (string) $fbCountId;
+}
+$fbCountStart = 0;
+if (isset($fbCountStart)) {
+    $fbCountStart = (int) $fbCountStart;
+}
+$fbApplyId = '';
+if (isset($fbApplyId)) {
+    $fbApplyId = (string) $fbApplyId;
+}
+$fbSubmit = false;
+if (isset($fbSubmit)) {
+    $fbSubmit = (bool) $fbSubmit;
+}
+$fbResetId = '';
+if (isset($fbResetId)) {
+    $fbResetId = (string) $fbResetId;
+}
+$fbResetHref = '';
+if (isset($fbResetHref)) {
+    $fbResetHref = (string) $fbResetHref;
+}
+$fbResetClass = '';
+if (isset($fbResetClass)) {
+    $fbResetClass = (string) $fbResetClass;
+}
 // Pre-rendered date-range widget HTML to place left of Apply (optional).
-$fbDateWidget = isset($fbDateWidget) ? (string) $fbDateWidget : '';
+$fbDateWidget = '';
+if (isset($fbDateWidget)) {
+    $fbDateWidget = (string) $fbDateWidget;
+}
 ?>
 <div class="card-header filter-bar-header">
   <span class="filter-bar-title">
@@ -37,7 +64,7 @@ $fbDateWidget = isset($fbDateWidget) ? (string) $fbDateWidget : '';
     <?php if ($fbCountId !== '') { ?>
       <span class="badge rounded-pill bg-primary ms-1 filter-bar-badge"
         id="<?= esc($fbCountId) ?>"
-        <?= $fbCountStart === 0 ? 'hidden' : '' ?>>
+        <?php if ($fbCountStart === 0) { ?>hidden<?php } ?>>
         <?= $fbCountStart ?>
       </span>
     <?php } ?>
