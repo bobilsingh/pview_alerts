@@ -144,14 +144,7 @@ class App extends BaseController
             'status'      => 'active',
             'created_by'  => logged_user_id(),
         ]);
-        activity_log(
-            'projects',
-            'create',
-            'project',
-            (string) $newId,
-            'Created project "' . $name . '"',
-            ['name' => $name]
-        );
+        activity_log('projects', 'create', 'project', (string) $newId, 'Created project "' . $name . '"', ['name' => $name]);
         $this->session->setFlashdata('success', 'Project "' . $name . '" created.');
         return redirect()->to(site_url('projects'));
     }
@@ -193,14 +186,7 @@ class App extends BaseController
         ];
         $this->app_model->projectUpdate($id, $after);
         $diff = activity_diff($before, $after, ['name', 'description', 'status']);
-        activity_log(
-            'projects',
-            'update',
-            'project',
-            (string) $id,
-            'Updated project "' . $name . '"',
-            $diff
-        );
+        activity_log('projects', 'update', 'project', (string) $id, 'Updated project "' . $name . '"', $diff);
         $this->session->setFlashdata('success', 'Project "' . $name . '" updated.');
         return redirect()->to(site_url('projects'));
     }
@@ -219,14 +205,7 @@ class App extends BaseController
         $before = $this->app_model->projectGetById($id);
         $this->app_model->projectSoftDelete($id);
         $name = isset($before['name']) ? (string) $before['name'] : '';
-        activity_log(
-            'projects',
-            'delete',
-            'project',
-            (string) $id,
-            'Removed project "' . $name . '"',
-            ['name' => $name]
-        );
+        activity_log('projects', 'delete', 'project', (string) $id, 'Removed project "' . $name . '"', ['name' => $name]);
         $this->session->setFlashdata('success', 'Project removed.');
         return redirect()->to(site_url('projects'));
     }
@@ -289,14 +268,7 @@ class App extends BaseController
             'created_by'      => logged_user_id(),
             'tat_level_count' => $tatLevelCount,
         ]);
-        activity_log(
-            'flows',
-            'create',
-            'flow',
-            (string) $newId,
-            'Created flow "' . $name . '"',
-            ['name' => $name, 'project_id' => $project_id]
-        );
+        activity_log('flows', 'create', 'flow', (string) $newId, 'Created flow "' . $name . '"', ['name' => $name, 'project_id' => $project_id]);
         $this->session->setFlashdata('success', 'Flow "' . $name . '" created.');
         return redirect()->to(site_url('flows'));
     }
@@ -352,14 +324,7 @@ class App extends BaseController
         ];
         $this->app_model->flowUpdate($id, $after);
         $diff = activity_diff($before, $after, ['name', 'project_id', 'status']);
-        activity_log(
-            'flows',
-            'update',
-            'flow',
-            (string) $id,
-            'Updated flow "' . $name . '"',
-            $diff
-        );
+        activity_log('flows', 'update', 'flow', (string) $id, 'Updated flow "' . $name . '"', $diff);
         $this->session->setFlashdata('success', 'Flow updated.');
         return redirect()->to(site_url('flows'));
     }
@@ -378,14 +343,7 @@ class App extends BaseController
         $before = $this->app_model->flowGetById($id);
         $this->app_model->flowSoftDelete($id);
         $name = isset($before['name']) ? (string) $before['name'] : '';
-        activity_log(
-            'flows',
-            'delete',
-            'flow',
-            (string) $id,
-            'Removed flow "' . $name . '"',
-            ['name' => $name]
-        );
+        activity_log('flows', 'delete', 'flow', (string) $id, 'Removed flow "' . $name . '"', ['name' => $name]);
         $this->session->setFlashdata('success', 'Flow removed.');
         return redirect()->to(site_url('flows'));
     }
@@ -563,14 +521,7 @@ class App extends BaseController
         }
 
         $isCreate = ($id <= 0);
-        activity_log(
-            'flows',
-            $isCreate ? 'create_state' : 'update_state',
-            'state',
-            (string) $savedId,
-            ($isCreate ? 'Added' : 'Updated') . ' state "' . $name . '" in flow #' . $flow_id,
-            ['flow_id' => $flow_id, 'name' => $name, 'is_initial' => $isInitial, 'is_final' => $isFinal]
-        );
+        activity_log('flows', $isCreate ? 'create_state' : 'update_state', 'state', (string) $savedId, ($isCreate ? 'Added' : 'Updated') . ' state "' . $name . '" in flow #' . $flow_id, ['flow_id' => $flow_id, 'name' => $name, 'is_initial' => $isInitial, 'is_final' => $isFinal]);
 
         $this->session->setFlashdata('success', 'State saved.');
         return redirect()->to(site_url('flows/states/' . $flow_id));
@@ -587,14 +538,7 @@ class App extends BaseController
         $result = $this->app_model->stateDelete($id);
         if (!empty($result['ok'])) {
             $stateName = isset($state['name']) ? (string) $state['name'] : '';
-            activity_log(
-                'flows',
-                'delete_state',
-                'state',
-                (string) $id,
-                'Removed state "' . $stateName . '" from flow #' . $flow_id,
-                ['flow_id' => $flow_id, 'name' => $stateName]
-            );
+            activity_log('flows', 'delete_state', 'state', (string) $id, 'Removed state "' . $stateName . '" from flow #' . $flow_id, ['flow_id' => $flow_id, 'name' => $stateName]);
             $this->session->setFlashdata('success', 'State removed.');
         } else {
             $msg = 'State could not be removed.';
@@ -626,14 +570,7 @@ class App extends BaseController
         if (!$this->app_model->stateReorder($flow_id, $order)) {
             return json_fail('Reorder rejected: state ids do not belong to this flow');
         }
-        activity_log(
-            'flows',
-            'reorder_states',
-            'flow',
-            (string) $flow_id,
-            'Reordered states in flow #' . $flow_id,
-            ['flow_id' => $flow_id, 'order' => $order]
-        );
+        activity_log('flows', 'reorder_states', 'flow', (string) $flow_id, 'Reordered states in flow #' . $flow_id, ['flow_id' => $flow_id, 'order' => $order]);
         return json_ok([], 'Order saved');
     }
 
@@ -680,13 +617,7 @@ class App extends BaseController
             'requires_comment' => $requires_comment,
             'created_by'      => (string) logged_user_id(),
         ]);
-        activity_log(
-            'flows',
-            'transition_save',
-            'flow',
-            (string) $flow_id,
-            ($id ? 'Updated' : 'Added') . ' ' . $type . ' transition in flow #' . $flow_id
-        );
+        activity_log('flows', 'transition_save', 'flow', (string) $flow_id, ($id ? 'Updated' : 'Added') . ' ' . $type . ' transition in flow #' . $flow_id);
         return json_ok(['id' => $newId], 'Transition saved');
     }
 
@@ -765,14 +696,7 @@ class App extends BaseController
             'is_active'       => 1,
             'created_by'      => logged_user_id(),
         ]);
-        activity_log(
-            'alerts',
-            'create',
-            'alert',
-            (string) $newId,
-            'Created alert "' . $alertName . '" (' . $alertType . ')',
-            ['name' => $alertName, 'project_id' => $projectId, 'flow_id' => $flowId, 'alert_type' => $alertType]
-        );
+        activity_log('alerts', 'create', 'alert', (string) $newId, 'Created alert "' . $alertName . '" (' . $alertType . ')', ['name' => $alertName, 'project_id' => $projectId, 'flow_id' => $flowId, 'alert_type' => $alertType]);
         $this->session->setFlashdata('success', 'Alert definition saved.');
         return redirect()->to(site_url('alerts'));
     }
@@ -828,14 +752,7 @@ class App extends BaseController
         ];
         $this->app_model->alertUpdate($id, $after);
         $diff = activity_diff($before, $after, ['project_id', 'name', 'description', 'alert_type', 'threshold_value', 'threshold_unit', 'flow_id', 'is_active']);
-        activity_log(
-            'alerts',
-            'update',
-            'alert',
-            (string) $id,
-            'Updated alert "' . $alertName . '"',
-            $diff
-        );
+        activity_log('alerts', 'update', 'alert', (string) $id, 'Updated alert "' . $alertName . '"', $diff);
         $this->session->setFlashdata('success', 'Alert definition updated.');
         return redirect()->to(site_url('alerts'));
     }
@@ -846,14 +763,7 @@ class App extends BaseController
         $before = $this->app_model->alertGetById($id);
         $this->app_model->alertDeactivate($id);
         $alertName = isset($before['name']) ? (string) $before['name'] : '';
-        activity_log(
-            'alerts',
-            'delete',
-            'alert',
-            (string) $id,
-            'Deactivated alert "' . $alertName . '"',
-            ['name' => $alertName]
-        );
+        activity_log('alerts', 'delete', 'alert', (string) $id, 'Deactivated alert "' . $alertName . '"', ['name' => $alertName]);
         $this->session->setFlashdata('success', 'Alert deactivated.');
         return redirect()->to(site_url('alerts'));
     }
@@ -899,14 +809,7 @@ class App extends BaseController
             'notify_user_ids' => (array) $this->request->getPost('notify_user_ids'),
             'alert_type'      => $alertType,
         ]);
-        activity_log(
-            'escalation',
-            'create',
-            'escalation',
-            null,
-            'Added escalation L' . $level . ' @ ' . $minutes . 'm for flow #' . $flow_id . ' state #' . $state_id,
-            ['flow_id' => $flow_id, 'state_id' => $state_id, 'level' => $level, 'escalate_after' => $minutes, 'alert_type' => $alertType]
-        );
+        activity_log('escalation', 'create', 'escalation', null, 'Added escalation L' . $level . ' @ ' . $minutes . 'm for flow #' . $flow_id . ' state #' . $state_id, ['flow_id' => $flow_id, 'state_id' => $state_id, 'level' => $level, 'escalate_after' => $minutes, 'alert_type' => $alertType]);
         $this->session->setFlashdata('success', 'Escalation rule added.');
         return redirect()->to(site_url('escalation'));
     }
@@ -915,13 +818,7 @@ class App extends BaseController
     {
         check_module_access('escalation', 'delete');
         $this->app_model->escalationDelete($id);
-        activity_log(
-            'escalation',
-            'delete',
-            'escalation',
-            (string) $id,
-            'Removed escalation rule #' . $id
-        );
+        activity_log('escalation', 'delete', 'escalation', (string) $id, 'Removed escalation rule #' . $id);
         $this->session->setFlashdata('success', 'Escalation rule removed.');
         return redirect()->to(site_url('escalation'));
     }
@@ -952,14 +849,7 @@ class App extends BaseController
             return redirect()->to(site_url('api_keys'));
         }
         $key = $this->app_model->apiKeyGenerate($project_id, $name);
-        activity_log(
-            'api_keys',
-            'generate',
-            'api_key',
-            null,
-            'Generated API key "' . $name . '" for project #' . $project_id,
-            ['name' => $name, 'project_id' => $project_id]
-        );
+        activity_log('api_keys', 'generate', 'api_key', null, 'Generated API key "' . $name . '" for project #' . $project_id, ['name' => $name, 'project_id' => $project_id]);
         $this->session->setFlashdata('newKey', $key);
         $this->session->setFlashdata('success', 'API key generated. Copy it now — you won\'t see it again.');
         return redirect()->to(site_url('api_keys'));
@@ -969,13 +859,7 @@ class App extends BaseController
     {
         check_module_access('api_keys', 'edit');
         $this->app_model->apiKeyToggle($id);
-        activity_log(
-            'api_keys',
-            'toggle',
-            'api_key',
-            (string) $id,
-            'Toggled API key #' . $id
-        );
+        activity_log('api_keys', 'toggle', 'api_key', (string) $id, 'Toggled API key #' . $id);
         return redirect()->to(site_url('api_keys'));
     }
 
@@ -1174,14 +1058,7 @@ class App extends BaseController
             log_message('error', "pview alert >> ticket save notify_ticket_event FAILED: error=[" . $e->getMessage() . "]");
         }
 
-        activity_log(
-            'tickets',
-            'create',
-            'ticket',
-            $alarmId,
-            'Raised ticket "' . $title . '" (' . $alertType . '/' . $priority . ')',
-            ['project_id' => $project_id, 'flow_id' => $flow_id, 'alert_type' => $alertType, 'priority' => $priority]
-        );
+        activity_log('tickets', 'create', 'ticket', $alarmId, 'Raised ticket "' . $title . '" (' . $alertType . '/' . $priority . ')', ['project_id' => $project_id, 'flow_id' => $flow_id, 'alert_type' => $alertType, 'priority' => $priority]);
 
         // Warn if a recent open ticket with the same type+project already exists.
         $dupWindowHours = app_setting_int('duplicate_detection_window_hours', 24);
@@ -1322,13 +1199,7 @@ class App extends BaseController
             return $r;
         }
         $ticket = $r;
-        activity_log(
-            'tickets',
-            'view',
-            'ticket',
-            (string) $ticket['alarm_id'],
-            'Viewed ticket ' . $ticket['alarm_id']
-        );
+        activity_log('tickets', 'view', 'ticket', (string) $ticket['alarm_id'], 'Viewed ticket ' . $ticket['alarm_id']);
 
         $allStates = $this->app_model->stateGetAll($ticket['flow_id']);
         $state     = $this->app_model->stateGetById($ticket['current_state_id']);
@@ -1426,13 +1297,7 @@ class App extends BaseController
                 log_message('error', "pview alert >> @mention parse/notify FAILED: " . $e->getMessage());
             }
 
-            activity_log(
-                'tickets',
-                'comment',
-                'ticket',
-                (string) $ticket['alarm_id'],
-                'Commented on ' . $ticket['alarm_id']
-            );
+            activity_log('tickets', 'comment', 'ticket', (string) $ticket['alarm_id'], 'Commented on ' . $ticket['alarm_id']);
             return json_ok([], 'Comment added');
         }
 
@@ -1453,14 +1318,7 @@ class App extends BaseController
             }
             $this->app_model->ticketUpdate($ticket['id'], ['title' => $newTitle]);
             $this->app_model->ticketLogAction($ticket['id'], 'title_changed', ['comment' => 'Title updated to: ' . $newTitle]);
-            activity_log(
-                'tickets',
-                'update',
-                'ticket',
-                (string) $ticket['alarm_id'],
-                'Title changed on ' . $ticket['alarm_id'],
-                ['field' => 'title', 'old' => $ticket['title'], 'new' => $newTitle]
-            );
+            activity_log('tickets', 'update', 'ticket', (string) $ticket['alarm_id'], 'Title changed on ' . $ticket['alarm_id'], ['field' => 'title', 'old' => $ticket['title'], 'new' => $newTitle]);
             return json_ok([], 'Title updated');
         }
 
@@ -1471,14 +1329,7 @@ class App extends BaseController
             }
             $this->app_model->ticketUpdate($ticket['id'], ['description' => $desc]);
             $this->app_model->ticketLogAction($ticket['id'], 'description_changed', ['comment' => 'Description updated']);
-            activity_log(
-                'tickets',
-                'update',
-                'ticket',
-                (string) $ticket['alarm_id'],
-                'Description changed on ' . $ticket['alarm_id'],
-                ['field' => 'description']
-            );
+            activity_log('tickets', 'update', 'ticket', (string) $ticket['alarm_id'], 'Description changed on ' . $ticket['alarm_id'], ['field' => 'description']);
             return json_ok([], 'Description updated');
         }
 
@@ -1489,14 +1340,7 @@ class App extends BaseController
             }
             $this->app_model->ticketUpdate($ticket['id'], ['priority' => $prio]);
             $this->app_model->ticketLogAction($ticket['id'], 'priority_changed', ['comment' => 'Priority changed to ' . $prio]);
-            activity_log(
-                'tickets',
-                'update',
-                'ticket',
-                (string) $ticket['alarm_id'],
-                'Priority changed on ' . $ticket['alarm_id'] . ' to ' . $prio,
-                ['field' => 'priority', 'old' => $ticket['priority'], 'new' => $prio]
-            );
+            activity_log('tickets', 'update', 'ticket', (string) $ticket['alarm_id'], 'Priority changed on ' . $ticket['alarm_id'] . ' to ' . $prio, ['field' => 'priority', 'old' => $ticket['priority'], 'new' => $prio]);
             return json_ok([], 'Priority updated');
         }
         return json_fail('Unknown action');
@@ -1631,14 +1475,7 @@ class App extends BaseController
             'comment'         => $logComment,
         ]);
         log_message('debug', "pview alert >> ticket move_state: alarm_id=[" . $alarm_id . "], to_state=[" . $next['name'] . "], by=[" . logged_user_id() . "]");
-        activity_log(
-            'tickets',
-            'move_state',
-            'ticket',
-            (string) $ticket['alarm_id'],
-            'Moved ' . $ticket['alarm_id'] . ' to "' . $next['name'] . '"',
-            ['from_state_id' => (int) $ticket['current_state_id'], 'to_state_id' => (int) $next['id']]
-        );
+        activity_log('tickets', 'move_state', 'ticket', (string) $ticket['alarm_id'], 'Moved ' . $ticket['alarm_id'] . ' to "' . $next['name'] . '"', ['from_state_id' => (int) $ticket['current_state_id'], 'to_state_id' => (int) $next['id']]);
 
         try {
             $level_users = $this->app_model->stateLevelUsers($next, 1);
@@ -1713,14 +1550,7 @@ class App extends BaseController
             'comment' => 'Assigned to ' . $user['name'],
         ]);
         log_message('debug', "pview alert >> ticket assign: alarm_id=[" . $alarm_id . "], assigned_to=[" . $userIdStr . "], by=[" . logged_user_id() . "]");
-        activity_log(
-            'tickets',
-            'assign',
-            'ticket',
-            (string) $ticket['alarm_id'],
-            'Assigned ' . $ticket['alarm_id'] . ' to ' . $user['name'],
-            ['assignee_user_id' => $userIdStr]
-        );
+        activity_log('tickets', 'assign', 'ticket', (string) $ticket['alarm_id'], 'Assigned ' . $ticket['alarm_id'] . ' to ' . $user['name'], ['assignee_user_id' => $userIdStr]);
         try {
             notify_ticket_event('assigned', $ticket, [
                 'actor_name'    => logged_user_name(),
@@ -1757,13 +1587,7 @@ class App extends BaseController
         $this->app_model->ticketUpdate($ticket['id'], $resolveData);
         $this->app_model->ticketLogAction($ticket['id'], 'resolved');
         log_message('debug', "pview alert >> ticket resolve: alarm_id=[" . $alarm_id . "], by=[" . logged_user_id() . "]");
-        activity_log(
-            'tickets',
-            'resolve',
-            'ticket',
-            (string) $ticket['alarm_id'],
-            'Resolved ' . $ticket['alarm_id']
-        );
+        activity_log('tickets', 'resolve', 'ticket', (string) $ticket['alarm_id'], 'Resolved ' . $ticket['alarm_id']);
         return json_ok([], 'Resolved');
     }
 
@@ -1856,13 +1680,7 @@ class App extends BaseController
             'comment' => 'Ticket reopened by ' . logged_user_name(),
         ]);
         log_message('debug', "pview alert >> ticket reopen: alarm_id=[" . $alarm_id . "], by=[" . logged_user_id() . "]");
-        activity_log(
-            'tickets',
-            'reopen',
-            'ticket',
-            (string) $ticket['alarm_id'],
-            'Reopened ' . $ticket['alarm_id']
-        );
+        activity_log('tickets', 'reopen', 'ticket', (string) $ticket['alarm_id'], 'Reopened ' . $ticket['alarm_id']);
         return json_ok([], 'Ticket reopened');
     }
 
@@ -1891,13 +1709,7 @@ class App extends BaseController
         $this->app_model->ticketUpdate($ticket['id'], $closeData);
         $this->app_model->ticketLogAction($ticket['id'], 'closed');
         log_message('debug', "pview alert >> ticket close: alarm_id=[" . $alarm_id . "], by=[" . logged_user_id() . "]");
-        activity_log(
-            'tickets',
-            'close',
-            'ticket',
-            (string) $ticket['alarm_id'],
-            'Closed ' . $ticket['alarm_id']
-        );
+        activity_log('tickets', 'close', 'ticket', (string) $ticket['alarm_id'], 'Closed ' . $ticket['alarm_id']);
         return json_ok([], 'Closed');
     }
 
@@ -2011,14 +1823,7 @@ class App extends BaseController
             'attachment_path' => $rel,
             'comment'         => basename($originalName), // display name; basename() strips any path components
         ]);
-        activity_log(
-            'tickets',
-            'attach',
-            'ticket',
-            (string) $ticket['alarm_id'],
-            'Attached "' . basename($originalName) . '" to ' . $ticket['alarm_id'],
-            ['original_name' => basename($originalName), 'size_bytes' => (int) $file->getSize(), 'mime' => $mime]
-        );
+        activity_log('tickets', 'attach', 'ticket', (string) $ticket['alarm_id'], 'Attached "' . basename($originalName) . '" to ' . $ticket['alarm_id'], ['original_name' => basename($originalName), 'size_bytes' => (int) $file->getSize(), 'mime' => $mime]);
         return json_ok(['path' => $rel], 'File attached');
     }
 
@@ -2065,14 +1870,7 @@ class App extends BaseController
                 $name = $candidate;
             }
         }
-        activity_log(
-            'tickets',
-            'download',
-            'ticket',
-            (string) $ticket['alarm_id'],
-            'Downloaded attachment "' . $name . '" from ' . $ticket['alarm_id'],
-            ['action_id' => (int) $action_id]
-        );
+        activity_log('tickets', 'download', 'ticket', (string) $ticket['alarm_id'], 'Downloaded attachment "' . $name . '" from ' . $ticket['alarm_id'], ['action_id' => (int) $action_id]);
         return $this->response->download($abs, null)->setFileName($name);
     }
 
@@ -2272,14 +2070,7 @@ class App extends BaseController
 
         $id = $this->app_model->savedFilterSave($userId, $name, $qs, 'tickets');
         log_message('debug', "pview alert >> saved filter save: user_id=[" . $userId . "], name=[" . $name . "], filter_id=[" . $id . "]");
-        activity_log(
-            'tickets',
-            'saved_filter_save',
-            'saved_filter',
-            (string) $id,
-            'Saved filter "' . $name . '"',
-            ['filter_name' => $name]
-        );
+        activity_log('tickets', 'saved_filter_save', 'saved_filter', (string) $id, 'Saved filter "' . $name . '"', ['filter_name' => $name]);
         return json_ok(['id' => $id], 'Filter saved');
     }
 
@@ -2293,13 +2084,7 @@ class App extends BaseController
         }
         $this->app_model->savedFilterDelete((int) $id, $userId);
         log_message('debug', "pview alert >> saved filter delete: id=[" . $id . "], user_id=[" . $userId . "]");
-        activity_log(
-            'tickets',
-            'saved_filter_delete',
-            'saved_filter',
-            (string) $id,
-            'Removed saved filter'
-        );
+        activity_log('tickets', 'saved_filter_delete', 'saved_filter', (string) $id, 'Removed saved filter');
         return json_ok([], 'Filter removed');
     }
 
@@ -2624,15 +2409,7 @@ class App extends BaseController
             log_message('error', "pview alert >> API raise notify FAILED: error=[" . $e->getMessage() . "]");
         }
 
-        activity_log(
-            'api',
-            'raise',
-            'ticket',
-            $alarmId,
-            'API raised ticket ' . $alarmId . ' via project #' . $project_id,
-            ['flow_id' => $flow_id, 'alert_type' => $alertType, 'priority' => $priority],
-            ['user_id' => 'api:' . $this->api_key_row['name'], 'user_name' => (string) $this->api_key_row['name'], 'user_role' => 'api', 'project_id' => $project_id]
-        );
+        activity_log('api', 'raise', 'ticket', $alarmId, 'API raised ticket ' . $alarmId . ' via project #' . $project_id, ['flow_id' => $flow_id, 'alert_type' => $alertType, 'priority' => $priority], ['user_id' => 'api:' . $this->api_key_row['name'], 'user_name' => (string) $this->api_key_row['name'], 'user_role' => 'api', 'project_id' => $project_id]);
 
         return service('response')->setStatusCode(201)->setJSON([
             'success'        => true,
@@ -2670,15 +2447,7 @@ class App extends BaseController
             ]);
         }
 
-        activity_log(
-            'api',
-            'show',
-            'ticket',
-            $clean,
-            'API read ticket ' . $clean,
-            [],
-            ['user_id' => 'api:' . $this->api_key_row['name'], 'user_name' => (string) $this->api_key_row['name'], 'user_role' => 'api', 'project_id' => (int) $t['project_id']]
-        );
+        activity_log('api', 'show', 'ticket', $clean, 'API read ticket ' . $clean, [], ['user_id' => 'api:' . $this->api_key_row['name'], 'user_name' => (string) $this->api_key_row['name'], 'user_role' => 'api', 'project_id' => (int) $t['project_id']]);
 
         $entered = strtotime((string) $t['state_entered_at']);
         $tatKey2 = 'l' . (int) $t['current_level'] . '_tat_minutes';
@@ -2766,15 +2535,7 @@ class App extends BaseController
             return service('response')->setStatusCode(400)->setJSON(['success' => false, 'message' => 'Unknown action']);
         }
 
-        activity_log(
-            'api',
-            'update',
-            'ticket',
-            $clean,
-            'API ' . $action . ' on ticket ' . $clean,
-            ['comment' => $comment, 'performed_by_system' => $sys],
-            ['user_id' => 'api:' . $this->api_key_row['name'], 'user_name' => (string) $this->api_key_row['name'], 'user_role' => 'api', 'project_id' => (int) $t['project_id']]
-        );
+        activity_log('api', 'update', 'ticket', $clean, 'API ' . $action . ' on ticket ' . $clean, ['comment' => $comment, 'performed_by_system' => $sys], ['user_id' => 'api:' . $this->api_key_row['name'], 'user_name' => (string) $this->api_key_row['name'], 'user_role' => 'api', 'project_id' => (int) $t['project_id']]);
 
         return service('response')->setJSON([
             'success'    => true,
@@ -2814,15 +2575,7 @@ class App extends BaseController
         }
         $rows = array_slice($rows, $offset, $limit);
 
-        activity_log(
-            'api',
-            'index',
-            null,
-            null,
-            'API listed ' . count($rows) . ' alert(s) for project #' . $filters['project_id'],
-            ['status' => $filters['status'], 'alert_type' => $filters['alert_type']],
-            ['user_id' => 'api:' . $this->api_key_row['name'], 'user_name' => (string) $this->api_key_row['name'], 'user_role' => 'api', 'project_id' => $filters['project_id']]
-        );
+        activity_log('api', 'index', null, null, 'API listed ' . count($rows) . ' alert(s) for project #' . $filters['project_id'], ['status' => $filters['status'], 'alert_type' => $filters['alert_type']], ['user_id' => 'api:' . $this->api_key_row['name'], 'user_name' => (string) $this->api_key_row['name'], 'user_role' => 'api', 'project_id' => $filters['project_id']]);
 
         return service('response')->setJSON([
             'success' => true,
@@ -2844,15 +2597,7 @@ class App extends BaseController
         $project_id = (int) $this->api_key_row['project_id'];
         $rows = $this->app_model->flowGetByProject($project_id);
 
-        activity_log(
-            'api',
-            'flows',
-            null,
-            null,
-            'API listed ' . count($rows) . ' flow(s) for project #' . $project_id,
-            [],
-            ['user_id' => 'api:' . $this->api_key_row['name'], 'user_name' => (string) $this->api_key_row['name'], 'user_role' => 'api', 'project_id' => $project_id]
-        );
+        activity_log('api', 'flows', null, null, 'API listed ' . count($rows) . ' flow(s) for project #' . $project_id, [], ['user_id' => 'api:' . $this->api_key_row['name'], 'user_name' => (string) $this->api_key_row['name'], 'user_role' => 'api', 'project_id' => $project_id]);
 
         return service('response')->setJSON(['success' => true, 'data' => $rows]);
     }
@@ -3175,14 +2920,7 @@ class App extends BaseController
         }
 
         log_message('debug', "pview alert >> module permissions save: by=[" . logged_user_id() . "], roles=[" . implode(',', $roles) . "], changes=[" . count($diff) . "]");
-        activity_log(
-            'module_control_panel',
-            'update',
-            null,
-            null,
-            'Updated module permissions for ' . count($roles) . ' role(s) (' . count($diff) . ' change(s))',
-            ['roles' => $roles, 'diff' => $diff]
-        );
+        activity_log('module_control_panel', 'update', null, null, 'Updated module permissions for ' . count($roles) . ' role(s) (' . count($diff) . ' change(s))', ['roles' => $roles, 'diff' => $diff]);
 
         $this->session->setFlashdata('success', 'Module permissions updated successfully.');
         return redirect()->to(site_url('module_control_panel'));
@@ -3275,14 +3013,7 @@ class App extends BaseController
         }
 
         log_message('debug', "pview alert >> module_add: key=[" . $moduleKey . "], by=[" . logged_user_id() . "]");
-        activity_log(
-            'module_control_panel',
-            'module_add',
-            'module',
-            $moduleKey,
-            'Added module "' . $name . '" (' . $moduleKey . ')',
-            ['module_key' => $moduleKey, 'name' => $name, 'sort_order' => $sortOrder]
-        );
+        activity_log('module_control_panel', 'module_add', 'module', $moduleKey, 'Added module "' . $name . '" (' . $moduleKey . ')', ['module_key' => $moduleKey, 'name' => $name, 'sort_order' => $sortOrder]);
 
         $this->session->setFlashdata('success', 'Module "' . $name . '" added. Grant role access in the permission grid above.');
         return redirect()->to(site_url('module_control_panel'));
@@ -3314,14 +3045,7 @@ class App extends BaseController
         $this->db->table('module_permissions')->where('module_key', $module_key)->delete();
 
         log_message('debug', "pview alert >> module_delete: key=[" . $module_key . "], by=[" . logged_user_id() . "]");
-        activity_log(
-            'module_control_panel',
-            'module_delete',
-            'module',
-            $module_key,
-            'Removed module "' . $name . '" (' . $module_key . ')',
-            ['module_key' => $module_key, 'name' => $name]
-        );
+        activity_log('module_control_panel', 'module_delete', 'module', $module_key, 'Removed module "' . $name . '" (' . $module_key . ')', ['module_key' => $module_key, 'name' => $name]);
 
         $this->session->setFlashdata('success', 'Module "' . $name . '" removed.');
         return redirect()->to(site_url('module_control_panel'));
@@ -3655,14 +3379,7 @@ class App extends BaseController
 
         if ($changed > 0) {
             app_settings_clear_cache();
-            activity_log(
-                'settings',
-                'update',
-                null,
-                null,
-                'Updated ' . $changed . ' setting(s)',
-                $changedKeys
-            );
+            activity_log('settings', 'update', null, null, 'Updated ' . $changed . ' setting(s)', $changedKeys);
             $this->session->setFlashdata('success', $changed . ' setting(s) saved.');
         } else {
             $this->session->setFlashdata('success', 'No changes to save.');
@@ -3692,26 +3409,11 @@ class App extends BaseController
         $ok = send_email($to, $subject, $body);
         if ($ok) {
             log_message('debug', 'pview alert >> settings_send_test_email OK: to=[' . $to . '], by=[' . logged_user_id() . ']');
-            activity_log(
-                'settings',
-                'send_test_email',
-                null,
-                null,
-                'Sent test email to ' . $to,
-                ['to' => $to]
-            );
+            activity_log('settings', 'send_test_email', null, null, 'Sent test email to ' . $to, ['to' => $to]);
             return json_ok([], 'Test email sent to ' . $to . '. Check your inbox in a minute.');
         }
         log_message('error', 'pview alert >> settings_send_test_email FAILED: to=[' . $to . ']');
-        activity_log(
-            'settings',
-            'send_test_email',
-            null,
-            null,
-            'Test email FAILED to ' . $to,
-            ['to' => $to],
-            ['status' => 'fail']
-        );
+        activity_log('settings', 'send_test_email', null, null, 'Test email FAILED to ' . $to, ['to' => $to], ['status' => 'fail']);
         return json_fail('Send failed. Check writable/logs/log-*.php for the SMTP error.');
     }
 
@@ -3732,14 +3434,7 @@ class App extends BaseController
         $this->app_model->settingSet('asset_version', (string) $next, $userId);
         app_settings_clear_cache();
 
-        activity_log(
-            'settings',
-            'bump_asset_version',
-            null,
-            null,
-            'Bumped asset_version ' . $current . ' → ' . $next,
-            ['from' => $current, 'to' => $next]
-        );
+        activity_log('settings', 'bump_asset_version', null, null, 'Bumped asset_version ' . $current . ' → ' . $next, ['from' => $current, 'to' => $next]);
 
         return json_ok(['value' => $next], 'Asset version bumped to ' . $next . '. Refresh once to pull the new files.');
     }

@@ -117,15 +117,7 @@ class User extends BaseController
         $user = $this->user_model->checkLogin($login, $password);
         if (empty($user)) {
             login_attempt_record($ip, $login, false);
-            activity_log(
-                'auth',
-                'login_failed',
-                'user',
-                null,
-                'Failed login for "' . $login . '"',
-                ['login_tried' => $login],
-                ['user_id' => '', 'user_name' => '', 'user_role' => '', 'status' => 'fail']
-            );
+            activity_log('auth', 'login_failed', 'user', null, 'Failed login for "' . $login . '"', ['login_tried' => $login], ['user_id' => '', 'user_name' => '', 'user_role' => '', 'status' => 'fail']);
             $session->setFlashdata('error', 'Invalid credentials.');
             $session->setFlashdata('old_login', $login);
             return redirect()->to(site_url('login'));
@@ -136,13 +128,7 @@ class User extends BaseController
 
         $this->user_model->setSession($user);
         log_message('debug', "pview alert >> Login complete: login=[" . $login . "], user_pk=[" . $user['id'] . "], user_id=[" . (isset($user['user_id']) ? $user['user_id'] : '') . "], role=[" . $user['role'] . "]");
-        activity_log(
-            'auth',
-            'login',
-            'user',
-            (string) $user['id'],
-            'Login: ' . (isset($user['name']) ? $user['name'] : $login)
-        );
+        activity_log('auth', 'login', 'user', (string) $user['id'], 'Login: ' . (isset($user['name']) ? $user['name'] : $login));
 
         // Redirect to the originally requested page, or fall back to first accessible module.
         $redirectUrl = $session->get('redirect_after_login');
@@ -156,13 +142,7 @@ class User extends BaseController
     /** GET /logout */
     public function logout()
     {
-        activity_log(
-            'auth',
-            'logout',
-            'user',
-            (string) logged_user_id(),
-            'Logout'
-        );
+        activity_log('auth', 'logout', 'user', (string) logged_user_id(), 'Logout');
         $this->user_model->logout();
         return redirect()->to(site_url('login'));
     }
@@ -227,13 +207,7 @@ class User extends BaseController
         $session->remove('password_must_rotate');
         $session->setFlashdata('success', 'Password updated.');
         log_message('debug', 'pview alert >> password_change complete: user_pk=[' . $userPk . ']');
-        activity_log(
-            'auth',
-            'password_change',
-            'user',
-            (string) $userPk,
-            'Password changed'
-        );
+        activity_log('auth', 'password_change', 'user', (string) $userPk, 'Password changed');
 
         return redirect()->to(first_accessible_module_url());
     }
@@ -339,14 +313,7 @@ class User extends BaseController
             'phone'     => (string) $this->request->getPost('phone'),
             'is_active' => 1,
         ]);
-        activity_log(
-            'users',
-            'create',
-            'user',
-            (string) $newId,
-            'Created user "' . $name . '" (' . $user_id . ', ' . $role . ')',
-            ['user_id' => $user_id, 'name' => $name, 'email' => $email, 'role' => $role]
-        );
+        activity_log('users', 'create', 'user', (string) $newId, 'Created user "' . $name . '" (' . $user_id . ', ' . $role . ')', ['user_id' => $user_id, 'name' => $name, 'email' => $email, 'role' => $role]);
         $this->session->setFlashdata('success', 'User "' . $name . '" created.');
         return redirect()->to(site_url('users'));
     }
@@ -491,14 +458,7 @@ class User extends BaseController
         if ($pass !== '') {
             $diff['password'] = ['(hidden)', '(reset)'];
         }
-        activity_log(
-            'users',
-            'update',
-            'user',
-            (string) $id,
-            'Updated user "' . $name . '"',
-            $diff
-        );
+        activity_log('users', 'update', 'user', (string) $id, 'Updated user "' . $name . '"', $diff);
         $this->session->setFlashdata('success', 'User "' . $name . '" updated.');
         return redirect()->to(site_url('users'));
     }
@@ -535,14 +495,7 @@ class User extends BaseController
         log_message('debug', "pview alert >> users delete request: id=[" . $id . "]");
         $this->user_model->softDelete($id);
         $deletedName = isset($row['name']) ? (string) $row['name'] : '';
-        activity_log(
-            'users',
-            'delete',
-            'user',
-            (string) $id,
-            'Removed user "' . $deletedName . '"',
-            ['user_id' => isset($row['user_id']) ? $row['user_id'] : '', 'name' => $deletedName]
-        );
+        activity_log('users', 'delete', 'user', (string) $id, 'Removed user "' . $deletedName . '"', ['user_id' => isset($row['user_id']) ? $row['user_id'] : '', 'name' => $deletedName]);
         $this->session->setFlashdata('success', 'User removed.');
         return redirect()->to(site_url('users'));
     }
@@ -640,14 +593,7 @@ class User extends BaseController
         if ($userPk > 0) {
             $this->user_model->update($userPk, ['theme' => $theme]);
             log_message('debug', "pview alert >> user theme updated to=[" . $theme . "] for user_pk=[" . $userPk . "]");
-            activity_log(
-                'me',
-                'theme_change',
-                'user',
-                (string) $userPk,
-                'Theme changed to ' . $theme,
-                ['theme' => $theme]
-            );
+            activity_log('me', 'theme_change', 'user', (string) $userPk, 'Theme changed to ' . $theme, ['theme' => $theme]);
         }
 
         return json_ok([], 'Theme preference updated');
@@ -742,14 +688,7 @@ class User extends BaseController
         $this->session->set('dashboard_layout', $layout);
 
         log_message('debug', "pview alert >> me_dashboard saved: user_pk=[" . $userPk . "], layout=[" . json_encode($layout) . "]");
-        activity_log(
-            'me',
-            'prefs_save',
-            'user',
-            (string) $userPk,
-            'Saved dashboard preferences',
-            $layout
-        );
+        activity_log('me', 'prefs_save', 'user', (string) $userPk, 'Saved dashboard preferences', $layout);
         $this->session->setFlashdata('success', 'Dashboard preferences updated.');
         return redirect()->to(site_url('dashboard'));
     }
@@ -837,13 +776,7 @@ class User extends BaseController
         }
 
         log_message('debug', "pview alert >> me_notifications saved: user_id=[" . $userId . "]");
-        activity_log(
-            'me',
-            'prefs_save',
-            'user',
-            $userId,
-            'Saved notification preferences'
-        );
+        activity_log('me', 'prefs_save', 'user', $userId, 'Saved notification preferences');
         $this->session->setFlashdata('success', 'Notification preferences updated.');
         return redirect()->to(site_url('me/notifications'));
     }
@@ -915,14 +848,7 @@ class User extends BaseController
         ]);
         $this->user_model->seedDefaultPermissions($roleKey);
 
-        activity_log(
-            'roles',
-            'create',
-            'role',
-            $roleKey,
-            'Created role "' . $label . '" (' . $roleKey . ')',
-            ['role_key' => $roleKey, 'label' => $label, 'is_admin_scope' => $isAdminScope]
-        );
+        activity_log('roles', 'create', 'role', $roleKey, 'Created role "' . $label . '" (' . $roleKey . ')', ['role_key' => $roleKey, 'label' => $label, 'is_admin_scope' => $isAdminScope]);
 
         $this->session->setFlashdata('success', 'Role "' . $label . '" created.');
         return redirect()->to(site_url('roles'));
@@ -963,14 +889,7 @@ class User extends BaseController
 
         $this->user_model->updateRoleLabel($role_key, $label);
         $this->user_model->updateRoleAdminScope($role_key, $isAdminScope);
-        activity_log(
-            'roles',
-            'update',
-            'role',
-            (string) $role_key,
-            'Updated role "' . $role_key . '" → "' . $label . '"',
-            ['role_key' => $role_key, 'label' => $label, 'is_admin_scope' => $isAdminScope]
-        );
+        activity_log('roles', 'update', 'role', (string) $role_key, 'Updated role "' . $role_key . '" → "' . $label . '"', ['role_key' => $role_key, 'label' => $label, 'is_admin_scope' => $isAdminScope]);
         $this->session->setFlashdata('success', 'Role updated.');
         return redirect()->to(site_url('roles'));
     }
@@ -994,14 +913,7 @@ class User extends BaseController
             return redirect()->to(site_url('roles'));
         }
         $this->user_model->deleteRole($role_key);
-        activity_log(
-            'roles',
-            'delete',
-            'role',
-            (string) $role_key,
-            'Removed role "' . $role['label'] . '" (' . $role_key . ')',
-            ['role_key' => $role_key, 'label' => $role['label']]
-        );
+        activity_log('roles', 'delete', 'role', (string) $role_key, 'Removed role "' . $role['label'] . '" (' . $role_key . ')', ['role_key' => $role_key, 'label' => $role['label']]);
         $this->session->setFlashdata('success', 'Role "' . $role['label'] . '" removed.');
         return redirect()->to(site_url('roles'));
     }
