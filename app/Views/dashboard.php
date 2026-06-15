@@ -110,7 +110,7 @@ $custProjectsList = isset($custProjects) && is_array($custProjects) ? $custProje
           </select>
           <div class="form-text">Scopes KPIs, severity mix and trend chart to a single project.</div>
         </div>
-        <div class="col-md-4">
+        <div class="col-md-6">
           <label class="form-label fw-semibold">Default Trend Range</label>
           <select name="default_trend_range" class="form-select">
             <option value="0" <?= $custTrendRange === 0 ? 'selected' : ''; ?>>
