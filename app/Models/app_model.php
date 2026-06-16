@@ -1704,7 +1704,7 @@ class App_model
         $total = (int) $this->db->table('projects')->where('deleted_at', null)->countAllResults();
 
         $baseFrom = "FROM projects p ";
-        
+
         static $tableExists = null;
         if ($tableExists === null) {
             $tableExists = $this->db->tableExists('user_projects');
@@ -1713,7 +1713,7 @@ class App_model
             $baseFrom .= " INNER JOIN user_projects up ON up.project_id = p.id AND up.user_id = " . $this->db->escape((string)$scopeUserPk) . " ";
         }
         $baseFrom .= " WHERE p.deleted_at IS NULL";
-        
+
         $params   = [];
         if ($search !== '') {
             $like      = '%' . $search . '%';

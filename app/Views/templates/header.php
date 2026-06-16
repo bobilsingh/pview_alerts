@@ -71,7 +71,7 @@ $secondaryColor = app_setting('secondary_color', '');
     }
     ?>
     <link rel="stylesheet" href="<?= base_url('assets/css/app.css'); ?>?v=<?= esc($assetVersion); ?>">
-    <link rel="stylesheet" href="<?= base_url('assets/css/theme-dark.css'); ?>?v=<?= esc($assetVersion); ?>">
+    <link rel="stylesheet" href="<?= base_url('assets/css/dark.css'); ?>?v=<?= esc($assetVersion); ?>">
     <?php if ($primaryColor !== '' || $secondaryColor !== '') { ?>
         <style>
             :root {

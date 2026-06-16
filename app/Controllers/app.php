@@ -551,7 +551,7 @@ class App extends BaseController
         }
 
         $isCreate = ($id <= 0);
-                $stateAction = 'update_state';
+        $stateAction = 'update_state';
         $stateMsgPrefix = 'Updated';
         if ($isCreate) {
             $stateAction = 'create_state';
@@ -671,7 +671,7 @@ class App extends BaseController
             'requires_comment' => $requires_comment,
             'created_by'      => (string) logged_user_id(),
         ]);
-                $transActionText = 'Added';
+        $transActionText = 'Added';
         if ($id) {
             $transActionText = 'Updated';
         }
@@ -1126,7 +1126,7 @@ class App extends BaseController
             }
         }
 
-                if ($assigneeUserId !== '') {
+        if ($assigneeUserId !== '') {
             $notifyUsers = [$assigneeUserId];
         } else {
             $notifyUsers = $this->app_model->stateLevelUsers($initial, 1);
@@ -2459,7 +2459,7 @@ class App extends BaseController
         if (isset($body['flow_id'])) {
             $flow_id = (int) $body['flow_id'];
         }
-                $rawTitle = '';
+        $rawTitle = '';
         if (isset($body['title'])) {
             $rawTitle = $body['title'];
         }
@@ -2487,7 +2487,7 @@ class App extends BaseController
             ]);
         }
 
-                $rawAlertType = 'info';
+        $rawAlertType = 'info';
         if (isset($body['alert_type'])) {
             $rawAlertType = $body['alert_type'];
         }
@@ -2495,7 +2495,7 @@ class App extends BaseController
         if (!in_array($alertType, ['info', 'major', 'critical'], true)) {
             $alertType = 'info';
         }
-                $rawPriority = 'medium';
+        $rawPriority = 'medium';
         if (isset($body['priority'])) {
             $rawPriority = $body['priority'];
         }
@@ -2691,17 +2691,17 @@ class App extends BaseController
             ]);
         }
 
-                $rawAction = '';
+        $rawAction = '';
         if (isset($body['action'])) {
             $rawAction = $body['action'];
         }
         $action  = (string) $rawAction;
-                $rawComment = '';
+        $rawComment = '';
         if (isset($body['comment'])) {
             $rawComment = $body['comment'];
         }
         $comment = (string) $rawComment;
-                $rawSys = '';
+        $rawSys = '';
         if (isset($body['performed_by_system'])) {
             $rawSys = $body['performed_by_system'];
         }
@@ -4266,11 +4266,11 @@ class App extends BaseController
             if (!isset($userSessions[$uid])) {
                 $userSessions[$uid] = ['name' => (string) $s['user_name'], 'logins' => [], 'logouts' => []];
             }
-                            $sessKey = 'logouts';
-                if ($s['action'] === 'login') {
-                    $sessKey = 'logins';
-                }
-                $userSessions[$uid][$sessKey][] = strtotime($s['created_at']);
+            $sessKey = 'logouts';
+            if ($s['action'] === 'login') {
+                $sessKey = 'logins';
+            }
+            $userSessions[$uid][$sessKey][] = strtotime($s['created_at']);
         }
 
         $sessionAvg = [];
@@ -4496,11 +4496,11 @@ class App extends BaseController
                 $desc = (string) $a['description'];
             }
 
-                    $rawThreshold = '-';
-        if ($tval !== '') {
-            $rawThreshold = $tval;
-        }
-        $threshold = esc($rawThreshold);
+            $rawThreshold = '-';
+            if ($tval !== '') {
+                $rawThreshold = $tval;
+            }
+            $threshold = esc($rawThreshold);
             if ($tunit !== '') {
                 $threshold .= ' <small class="text-muted">' . esc($tunit) . '</small>';
             }

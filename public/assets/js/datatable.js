@@ -1279,24 +1279,24 @@ function initCronRunsTable() {
     lengthMenu: [10, 25, 50, 100],
     order: [[1, "desc"]],
     columns: [
-      { data: "script",   orderable: true },
-      { data: "started",  orderable: true },
+      { data: "script", orderable: true },
+      { data: "started", orderable: true },
       { data: "duration", orderable: true },
-      { data: "tickets",  orderable: true,  className: "text-center" },
-      { data: "sent",     orderable: true,  className: "text-center" },
-      { data: "failed",   orderable: true,  className: "text-center" },
-      { data: "status",   orderable: true,  className: "text-center" },
-      { data: "summary",  orderable: false },
+      { data: "tickets", orderable: true, className: "text-center" },
+      { data: "sent", orderable: true, className: "text-center" },
+      { data: "failed", orderable: true, className: "text-center" },
+      { data: "status", orderable: true, className: "text-center" },
+      { data: "summary", orderable: false },
     ],
     ajax: {
       url: ajaxUrl,
       type: "GET",
       dataSrc: "data",
       data: function (d) {
-        d.f_from   = $("#cronFrom").val()    || "";
-        d.f_to     = $("#cronTo").val()      || "";
-        d.f_script = $("#cronScript").val()  || "";
-        d.f_status = $("#cronStatus").val()  || "";
+        d.f_from = $("#cronFrom").val() || "";
+        d.f_to = $("#cronTo").val() || "";
+        d.f_script = $("#cronScript").val() || "";
+        d.f_status = $("#cronStatus").val() || "";
       },
       error: function (xhr) {
         var msg = "Failed to load cron run history.";
@@ -1307,12 +1307,12 @@ function initCronRunsTable() {
       },
     },
     language: {
-      emptyTable:   "No cron runs recorded yet.",
-      zeroRecords:  "No runs match the selected filters.",
-      info:         "Showing _START_ to _END_ of _TOTAL_ runs",
-      infoEmpty:    "No runs",
+      emptyTable: "No cron runs recorded yet.",
+      zeroRecords: "No runs match the selected filters.",
+      info: "Showing _START_ to _END_ of _TOTAL_ runs",
+      infoEmpty: "No runs",
       infoFiltered: "(filtered from _MAX_ total)",
-      search:       "",
+      search: "",
       searchPlaceholder: "Search…",
     },
     drawCallback: function () {

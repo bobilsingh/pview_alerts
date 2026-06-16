@@ -66,8 +66,10 @@ class User extends BaseController
 
         if ($session->get('user_pk') || $session->get('user_id')) {
             // Destroy a non-admin session during maintenance to break the redirect loop.
-            if (app_setting_bool('maintenance_mode', false)
-                && !role_has_admin_scope((string) $session->get('user_role'))) {
+            if (
+                app_setting_bool('maintenance_mode', false)
+                && !role_has_admin_scope((string) $session->get('user_role'))
+            ) {
                 $session->destroy();
             } else {
                 return redirect()->to(site_url('dashboard'));
@@ -135,7 +137,7 @@ class User extends BaseController
             $loggedUserIdVal = $user['user_id'];
         }
         log_message('debug', "pview alert >> Login complete: login=[" . $login . "], user_pk=[" . $user['id'] . "], user_id=[" . $loggedUserIdVal . "], role=[" . $user['role'] . "]");
-                $loginLogName = $login;
+        $loginLogName = $login;
         if (isset($user['name'])) {
             $loginLogName = $user['name'];
         }
@@ -509,7 +511,7 @@ class User extends BaseController
         if (isset($row['name'])) {
             $deletedName = (string) $row['name'];
         }
-                $deletedUid = '';
+        $deletedUid = '';
         if (isset($row['user_id'])) {
             $deletedUid = $row['user_id'];
         }

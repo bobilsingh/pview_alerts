@@ -1165,12 +1165,7 @@ function bindPostButton(selector, onSuccess) {
 }
 
 function escapeHtml(string) {
-  return String(string)
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#039;");
+  return String(string).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;");
 }
 
 function appendTimelineItem(commentText, iconHtml) {
@@ -1196,15 +1191,15 @@ function appendTimelineItem(commentText, iconHtml) {
   var performerName = $(".topbar-user .name").text().trim() || "You";
 
   var html = '<li class="activity-item new-activity-item" style="display:none;">';
-  html += '  <div class="activity-icon">' + iconHtml + '</div>';
+  html += '  <div class="activity-icon">' + iconHtml + "</div>";
   html += '  <div class="activity-body">';
   html += '    <div class="activity-meta">';
-  html += '      <strong>' + escapeHtml(performerName) + '</strong> ';
-  html += '      <span class="text-muted">' + dateTimeStr + '</span>';
-  html += '    </div>';
-  html += '    <div class="activity-text">' + commentText + '</div>';
-  html += '  </div>';
-  html += '</li>';
+  html += "      <strong>" + escapeHtml(performerName) + "</strong> ";
+  html += '      <span class="text-muted">' + dateTimeStr + "</span>";
+  html += "    </div>";
+  html += '    <div class="activity-text">' + commentText + "</div>";
+  html += "  </div>";
+  html += "</li>";
 
   var $item = $(html);
   $feed.prepend($item);
@@ -1286,7 +1281,7 @@ function refreshTicketDetailsAndActions(onDone) {
         appendTimelineItem(escapeHtml(commentVal), '<i class="bi bi-chat-left-text text-primary"></i>');
         $commentArea.val("");
         refreshTicketDetailsAndActions();
-      }
+      },
     });
 
     bindPostForm("#assignForm", {
@@ -1303,7 +1298,7 @@ function refreshTicketDetailsAndActions(onDone) {
         appendTimelineItem("Assigned ticket to " + escapeHtml(name), '<i class="bi bi-person-check text-primary"></i>');
         $select.val("");
         refreshTicketDetailsAndActions();
-      }
+      },
     });
 
     bindPostForm("#attachForm", {
@@ -1531,7 +1526,7 @@ function initTicketDetailPage() {
       appendTimelineItem(escapeHtml(commentVal), '<i class="bi bi-chat-left-text text-primary"></i>');
       $commentArea.val("");
       refreshTicketDetailsAndActions();
-    }
+    },
   });
 
   bindPostForm("#assignForm", {
@@ -1547,7 +1542,7 @@ function initTicketDetailPage() {
       appendTimelineItem("Assigned ticket to " + escapeHtml(name), '<i class="bi bi-person-check text-primary"></i>');
       $select.val("");
       refreshTicketDetailsAndActions();
-    }
+    },
   });
 
   bindPostForm("#attachForm", {
@@ -2713,7 +2708,7 @@ function initThemeSwitch() {
         },
         error: function (xhr) {
           console.error("[Theme Toggle] Database sync failed due to network error.", xhr);
-        }
+        },
       });
     }
   });

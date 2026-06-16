@@ -170,8 +170,8 @@ foreach ($tickets as $ticket) {
 
 $qResult = process_notification_queue();
 echo "Notification queue drained: sent=" . $qResult['sent']
-   . " failed=" . $qResult['failed']
-   . " retried=" . $qResult['retried'] . "\n";
+    . " failed=" . $qResult['failed']
+    . " retried=" . $qResult['retried'] . "\n";
 $cronNotifsSent   = (int) ($qResult['sent']   ?? 0);
 $cronNotifsFailed = (int) ($qResult['failed'] ?? 0);
 
@@ -179,7 +179,9 @@ $cronNotifsFailed = (int) ($qResult['failed'] ?? 0);
 try {
     $db = \Config\Database::connect();
     $retainDays    = (int) app_setting_int('log_retention_days', 30);
-    if ($retainDays < 1) { $retainDays = 30; }
+    if ($retainDays < 1) {
+        $retainDays = 30;
+    }
     $oldCutoff     = date('Y-m-d H:i:s', time() - ($retainDays * 86400));
     $apiCutoff     = date('Y-m-d H:i:s', time() - 86400); // api_request_log: always 1 day
     $db->table('api_request_log')->where('requested_at <', $apiCutoff)->delete();
