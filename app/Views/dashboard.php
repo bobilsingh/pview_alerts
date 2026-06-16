@@ -74,11 +74,30 @@ if (isset($prefProjectName) && $prefProjectName !== '') {
 </div>
 
 <?php
-$custKpi = isset($custKpiVisible) && is_array($custKpiVisible) ? $custKpiVisible : ['open' => 1, 'critical' => 1, 'major' => 1, 'resolved' => 1];
-$custProjId = (int) ($custDefaultProjectId ?? 0);
-$custTrendRange = (int) ($custDefaultTrendRange ?? 0);
-$custRanges = isset($custRangesInt) && is_array($custRangesInt) ? $custRangesInt : [7, 15, 30];
-$custProjectsList = isset($custProjects) && is_array($custProjects) ? $custProjects : [];
+$custKpi = ['open' => 1, 'critical' => 1, 'major' => 1, 'resolved' => 1];
+if (isset($custKpiVisible) && is_array($custKpiVisible)) {
+    $custKpi = $custKpiVisible;
+}
+$defaultProjIdVal = 0;
+if (isset($custDefaultProjectId)) {
+    $defaultProjIdVal = $custDefaultProjectId;
+}
+$custProjId = (int) $defaultProjIdVal;
+
+$defaultTrendRangeVal = 0;
+if (isset($custDefaultTrendRange)) {
+    $defaultTrendRangeVal = $custDefaultTrendRange;
+}
+$custTrendRange = (int) $defaultTrendRangeVal;
+
+$custRanges = [7, 15, 30];
+if (isset($custRangesInt) && is_array($custRangesInt)) {
+    $custRanges = $custRangesInt;
+}
+$custProjectsList = [];
+if (isset($custProjects) && is_array($custProjects)) {
+    $custProjectsList = $custProjects;
+}
 ?>
 
 <!-- Inline Customize panel (same settings as me/dashboard page) -->
@@ -102,8 +121,13 @@ $custProjectsList = isset($custProjects) && is_array($custProjects) ? $custProje
           <label class="form-label fw-semibold">Default Project</label>
           <select name="default_project_id" class="form-select">
             <option value="0">All projects (no filter)</option>
-            <?php foreach ($custProjectsList as $p) { ?>
-              <option value="<?= (int) $p['id']; ?>" <?= $custProjId === (int) $p['id'] ? 'selected' : ''; ?>>
+            <?php foreach ($custProjectsList as $p) {
+                $selectedStr = '';
+                if ($custProjId === (int) $p['id']) {
+                    $selectedStr = 'selected';
+                }
+                ?>
+              <option value="<?= (int) $p['id']; ?>" <?= $selectedStr; ?>>
                 <?= esc($p['name']); ?>
               </option>
             <?php } ?>
@@ -113,11 +137,26 @@ $custProjectsList = isset($custProjects) && is_array($custProjects) ? $custProje
         <div class="col-md-6">
           <label class="form-label fw-semibold">Default Trend Range</label>
           <select name="default_trend_range" class="form-select">
-            <option value="0" <?= $custTrendRange === 0 ? 'selected' : ''; ?>>
-              System default (<?= (int) ($custRanges[0] ?? 7); ?> days)
+            <?php
+            $selectedStr = '';
+            if ($custTrendRange === 0) {
+                $selectedStr = 'selected';
+            }
+            $custRange0 = 7;
+            if (isset($custRanges[0])) {
+                $custRange0 = $custRanges[0];
+            }
+            ?>
+            <option value="0" <?= $selectedStr; ?>>
+              System default (<?= (int) $custRange0; ?> days)
             </option>
-            <?php foreach ($custRanges as $r) { ?>
-              <option value="<?= (int) $r; ?>" <?= $custTrendRange === (int) $r ? 'selected' : ''; ?>>
+            <?php foreach ($custRanges as $r) {
+                $selectedStr = '';
+                if ($custTrendRange === (int) $r) {
+                    $selectedStr = 'selected';
+                }
+                ?>
+              <option value="<?= (int) $r; ?>" <?= $selectedStr; ?>>
                 <?= (int) $r; ?> days
               </option>
             <?php } ?>
@@ -130,11 +169,16 @@ $custProjectsList = isset($custProjects) && is_array($custProjects) ? $custProje
       <div>
         <label class="form-label fw-semibold">KPI Cards</label>
         <div class="row g-2">
-          <?php foreach (['open' => 'Open Tickets', 'critical' => 'Critical', 'major' => 'Major', 'resolved' => 'Resolved'] as $key => $lbl) { ?>
+          <?php foreach (['open' => 'Open Tickets', 'critical' => 'Critical', 'major' => 'Major', 'resolved' => 'Resolved'] as $key => $lbl) {
+              $checkedStr = '';
+              if (!empty($custKpi[$key])) {
+                  $checkedStr = 'checked';
+              }
+              ?>
             <div class="col-md-3 col-6">
               <div class="form-check form-switch">
                 <input type="checkbox" class="form-check-input" name="kpi_<?= $key; ?>" id="dkpi_<?= $key; ?>"
-                  <?= !empty($custKpi[$key]) ? 'checked' : ''; ?>>
+                  <?= $checkedStr; ?>>
                 <label class="form-check-label" for="dkpi_<?= $key; ?>"><?= esc($lbl); ?></label>
               </div>
             </div>
@@ -291,12 +335,30 @@ $custProjectsList = isset($custProjects) && is_array($custProjects) ? $custProje
         <?php foreach ($recentTickets as $t) { ?>
           <?php
           $expires    = tat_expires_at($t);
-          $status     = isset($t['status'])     ? $t['status']     : '';
-          $alertType  = isset($t['alert_type']) ? $t['alert_type'] : '';
-          $priority   = isset($t['priority'])   ? $t['priority']   : '';
-          $stateName  = (isset($t['state_name']) && $t['state_name'] !== '') ? $t['state_name'] : '-';
-          $assignee   = (isset($t['assignee_name']) && $t['assignee_name'] !== '') ? $t['assignee_name'] : 'Unassigned';
-          $rowClass   = $status === 'escalated' ? 'row-escalated' : '';
+          $status = '';
+          if (isset($t['status'])) {
+              $status = $t['status'];
+          }
+          $alertType = '';
+          if (isset($t['alert_type'])) {
+              $alertType = $t['alert_type'];
+          }
+          $priority = '';
+          if (isset($t['priority'])) {
+              $priority = $t['priority'];
+          }
+          $stateName = '-';
+          if (isset($t['state_name']) && $t['state_name'] !== '') {
+              $stateName = $t['state_name'];
+          }
+          $assignee = 'Unassigned';
+          if (isset($t['assignee_name']) && $t['assignee_name'] !== '') {
+              $assignee = $t['assignee_name'];
+          }
+          $rowClass = '';
+          if ($status === 'escalated') {
+              $rowClass = 'row-escalated';
+          }
           ?>
           <tr class="<?= $rowClass; ?>">
             <td><a href="<?= site_url('tickets/detail/' . $t['alarm_id']); ?>" class="alarm-id"><?= esc($t['alarm_id']); ?></a></td>

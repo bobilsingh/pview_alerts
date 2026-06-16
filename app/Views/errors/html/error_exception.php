@@ -29,8 +29,14 @@ $errorId = uniqid('error', true);
             CodeIgniter: <?= esc(CodeIgniter::CI_VERSION) ?> --
             Environment: <?= ENVIRONMENT ?>
         </div>
+        <?php
+        $exceptionCodeSuffix = '';
+        if ($exception->getCode()) {
+            $exceptionCodeSuffix = ' #' . $exception->getCode();
+        }
+        ?>
         <div class="container">
-            <h1><?= esc($title), esc($exception->getCode() ? ' #' . $exception->getCode() : '') ?></h1>
+            <h1><?= esc($title), esc($exceptionCodeSuffix) ?></h1>
             <p>
                 <?= nl2br(esc($exception->getMessage())) ?>
                 <a href="https://www.duckduckgo.com/?q=<?= urlencode($title . ' ' . preg_replace('#\'.*\'|".*"#Us', '', $exception->getMessage())) ?>"
@@ -56,11 +62,15 @@ $errorId = uniqid('error', true);
 
         while ($prevException = $last->getPrevious()) {
             $last = $prevException;
+            $prevExceptionCodeSuffix = '';
+            if ($prevException->getCode()) {
+                $prevExceptionCodeSuffix = ' #' . $prevException->getCode();
+            }
             ?>
 
     <pre>
     Caused by:
-    <?= esc($prevException::class), esc($prevException->getCode() ? ' #' . $prevException->getCode() : '') ?>
+    <?= esc($prevException::class), esc($prevExceptionCodeSuffix) ?>
 
     <?= nl2br(esc($prevException->getMessage())) ?>
     <a href="https://www.duckduckgo.com/?q=<?= urlencode($prevException::class . ' ' . preg_replace('#\'.*\'|".*"#Us', '', $prevException->getMessage())) ?>"
@@ -121,13 +131,22 @@ $errorId = uniqid('error', true);
                                         $params = null;
                                         // Reflection by name is not available for closure function
                                         if (! str_ends_with($row['function'], '}')) {
-                                            $mirror = isset($row['class']) ? new ReflectionMethod($row['class'], $row['function']) : new ReflectionFunction($row['function']);
+                                            if (isset($row['class'])) {
+                                                $mirror = new ReflectionMethod($row['class'], $row['function']);
+                                            } else {
+                                                $mirror = new ReflectionFunction($row['function']);
+                                            }
                                             $params = $mirror->getParameters();
                                         }
 
-                                        foreach ($row['args'] as $key => $value) : ?>
+                                        foreach ($row['args'] as $key => $value) : 
+                                            $paramName = "#{$key}";
+                                            if (isset($params[$key])) {
+                                                $paramName = '$' . $params[$key]->name;
+                                            }
+                                            ?>
                                             <tr>
-                                                <td><code><?= esc(isset($params[$key]) ? '$' . $params[$key]->name : "#{$key}") ?></code></td>
+                                                <td><code><?= esc($paramName) ?></code></td>
                                                 <td><pre><?= esc(print_r($value, true)) ?></pre></td>
                                             </tr>
                                         <?php endforeach ?>
@@ -224,7 +243,21 @@ $errorId = uniqid('error', true);
 
             <!-- Request -->
             <div class="content" id="request">
-                <?php $request = service('request'); ?>
+                <?php 
+                $request = service('request'); 
+                $isAjaxStr = 'no';
+                if ($request->isAJAX()) {
+                    $isAjaxStr = 'yes';
+                }
+                $isCliStr = 'no';
+                if ($request->isCLI()) {
+                    $isCliStr = 'yes';
+                }
+                $isSecureStr = 'no';
+                if ($request->isSecure()) {
+                    $isSecureStr = 'yes';
+                }
+                ?>
 
                 <table>
                     <tbody>
@@ -242,15 +275,15 @@ $errorId = uniqid('error', true);
                         </tr>
                         <tr>
                             <td style="width: 10em">Is AJAX Request?</td>
-                            <td><?= $request->isAJAX() ? 'yes' : 'no' ?></td>
+                            <td><?= $isAjaxStr ?></td>
                         </tr>
                         <tr>
                             <td>Is CLI Request?</td>
-                            <td><?= $request->isCLI() ? 'yes' : 'no' ?></td>
+                            <td><?= $isCliStr ?></td>
                         </tr>
                         <tr>
                             <td>Is Secure Request?</td>
-                            <td><?= $request->isSecure() ? 'yes' : 'no' ?></td>
+                            <td><?= $isSecureStr ?></td>
                         </tr>
                         <tr>
                             <td>User Agent</td>

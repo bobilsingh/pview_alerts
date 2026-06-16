@@ -221,7 +221,11 @@ if (!function_exists('assignable_role_keys')) {
             foreach ($rows as $r) {
                 $key            = (string) $r['role_key'];
                 $isSuper        = ($key === ROLE_SUPER_ADMIN);
-                $isAdminScope   = ((int) ($r['is_admin_scope'] ?? 0)) === 1;
+                $adminScopeVal = 0;
+                if (isset($r['is_admin_scope'])) {
+                    $adminScopeVal = $r['is_admin_scope'];
+                }
+                $isAdminScope   = ((int) $adminScopeVal) === 1;
 
                 if ($isSuper && !$actorIsSuper) {
                     continue;
@@ -1849,7 +1853,11 @@ if (!function_exists('flow_ticket_ancestor_ids')) {
         if (!empty($transitions)) {
             $revFwd = [];
             foreach ($transitions as $t) {
-                if (($t['transition_type'] ?? 'forward') !== 'forward') {
+                $transType = 'forward';
+                if (isset($t['transition_type'])) {
+                    $transType = $t['transition_type'];
+                }
+                if ($transType !== 'forward') {
                     continue;
                 }
                 $from = (int) $t['from_state_id'];
@@ -1864,7 +1872,11 @@ if (!function_exists('flow_ticket_ancestor_ids')) {
                 while (!empty($queue) && $guard < 200) {
                     $guard++;
                     $node = array_shift($queue);
-                    foreach ($revFwd[$node] ?? [] as $prev) {
+                    $revFwdNode = [];
+                    if (isset($revFwd[$node])) {
+                        $revFwdNode = $revFwd[$node];
+                    }
+                    foreach ($revFwdNode as $prev) {
                         if (!isset($visited[$prev])) {
                             $visited[$prev]    = true;
                             $ancestors[$prev]  = true;
@@ -1906,7 +1918,11 @@ if (!function_exists('flow_vis_edges')) {
         // Collect only forward edges from the transitions table.
         $fwdEdges = [];
         foreach ($transitions as $t) {
-            if (($t['transition_type'] ?? 'forward') === 'forward') {
+            $transType = 'forward';
+            if (isset($t['transition_type'])) {
+                $transType = $t['transition_type'];
+            }
+            if ($transType === 'forward') {
                 $fwdEdges[] = [
                     'from'            => (int) $t['from_state_id'],
                     'to'              => (int) $t['to_state_id'],
@@ -1995,7 +2011,11 @@ if (!function_exists('flow_vis_designer_data')) {
         }
         $edges = flow_vis_edges($states, $transitions);
         foreach ($transitions as $t) {
-            if (($t['transition_type'] ?? '') === 'backward') {
+            $transType = '';
+            if (isset($t['transition_type'])) {
+                $transType = $t['transition_type'];
+            }
+            if ($transType === 'backward') {
                 $edges[] = [
                     'from'            => (int) $t['from_state_id'],
                     'to'              => (int) $t['to_state_id'],
@@ -2045,7 +2065,11 @@ if (!function_exists('flow_vis_ticket_data')) {
         }
         $edges = flow_vis_edges($states, $transitions);
         foreach ($transitions as $t) {
-            if (($t['transition_type'] ?? '') === 'backward') {
+            $transType = '';
+            if (isset($t['transition_type'])) {
+                $transType = $t['transition_type'];
+            }
+            if ($transType === 'backward') {
                 $edges[] = [
                     'from'            => (int) $t['from_state_id'],
                     'to'              => (int) $t['to_state_id'],

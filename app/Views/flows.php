@@ -121,7 +121,12 @@ $decode = function ($raw) {
           <label class="form-label">TAT Level Count
             <small class="text-muted fw-normal ms-1">— how many escalation levels before a ticket is flagged as escalated (1–4)</small>
           </label>
-          <?php $currentTatLevel = isset($flow['tat_level_count']) ? (int) $flow['tat_level_count'] : 4; ?>
+          <?php 
+          $currentTatLevel = 4;
+          if (isset($flow['tat_level_count'])) {
+              $currentTatLevel = (int) $flow['tat_level_count'];
+          }
+          ?>
           <select name="tat_level_count" class="form-select">
             <?php foreach ([1, 2, 3, 4] as $lvl) { ?>
               <option value="<?= $lvl; ?>" <?php if ($currentTatLevel === $lvl) { echo 'selected'; } ?>>
@@ -160,15 +165,47 @@ $decode = function ($raw) {
 
   <?php
   $isEditState = !empty($editState);
-  $editSid     = $isEditState ? (int) $editState['id'] : 0;
+  $editSid = 0;
+  if ($isEditState) {
+      $editSid = (int) $editState['id'];
+  }
 
   $editL = [];
   if ($isEditState) {
     foreach ([1, 2, 3, 4] as $lvl) {
-      $raw = $editState['l' . $lvl . '_user_ids'] ?? '';
+      $raw = '';
+      if (isset($editState['l' . $lvl . '_user_ids'])) {
+          $raw = $editState['l' . $lvl . '_user_ids'];
+      }
       $arr = json_decode((string) $raw, true);
-      $editL[$lvl] = is_array($arr) ? array_map('strval', $arr) : [];
+      if (is_array($arr)) {
+          $editL[$lvl] = array_map('strval', $arr);
+      } else {
+          $editL[$lvl] = [];
+      }
     }
+  }
+
+  $stateIcon = 'plus-square';
+  $stateActionTitle = 'Add new state';
+  $editStateNameVal = '';
+  $initialChecked = '';
+  $finalChecked = '';
+  $btnIcon = 'plus-lg';
+  $btnText = 'Add State';
+
+  if ($isEditState) {
+      $stateIcon = 'pencil-square';
+      $stateActionTitle = 'Edit state: ' . esc($editState['name']);
+      $editStateNameVal = esc($editState['name']);
+      if (!empty($editState['is_initial'])) {
+          $initialChecked = 'checked';
+      }
+      if (!empty($editState['is_final'])) {
+          $finalChecked = 'checked';
+      }
+      $btnIcon = 'check-lg';
+      $btnText = 'Update State';
   }
   ?>
 
@@ -183,10 +220,15 @@ $decode = function ($raw) {
     <a href="<?= site_url('flows'); ?>" class="btn btn-light"><i class="bi bi-arrow-left"></i> Back to flows</a>
   </div>
 
-  <?php if (!empty($states)) { ?>
+  <?php if (!empty($states)) { 
+    $visTransitions = [];
+    if (isset($transitions)) {
+        $visTransitions = $transitions;
+    }
+    ?>
     <div id="flowStepper" class="mb-3">
       <?= flow_widget_html(
-        flow_vis_designer_data($states, isset($transitions) ? $transitions : []),
+        flow_vis_designer_data($states, $visTransitions),
         ['subtitle' => 'Workflow diagram', 'variant' => 'designer', 'legend' => true]
       ); ?>
     </div>
@@ -209,16 +251,51 @@ $decode = function ($raw) {
             <?php foreach ($states as $i => $s) { ?>
               <?php
               $sid       = (int) $s['id'];
-              $l1c       = count($decode($s['l1_user_ids'] ?? ''));
-              $l2c       = count($decode($s['l2_user_ids'] ?? ''));
-              $l3c       = count($decode($s['l3_user_ids'] ?? ''));
-              $l4c       = count($decode($s['l4_user_ids'] ?? ''));
-              $sbwd      = $bwdLabels[$sid] ?? [];
+              
+              $sL1Val = '';
+              if (isset($s['l1_user_ids'])) {
+                  $sL1Val = $s['l1_user_ids'];
+              }
+              $l1c       = count($decode($sL1Val));
+
+              $sL2Val = '';
+              if (isset($s['l2_user_ids'])) {
+                  $sL2Val = $s['l2_user_ids'];
+              }
+              $l2c       = count($decode($sL2Val));
+
+              $sL3Val = '';
+              if (isset($s['l3_user_ids'])) {
+                  $sL3Val = $s['l3_user_ids'];
+              }
+              $l3c       = count($decode($sL3Val));
+
+              $sL4Val = '';
+              if (isset($s['l4_user_ids'])) {
+                  $sL4Val = $s['l4_user_ids'];
+              }
+              $l4c       = count($decode($sL4Val));
+
+              $sbwd      = [];
+              if (isset($bwdLabels[$sid])) {
+                  $sbwd = $bwdLabels[$sid];
+              }
+
               $isEditing = ($sid === $editSid);
               $isLast    = ($i === count($states) - 1);
+
+              $editingCls = '';
+              if ($isEditing) {
+                  $editingCls = ' state-item--focus';
+              }
+
+              $parentStateIdVal = 0;
+              if (isset($s['parent_state_id'])) {
+                  $parentStateIdVal = (int) $s['parent_state_id'];
+              }
               ?>
-              <li class="state-item<?= $isEditing ? ' state-item--focus' : ''; ?>"
-                  data-id="<?= $sid; ?>" data-parent-id="<?= (int) ($s['parent_state_id'] ?? 0); ?>">
+              <li class="state-item<?= $editingCls; ?>"
+                  data-id="<?= $sid; ?>" data-parent-id="<?= $parentStateIdVal; ?>">
                 <div class="d-flex align-items-start gap-2">
                   <i class="bi bi-grip-vertical text-muted state-grip mt-1"></i>
                   <div class="flex-grow-1">
@@ -273,8 +350,8 @@ $decode = function ($raw) {
       <div class="card h-100">
         <div class="card-header d-flex justify-content-between align-items-center">
           <strong>
-            <i class="bi bi-<?= $isEditState ? 'pencil-square' : 'plus-square'; ?> text-primary"></i>
-            <?= $isEditState ? 'Edit state: ' . esc($editState['name']) : 'Add new state'; ?>
+            <i class="bi bi-<?= $stateIcon; ?> text-primary"></i>
+            <?= $stateActionTitle; ?>
           </strong>
           <?php if ($isEditState) { ?>
             <a href="<?= site_url('flows/states/' . $flow['id']); ?>" class="btn btn-sm btn-light">
@@ -293,18 +370,18 @@ $decode = function ($raw) {
               <label class="form-label">State name *</label>
               <input type="text" name="name" class="form-control" required
                 placeholder="e.g. L1 Validation"
-                value="<?= $isEditState ? esc($editState['name']) : ''; ?>">
+                value="<?= $editStateNameVal; ?>">
             </div>
 
             <div class="d-flex gap-3 mb-3">
               <div class="form-check form-switch">
                 <input class="form-check-input" type="checkbox" name="is_initial" id="isInitial"
-                  <?= ($isEditState && !empty($editState['is_initial'])) ? 'checked' : ''; ?>>
+                  <?= $initialChecked; ?>>
                 <label class="form-check-label" for="isInitial">Initial state</label>
               </div>
               <div class="form-check form-switch">
                 <input class="form-check-input" type="checkbox" name="is_final" id="isFinal"
-                  <?= ($isEditState && !empty($editState['is_final'])) ? 'checked' : ''; ?>>
+                  <?= $finalChecked; ?>>
                 <label class="form-check-label" for="isFinal">Closing state</label>
               </div>
             </div>
@@ -317,14 +394,24 @@ $decode = function ($raw) {
               return true;
             });
             if (!empty($parentCandidates)) {
-              $currentParent = $isEditState ? (int) ($editState['parent_state_id'] ?? 0) : 0;
+              $currentParent = 0;
+              if ($isEditState) {
+                  if (isset($editState['parent_state_id'])) {
+                      $currentParent = (int) $editState['parent_state_id'];
+                  }
+              }
             ?>
             <div class="mb-3" id="parentStateWrap">
               <label class="form-label">Parent State <small class="text-muted">(defines branching structure)</small></label>
               <select name="parent_state_id" class="form-select">
                 <option value="">No parent (root-level)</option>
-                <?php foreach ($parentCandidates as $sp) { ?>
-                  <option value="<?= (int) $sp['id']; ?>" <?= ($currentParent === (int) $sp['id']) ? 'selected' : ''; ?>>
+                <?php foreach ($parentCandidates as $sp) { 
+                  $sel = '';
+                  if ($currentParent === (int) $sp['id']) {
+                      $sel = 'selected';
+                  }
+                  ?>
+                  <option value="<?= (int) $sp['id']; ?>" <?= $sel; ?>>
                     <?= esc($sp['name']); ?>
                   </option>
                 <?php } ?>
@@ -340,15 +427,22 @@ $decode = function ($raw) {
               if (!empty($sp['is_final'])) { return false; }
               return true;
             });
-            $editBwdIdsArr = $editBwdIds ?? [];
+            $editBwdIdsArr = [];
+            if (isset($editBwdIds)) {
+                $editBwdIdsArr = $editBwdIds;
+            }
             if (!empty($bwdCandidates)) {
             ?>
             <div class="mb-3">
               <label class="form-label">Allowed Backward States <small class="text-muted">(send-back targets)</small></label>
               <select name="backward_state_ids[]" class="form-select select2" multiple>
-                <?php foreach ($bwdCandidates as $sp) { ?>
-                  <option value="<?= (int) $sp['id']; ?>"
-                    <?= in_array((int) $sp['id'], $editBwdIdsArr, true) ? 'selected' : ''; ?>>
+                <?php foreach ($bwdCandidates as $sp) { 
+                  $sel = '';
+                  if (in_array((int) $sp['id'], $editBwdIdsArr, true)) {
+                      $sel = 'selected';
+                  }
+                  ?>
+                  <option value="<?= (int) $sp['id']; ?>" <?= $sel; ?>>
                     <?= esc($sp['name']); ?>
                   </option>
                 <?php } ?>
@@ -364,15 +458,26 @@ $decode = function ($raw) {
             <?php
             $defaultTat = [60, 120, 240, 480];
             for ($lvl = 1; $lvl <= 4; $lvl++) {
-              $tatVal   = $isEditState ? (int) ($editState['l' . $lvl . '_tat_minutes'] ?? $defaultTat[$lvl - 1]) : $defaultTat[$lvl - 1];
-              $lvlUsers = $isEditState ? $editL[$lvl] : [];
+              $tatVal = $defaultTat[$lvl - 1];
+              if ($isEditState) {
+                  if (isset($editState['l' . $lvl . '_tat_minutes'])) {
+                      $tatVal = (int) $editState['l' . $lvl . '_tat_minutes'];
+                  }
+              }
+              $lvlUsers = [];
+              if ($isEditState) {
+                  $lvlUsers = $editL[$lvl];
+              }
             ?>
               <div class="row g-2 mb-2 align-items-end">
                 <div class="col-7">
                   <label class="form-label small fw-semibold mb-1">L<?= $lvl; ?> users</label>
                   <select name="l<?= $lvl; ?>_user_ids[]" class="form-select select2" multiple>
                     <?php foreach ($users as $u) {
-                      $sel = in_array((string) $u['user_id'], $lvlUsers, true) ? 'selected' : '';
+                      $sel = '';
+                      if (in_array((string) $u['user_id'], $lvlUsers, true)) {
+                          $sel = 'selected';
+                      }
                     ?>
                       <option value="<?= esc((string) $u['user_id']); ?>" <?= $sel; ?>><?= esc($u['name']); ?> - <?= esc($u['email']); ?></option>
                     <?php } ?>
@@ -387,8 +492,8 @@ $decode = function ($raw) {
             <?php } ?>
 
             <button type="submit" class="btn btn-primary mt-2 w-100">
-              <i class="bi bi-<?= $isEditState ? 'check-lg' : 'plus-lg'; ?>"></i>
-              <?= $isEditState ? 'Update State' : 'Add State'; ?>
+              <i class="bi bi-<?= $btnIcon; ?>"></i>
+              <?= $btnText; ?>
             </button>
           </form>
         </div>

@@ -40,7 +40,11 @@ class Helper_model
         $map = [];
         foreach ($rows as $r) {
             $isAdmin = false;
-            if (((int) ($r['is_admin_scope'] ?? 0)) === 1) {
+            $adminScopeVal = 0;
+            if (isset($r['is_admin_scope'])) {
+                $adminScopeVal = $r['is_admin_scope'];
+            }
+            if (((int) $adminScopeVal) === 1) {
                 $isAdmin = true;
             }
             $map[(string) $r['role_key']] = $isAdmin;

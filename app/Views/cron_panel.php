@@ -37,29 +37,90 @@ $today = date('Y-m-d');
     $todayNotifs    = 0;
     $durTotal       = 0;
     foreach ($runs as $r) {
-      if (($r['status'] ?? 'ok') === 'ok') {
+      $statusVal = 'ok';
+      if (isset($r['status'])) {
+          $statusVal = $r['status'];
+      }
+      if ($statusVal === 'ok') {
         $okRuns++;
       }
-      $durTotal += (int)($r['duration_ms'] ?? 0);
-      if (substr($r['started_at'] ?? '', 0, 10) === $todayStr) {
+
+      $durMsVal = 0;
+      if (isset($r['duration_ms'])) {
+          $durMsVal = $r['duration_ms'];
+      }
+      $durTotal += (int) $durMsVal;
+
+      $startedAtVal = '';
+      if (isset($r['started_at'])) {
+          $startedAtVal = $r['started_at'];
+      }
+      if (substr($startedAtVal, 0, 10) === $todayStr) {
         $todayRuns++;
-        $todayTickets += (int)($r['tickets_checked'] ?? 0);
-        $todayNotifs  += (int)($r['notifs_sent'] ?? 0);
+
+        $ticketsCheckedVal = 0;
+        if (isset($r['tickets_checked'])) {
+            $ticketsCheckedVal = $r['tickets_checked'];
+        }
+        $todayTickets += (int) $ticketsCheckedVal;
+
+        $notifsSentVal = 0;
+        if (isset($r['notifs_sent'])) {
+            $notifsSentVal = $r['notifs_sent'];
+        }
+        $todayNotifs  += (int) $notifsSentVal;
       }
     }
-    $successRate = $totalRuns > 0 ? round($okRuns / $totalRuns * 100, 1) : 0;
-    $avgDurSec   = $totalRuns > 0 ? round($durTotal / $totalRuns / 1000, 2) : 0;
-    $successCls  = $successRate >= 95 ? 'text-success' : ($successRate >= 80 ? 'text-warning' : 'text-danger');
+
+    $successRate = 0;
+    if ($totalRuns > 0) {
+        $successRate = round($okRuns / $totalRuns * 100, 1);
+    }
+
+    $avgDurSec = 0;
+    if ($totalRuns > 0) {
+        $avgDurSec = round($durTotal / $totalRuns / 1000, 2);
+    }
+
+    $successCls = 'text-danger';
+    if ($successRate >= 95) {
+        $successCls = 'text-success';
+    } elseif ($successRate >= 80) {
+        $successCls = 'text-warning';
+    }
+
+    $progressBarCls = 'bg-danger';
+    if ($successRate >= 95) {
+        $progressBarCls = 'bg-success';
+    } elseif ($successRate >= 80) {
+        $progressBarCls = 'bg-warning';
+    }
     ?>
     <div class="row g-3 mb-4">
 
       <!-- Per-script last-run cards -->
       <?php foreach ($lastRuns as $script => $run): ?>
         <?php
-        $isOk      = ($run['status'] ?? 'ok') === 'ok';
-        $statusCls = $isOk ? 'bg-success' : 'bg-danger';
-        $statusLbl = $isOk ? 'OK' : 'FAILED';
-        $durSec    = round((int)($run['duration_ms'] ?? 0) / 1000, 2);
+        $runStatusVal = 'ok';
+        if (isset($run['status'])) {
+            $runStatusVal = $run['status'];
+        }
+        $isOk      = $runStatusVal === 'ok';
+        $statusCls = 'bg-danger';
+        if ($isOk) {
+            $statusCls = 'bg-success';
+        }
+        $statusLbl = 'FAILED';
+        if ($isOk) {
+            $statusLbl = 'OK';
+        }
+
+        $runDurMsVal = 0;
+        if (isset($run['duration_ms'])) {
+            $runDurMsVal = $run['duration_ms'];
+        }
+        $durSec    = round((int) $runDurMsVal / 1000, 2);
+
         $minutesAgo = '';
         if (!empty($run['started_at'])) {
           $diff = time() - strtotime($run['started_at']);
@@ -71,6 +132,30 @@ $today = date('Y-m-d');
             $minutesAgo = round($diff / 3600, 1) . 'h ago';
           }
         }
+
+        $runStartedAt = '-';
+        if (isset($run['started_at'])) {
+            $runStartedAt = $run['started_at'];
+        }
+
+        $runTicketsChecked = 0;
+        if (isset($run['tickets_checked'])) {
+            $runTicketsChecked = (int) $run['tickets_checked'];
+        }
+
+        $runNotifsSent = 0;
+        if (isset($run['notifs_sent'])) {
+            $runNotifsSent = (int) $run['notifs_sent'];
+        }
+
+        $runNotifsFailed = 0;
+        if (isset($run['notifs_failed'])) {
+            $runNotifsFailed = (int) $run['notifs_failed'];
+        }
+        $failedCls = '';
+        if ($runNotifsFailed > 0) {
+            $failedCls = 'text-danger';
+        }
         ?>
         <div class="col-lg-4">
           <div class="card h-100">
@@ -81,7 +166,7 @@ $today = date('Y-m-d');
               </div>
               <div class="small text-muted mb-1">
                 <i class="bi bi-clock"></i>
-                Last run: <?= esc($run['started_at'] ?? '-'); ?>
+                Last run: <?= esc($runStartedAt); ?>
                 <?php if ($minutesAgo): ?>
                   <span class="ms-1 text-muted">(<?= esc($minutesAgo); ?>)</span>
                 <?php endif; ?>
@@ -91,16 +176,16 @@ $today = date('Y-m-d');
               </div>
               <div class="row g-2 mt-2 text-center">
                 <div class="col-4">
-                  <div class="fw-bold fs-5"><?= (int)($run['tickets_checked'] ?? 0); ?></div>
+                  <div class="fw-bold fs-5"><?= $runTicketsChecked; ?></div>
                   <div class="small text-muted">Tickets</div>
                 </div>
                 <div class="col-4">
-                  <div class="fw-bold fs-5 text-success"><?= (int)($run['notifs_sent'] ?? 0); ?></div>
+                  <div class="fw-bold fs-5 text-success"><?= $runNotifsSent; ?></div>
                   <div class="small text-muted">Sent</div>
                 </div>
                 <div class="col-4">
-                  <div class="fw-bold fs-5 <?= (int)($run['notifs_failed'] ?? 0) > 0 ? 'text-danger' : ''; ?>">
-                    <?= (int)($run['notifs_failed'] ?? 0); ?>
+                  <div class="fw-bold fs-5 <?= $failedCls; ?>">
+                    <?= $runNotifsFailed; ?>
                   </div>
                   <div class="small text-muted">Failed</div>
                 </div>
@@ -142,7 +227,7 @@ $today = date('Y-m-d');
                 <span class="fw-bold <?= $successCls; ?>"><?= $successRate; ?>%</span>
               </div>
               <div class="progress" style="height:6px;">
-                <div class="progress-bar <?= $successRate >= 95 ? 'bg-success' : ($successRate >= 80 ? 'bg-warning' : 'bg-danger'); ?>"
+                <div class="progress-bar <?= $progressBarCls; ?>"
                   style="width:<?= $successRate; ?>%"></div>
               </div>
               <div class="d-flex justify-content-between small mt-2">

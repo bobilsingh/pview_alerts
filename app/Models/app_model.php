@@ -377,9 +377,24 @@ class App_model
     // Inserts or updates a state transition. Returns the row id.
     public function stateTransitionSave($data)
     {
-        $data['flow_id']       = (int) ($data['flow_id']       ?? 0);
-        $data['from_state_id'] = (int) ($data['from_state_id'] ?? 0);
-        $data['to_state_id']   = (int) ($data['to_state_id']   ?? 0);
+        $flowIdVal = 0;
+        if (isset($data['flow_id'])) {
+            $flowIdVal = $data['flow_id'];
+        }
+        $data['flow_id'] = (int) $flowIdVal;
+
+        $fromStateIdVal = 0;
+        if (isset($data['from_state_id'])) {
+            $fromStateIdVal = $data['from_state_id'];
+        }
+        $data['from_state_id'] = (int) $fromStateIdVal;
+
+        $toStateIdVal = 0;
+        if (isset($data['to_state_id'])) {
+            $toStateIdVal = $data['to_state_id'];
+        }
+        $data['to_state_id'] = (int) $toStateIdVal;
+
         $transType = '';
         if (isset($data['transition_type'])) {
             $transType = (string) $data['transition_type'];
@@ -388,8 +403,18 @@ class App_model
             $transType = 'forward';
         }
         $data['transition_type'] = $transType;
-        $data['requires_comment']   = (int) ($data['requires_comment'] ?? 0);
-        $data['sort_order']         = (int) ($data['sort_order'] ?? 0);
+
+        $requiresCommentVal = 0;
+        if (isset($data['requires_comment'])) {
+            $requiresCommentVal = $data['requires_comment'];
+        }
+        $data['requires_comment'] = (int) $requiresCommentVal;
+
+        $sortOrderVal = 0;
+        if (isset($data['sort_order'])) {
+            $sortOrderVal = $data['sort_order'];
+        }
+        $data['sort_order'] = (int) $sortOrderVal;
         if (!empty($data['id'])) {
             $id = (int) $data['id'];
             unset($data['id'], $data['created_at']);

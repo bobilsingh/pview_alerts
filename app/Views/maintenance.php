@@ -1,6 +1,10 @@
 <?php
 $appName      = app_setting('app_name', 'pView Alert System');
-$isSuperAdmin = isset($isSuperAdmin) ? (bool) $isSuperAdmin : false;
+if (isset($isSuperAdmin)) {
+    $isSuperAdmin = (bool) $isSuperAdmin;
+} else {
+    $isSuperAdmin = false;
+}
 ?>
 <div class="text-center py-4">
   <div class="mb-3" style="font-size:3rem;line-height:1;">

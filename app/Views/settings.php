@@ -194,7 +194,14 @@ if (!empty($other)) {
             }
             $row    = $byKey[$key];
             $value  = (string) $row['setting_value'];
-            $desc   = isset($descOverrides[$key]) ? $descOverrides[$key] : (string) (isset($row['description']) ? $row['description'] : '');
+            if (isset($descOverrides[$key])) {
+                $desc = $descOverrides[$key];
+            } else {
+                $desc = '';
+                if (isset($row['description'])) {
+                    $desc = (string) $row['description'];
+                }
+            }
             $isBool = ($value === '0' || $value === '1') && !in_array($key, $numericKeys, true);
             $isLong = (mb_strlen($value) > 80);
             $isPass = in_array($key, $passwordKeys, true);

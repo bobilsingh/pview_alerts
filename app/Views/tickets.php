@@ -154,6 +154,14 @@ if (!function_exists('ticket_activity_icon')) {
 
   // Export URL is built server-side; JS re-builds it dynamically when
   // filters change via AJAX (see #ticketsExportBtn handler in app.js).
+  $fFromVal = '';
+  if (!empty($filters['f_from'])) {
+      $fFromVal = $filters['f_from'];
+  }
+  $fToVal = '';
+  if (!empty($filters['f_to'])) {
+      $fToVal = $filters['f_to'];
+  }
   $exportParams = [
     'mode'       => $ticketMode,
     'status'     => $cur,
@@ -162,14 +170,20 @@ if (!function_exists('ticket_activity_icon')) {
     'flow_id'    => $flowSel,
     'alert_type' => $typeSel,
     'priority'   => $prioSel,
-    'f_from'     => !empty($filters['f_from']) ? $filters['f_from'] : '',
-    'f_to'       => !empty($filters['f_to'])   ? $filters['f_to']   : '',
+    'f_from'     => $fFromVal,
+    'f_to'       => $fToVal,
   ];
   $exportParams = array_filter($exportParams);
   $exportUrl    = site_url('tickets/export') . '?' . http_build_query($exportParams);
 
-  $drInitFrom = !empty($filters['f_from']) ? $filters['f_from'] : date('Y-m-d');
-  $drInitTo   = !empty($filters['f_to'])   ? $filters['f_to']   : date('Y-m-d');
+  $drInitFrom = date('Y-m-d');
+  if (!empty($filters['f_from'])) {
+      $drInitFrom = $filters['f_from'];
+  }
+  $drInitTo = date('Y-m-d');
+  if (!empty($filters['f_to'])) {
+      $drInitTo = $filters['f_to'];
+  }
   ?>
 
   <!-- Status pills row -->
@@ -190,8 +204,12 @@ if (!function_exists('ticket_activity_icon')) {
         if (!empty($params)) {
           $url .= '?' . http_build_query($params);
         }
+        $activeClass = '';
+        if ($cur === $key) {
+            $activeClass = 'active';
+        }
         ?>
-        <a class="filter-pill <?= $cur === $key ? 'active' : '' ?>" href="<?= esc($url); ?>"><?= esc($label); ?></a>
+        <a class="filter-pill <?= $activeClass ?>" href="<?= esc($url); ?>"><?= esc($label); ?></a>
       <?php } ?>
     </div>
 
@@ -204,9 +222,15 @@ if (!function_exists('ticket_activity_icon')) {
     <div class="card-header filter-bar-header">
       <span class="filter-bar-title">
         <i class="bi bi-funnel"></i> Filters
+        <?php
+        $hiddenAttr = '';
+        if ($activeFilterCount === 0) {
+            $hiddenAttr = 'hidden';
+        }
+        ?>
         <span class="badge rounded-pill bg-primary ms-1 filter-bar-badge"
               id="ticketsFilterBadge"
-              <?= $activeFilterCount === 0 ? 'hidden' : '' ?>>
+              <?= $hiddenAttr ?>>
           <?= $activeFilterCount ?>
         </span>
       </span>
@@ -247,6 +271,16 @@ if (!function_exists('ticket_activity_icon')) {
               <?php } ?>
             <?php } ?>
             <div class="dropdown-divider"></div>
+            <?php
+            $savedFilterBtnHidden = '';
+            if (!$hasFilter) {
+                $savedFilterBtnHidden = 'hidden';
+            }
+            $savedFilterHintHidden = '';
+            if ($hasFilter) {
+                $savedFilterHintHidden = 'hidden';
+            }
+            ?>
             <button type="button" class="dropdown-item" id="savedFilterAddBtn"
               data-save-url="<?= site_url('tickets/saved/save'); ?>"
               data-current-qs="<?= esc(http_build_query(array_filter([
@@ -257,11 +291,11 @@ if (!function_exists('ticket_activity_icon')) {
                                   'alert_type' => $typeSel,
                                   'priority'   => $prioSel,
                                 ])), 'attr'); ?>"
-              <?= !$hasFilter ? 'hidden' : '' ?>>
+              <?= $savedFilterBtnHidden ?>>
               <i class="bi bi-plus-circle text-primary"></i> Save current filter…
             </button>
             <span class="dropdown-item-text text-muted small" id="savedFilterAddHint"
-              <?= $hasFilter ? 'hidden' : '' ?>>Apply a filter to save it.</span>
+              <?= $savedFilterHintHidden ?>>Apply a filter to save it.</span>
           </div>
         </div>
 
@@ -311,8 +345,13 @@ if (!function_exists('ticket_activity_icon')) {
             <label class="filter-label">Project</label>
             <select name="project_id" class="form-select form-select-sm">
               <option value="">All projects</option>
-              <?php foreach ($projects as $p) { ?>
-                <option value="<?= (int) $p['id']; ?>" <?= $projectSel === (int) $p['id'] ? 'selected' : '' ?>>
+              <?php foreach ($projects as $p) { 
+                $sel = '';
+                if ($projectSel === (int) $p['id']) {
+                    $sel = 'selected';
+                }
+                ?>
+                <option value="<?= (int) $p['id']; ?>" <?= $sel; ?>>
                   <?= esc($p['name']); ?>
                 </option>
               <?php } ?>
@@ -322,8 +361,13 @@ if (!function_exists('ticket_activity_icon')) {
             <label class="filter-label">Flow</label>
             <select name="flow_id" class="form-select form-select-sm">
               <option value="">All flows</option>
-              <?php foreach ($flows as $f) { ?>
-                <option value="<?= (int) $f['id']; ?>" <?= $flowSel === (int) $f['id'] ? 'selected' : '' ?>>
+              <?php foreach ($flows as $f) { 
+                $sel = '';
+                if ($flowSel === (int) $f['id']) {
+                    $sel = 'selected';
+                }
+                ?>
+                <option value="<?= (int) $f['id']; ?>" <?= $sel; ?>>
                   <?= esc($f['name']); ?>
                 </option>
               <?php } ?>
@@ -335,8 +379,13 @@ if (!function_exists('ticket_activity_icon')) {
           <label class="filter-label">Severity</label>
           <select name="alert_type" class="form-select form-select-sm">
             <option value="">All</option>
-            <?php foreach ($severityOptions as $key => $label) { ?>
-              <option value="<?= $key; ?>" <?= $typeSel === $key ? 'selected' : '' ?>><?= $label; ?></option>
+            <?php foreach ($severityOptions as $key => $label) { 
+              $sel = '';
+              if ($typeSel === $key) {
+                  $sel = 'selected';
+              }
+              ?>
+              <option value="<?= $key; ?>" <?= $sel; ?>><?= $label; ?></option>
             <?php } ?>
           </select>
         </div>
@@ -345,8 +394,13 @@ if (!function_exists('ticket_activity_icon')) {
           <label class="filter-label">Priority</label>
           <select name="priority" class="form-select form-select-sm">
             <option value="">All</option>
-            <?php foreach ($priorityOptions as $key => $label) { ?>
-              <option value="<?= $key; ?>" <?= $prioSel === $key ? 'selected' : '' ?>><?= $label; ?></option>
+            <?php foreach ($priorityOptions as $key => $label) { 
+              $sel = '';
+              if ($prioSel === $key) {
+                  $sel = 'selected';
+              }
+              ?>
+              <option value="<?= $key; ?>" <?= $sel; ?>><?= $label; ?></option>
             <?php } ?>
           </select>
         </div>
@@ -563,8 +617,16 @@ if (!function_exists('ticket_activity_icon')) {
   if ($ticketStatus === 'resolved' || $ticketStatus === 'closed') {
     $isTerminal = true;
   }
-  $attachCount = isset($attachCount) ? (int) $attachCount : 0;
-  $attachMax   = isset($attachMax)   ? (int) $attachMax   : 5;
+  if (isset($attachCount)) {
+      $attachCount = (int) $attachCount;
+  } else {
+      $attachCount = 0;
+  }
+  if (isset($attachMax)) {
+      $attachMax = (int) $attachMax;
+  } else {
+      $attachMax = 5;
+  }
   $attachFull  = $attachCount >= $attachMax;
   ?>
 
@@ -610,9 +672,15 @@ if (!function_exists('ticket_activity_icon')) {
             data-field="description"
             data-url="<?= site_url('tickets/action/' . $alarmId); ?>"><?= esc($descToShow); ?></div>
 
-          <?php helper('app'); ?>
+          <?php 
+          helper('app'); 
+          $visAllTransitions = [];
+          if (isset($allTransitions)) {
+              $visAllTransitions = $allTransitions;
+          }
+          ?>
           <?= flow_widget_html(
-            flow_vis_ticket_data($allStates, (int) $currentStateId, isset($allTransitions) ? $allTransitions : []),
+            flow_vis_ticket_data($allStates, (int) $currentStateId, $visAllTransitions),
             ['subtitle' => 'Ticket progress through this flow', 'variant' => 'ticket', 'legend' => false]
           ); ?>
 
@@ -922,16 +990,28 @@ if (!function_exists('ticket_activity_icon')) {
                         echo highlight_mentions($cmt);
                         break;
                       case 'state_changed':
-                        $transDir = isset($a['transition_type']) && $a['transition_type'] === 'backward' ? 'backward' : 'forward';
+                        $transDir = 'forward';
+                        if (isset($a['transition_type'])) {
+                            if ($a['transition_type'] === 'backward') {
+                                $transDir = 'backward';
+                            }
+                        }
                         if ($transDir === 'backward') {
                           echo '<span class="badge text-bg-danger me-1"><i class="bi bi-arrow-left-circle"></i> Send back</span>';
                         }
                         echo 'Moved state from <strong>' . esc(or_default($fromStateName, '?')) . '</strong>';
                         echo ' to <strong>' . esc(or_default($toStateName, '?')) . '</strong>';
                         // Show user-supplied reason (stored after ": " in the comment).
-                        $stCommentStr = trim((string) ($a['comment'] ?? ''));
+                        $aCommentStr = '';
+                        if (isset($a['comment'])) {
+                            $aCommentStr = $a['comment'];
+                        }
+                        $stCommentStr = trim((string) $aCommentStr);
                         $stReasonPos  = strpos($stCommentStr, ': ');
-                        $stReason     = $stReasonPos !== false ? trim(substr($stCommentStr, $stReasonPos + 2)) : '';
+                        $stReason     = '';
+                        if ($stReasonPos !== false) {
+                            $stReason = trim(substr($stCommentStr, $stReasonPos + 2));
+                        }
                         if ($stReason !== '') {
                           echo '<div class="small text-muted mt-1"><i class="bi bi-chat-quote me-1"></i>' . esc($stReason) . '</div>';
                         }

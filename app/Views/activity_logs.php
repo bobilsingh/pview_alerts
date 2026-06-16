@@ -1,12 +1,26 @@
 <?php
 // Activity Log viewer — event log + analytics (analytics tab visible to
 // super_admin by default; other roles need activity_logs.analytics permission).
-$canAnalytics = isset($canAnalytics) ? (bool) $canAnalytics : false;
-$modules      = isset($modules)      ? $modules              : [];
-$actions      = isset($actions)      ? $actions              : [];
-$projects     = isset($projects)     ? $projects             : [];
-$roles        = isset($roles)        ? $roles                : [];
-$statuses     = isset($statuses)     ? $statuses             : ['success', 'fail'];
+if (isset($canAnalytics)) {
+    $canAnalytics = (bool) $canAnalytics;
+} else {
+    $canAnalytics = false;
+}
+if (!isset($modules)) {
+    $modules = [];
+}
+if (!isset($actions)) {
+    $actions = [];
+}
+if (!isset($projects)) {
+    $projects = [];
+}
+if (!isset($roles)) {
+    $roles = [];
+}
+if (!isset($statuses)) {
+    $statuses = ['success', 'fail'];
+}
 $today        = date('Y-m-d');
 ?>
 

@@ -44,18 +44,28 @@ if (defined('SHOW_DEBUG_BACKTRACE') && SHOW_DEBUG_BACKTRACE) {
         $function = '';
 
         if (isset($error['class'])) {
-            $type = ($error['type'] === '->') ? '()' . $error['type'] : $error['type'];
+            if ($error['type'] === '->') {
+                $type = '()' . $error['type'];
+            } else {
+                $type = $error['type'];
+            }
             $function .= $padClass . $error['class'] . $type . $error['function'];
         } elseif (! isset($error['class']) && isset($error['function'])) {
             $function .= $padClass . $error['function'];
         }
 
+        $errorArgs = [];
+        if (isset($error['args'])) {
+            $errorArgs = $error['args'];
+        }
+
         $args = implode(', ', array_map(static fn ($value): string => match (true) {
             is_object($value) => 'Object(' . $value::class . ')',
-            is_array($value)  => $value !== [] ? '[...]' : '[]',
+            is_array($value) && $value !== [] => '[...]',
+            is_array($value) => '[]',
             $value === null   => 'null', // return the lowercased version
             default           => var_export($value, true),
-        }, array_values($error['args'] ?? [])));
+        }, array_values($errorArgs)));
 
         $function .= '(' . $args . ')';
 

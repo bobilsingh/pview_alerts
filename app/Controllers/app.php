@@ -392,11 +392,19 @@ class App extends BaseController
         $bwdLabels      = [];
         $editBwdIds     = [];
         foreach ($allTransitions as $t) {
-            if (($t['transition_type'] ?? '') !== 'backward') {
+            $transType = '';
+            if (isset($t['transition_type'])) {
+                $transType = $t['transition_type'];
+            }
+            if ($transType !== 'backward') {
                 continue;
             }
             $fromId               = (int) $t['from_state_id'];
-            $toName               = $stateNameMap[(int) $t['to_state_id']] ?? ('#' . $t['to_state_id']);
+            $toStateId            = (int) $t['to_state_id'];
+            $toName               = '#' . $toStateId;
+            if (isset($stateNameMap[$toStateId])) {
+                $toName = $stateNameMap[$toStateId];
+            }
             $bwdLabels[$fromId][] = $toName;
             if ($editStateId > 0 && $fromId === $editStateId) {
                 $editBwdIds[] = (int) $t['to_state_id'];
@@ -1298,7 +1306,11 @@ class App extends BaseController
 
         $attachCount = $this->app_model->ticketAttachmentCount($ticket['id']);
 
-        $currentSortOrder = (int) ($state['sort_order'] ?? 0);
+        $sortOrderVal = 0;
+        if (isset($state['sort_order'])) {
+            $sortOrderVal = $state['sort_order'];
+        }
+        $currentSortOrder = (int) $sortOrderVal;
         $isInitialState   = !empty($state['is_initial']);
         $bwdTransitions   = $this->app_model->stateGetTransitions(
             (int) $ticket['flow_id'],
@@ -1532,7 +1544,11 @@ class App extends BaseController
             }
         }
 
-        $currentAssignee = (string) ($ticket['current_assignee'] ?? '');
+        $assigneeVal = '';
+        if (isset($ticket['current_assignee'])) {
+            $assigneeVal = $ticket['current_assignee'];
+        }
+        $currentAssignee = (string) $assigneeVal;
         if ($currentAssignee !== '') {
             $newPool = $this->app_model->stateLevelUsers($next, 1);
             if (!in_array($currentAssignee, $newPool, true)) {
@@ -2850,14 +2866,39 @@ class App extends BaseController
             if (!empty($r['alarm_id'])) {
                 $url = site_url('tickets/detail/' . $r['alarm_id']);
             }
+            $alarmIdVal = '';
+            if (isset($r['alarm_id'])) {
+                $alarmIdVal = $r['alarm_id'];
+            }
+            $titleVal = '';
+            if (isset($r['title'])) {
+                $titleVal = $r['title'];
+            }
+            $alertTypeVal = 'info';
+            if (isset($r['alert_type'])) {
+                $alertTypeVal = $r['alert_type'];
+            }
+            $statusVal = '';
+            if (isset($r['status'])) {
+                $statusVal = $r['status'];
+            }
+            $currentLevelVal = 1;
+            if (isset($r['current_level'])) {
+                $currentLevelVal = $r['current_level'];
+            }
+            $stateNameVal = '';
+            if (isset($r['state_name'])) {
+                $stateNameVal = $r['state_name'];
+            }
+
             $items[] = [
                 'id'            => (int) $r['id'],
-                'alarm_id'      => (string) ($r['alarm_id'] ?? ''),
-                'title'         => (string) ($r['title'] ?? ''),
-                'alert_type'    => (string) ($r['alert_type'] ?? 'info'),
-                'ticket_status' => (string) ($r['status'] ?? ''),
-                'level'         => (int)    ($r['current_level'] ?? 1),
-                'state_name'    => (string) ($r['state_name'] ?? ''),
+                'alarm_id'      => (string) $alarmIdVal,
+                'title'         => (string) $titleVal,
+                'alert_type'    => (string) $alertTypeVal,
+                'ticket_status' => (string) $statusVal,
+                'level'         => (int)    $currentLevelVal,
+                'state_name'    => (string) $stateNameVal,
                 'when'          => $when,
                 'url'           => $url,
             ];
@@ -2877,7 +2918,11 @@ class App extends BaseController
 
             $seenTickets = [];
             foreach ($rawMentions as $m) {
-                $tid = (int) ($m['ticket_id'] ?? 0);
+                $ticketIdVal = 0;
+                if (isset($m['ticket_id'])) {
+                    $ticketIdVal = $m['ticket_id'];
+                }
+                $tid = (int) $ticketIdVal;
                 if ($tid <= 0 || isset($seenTickets[$tid])) {
                     continue;
                 }
@@ -2897,11 +2942,24 @@ class App extends BaseController
                 if (!empty($m['alarm_id'])) {
                     $url = site_url('tickets/detail/' . $m['alarm_id']);
                 }
+                $mAlarmIdVal = '';
+                if (isset($m['alarm_id'])) {
+                    $mAlarmIdVal = $m['alarm_id'];
+                }
+                $mTitleVal = '';
+                if (isset($m['title'])) {
+                    $mTitleVal = $m['title'];
+                }
+                $mAlertTypeVal = 'info';
+                if (isset($m['alert_type'])) {
+                    $mAlertTypeVal = $m['alert_type'];
+                }
+
                 $mentions[] = [
                     'id'         => (int) $m['id'],
-                    'alarm_id'   => (string) ($m['alarm_id'] ?? ''),
-                    'title'      => (string) ($m['title'] ?? ''),
-                    'alert_type' => (string) ($m['alert_type'] ?? 'info'),
+                    'alarm_id'   => (string) $mAlarmIdVal,
+                    'title'      => (string) $mTitleVal,
+                    'alert_type' => (string) $mAlertTypeVal,
                     'from_name'  => $fromName,
                     'when'       => (string) $m['created_at'],
                     'url'        => $url,
@@ -3088,11 +3146,23 @@ class App extends BaseController
         $diff = [];
         foreach ($newPermsAll as $role => $modulesNew) {
             foreach ($modulesNew as $module => $newP) {
-                $oldP = $oldPerms[$role][$module] ?? ['view' => 0, 'add' => 0, 'edit' => 0, 'delete' => 0];
+                $oldP = ['view' => 0, 'add' => 0, 'edit' => 0, 'delete' => 0];
+                if (isset($oldPerms[$role][$module])) {
+                    $oldP = $oldPerms[$role][$module];
+                }
                 $changed = [];
                 foreach (['view', 'add', 'edit', 'delete'] as $act) {
-                    $o = (int) ($oldP[$act] ?? 0);
-                    $n = (int) ($newP[$act] ?? 0);
+                    $oVal = 0;
+                    if (isset($oldP[$act])) {
+                        $oVal = $oldP[$act];
+                    }
+                    $o = (int) $oVal;
+
+                    $nVal = 0;
+                    if (isset($newP[$act])) {
+                        $nVal = $newP[$act];
+                    }
+                    $n = (int) $nVal;
                     if ($o !== $n) {
                         $changed[$act] = $o . '→' . $n;
                     }
@@ -3350,16 +3420,45 @@ class App extends BaseController
 
         $out = [];
         foreach ($rows as $r) {
-            $isOk   = ($r['status'] ?? 'ok') === 'ok';
-            $durSec = round((int) ($r['duration_ms'] ?? 0) / 1000, 2);
-            $failed = (int) ($r['notifs_failed'] ?? 0);
+            $statusVal = 'ok';
+            if (isset($r['status'])) {
+                $statusVal = $r['status'];
+            }
+            $isOk   = $statusVal === 'ok';
+
+            $durMsVal = 0;
+            if (isset($r['duration_ms'])) {
+                $durMsVal = $r['duration_ms'];
+            }
+            $durSec = round((int) $durMsVal / 1000, 2);
+
+            $failedVal = 0;
+            if (isset($r['notifs_failed'])) {
+                $failedVal = $r['notifs_failed'];
+            }
+            $failed = (int) $failedVal;
 
             $tmp = [];
             $tmp['script']   = '<code class="small">' . esc($r['script']) . '</code>';
-            $tmp['started']  = esc(substr($r['started_at'] ?? '-', 0, 19));
+
+            $startedAtVal = '-';
+            if (isset($r['started_at'])) {
+                $startedAtVal = $r['started_at'];
+            }
+            $tmp['started']  = esc(substr($startedAtVal, 0, 19));
             $tmp['duration'] = esc($durSec) . 's';
-            $tmp['tickets']  = (int) ($r['tickets_checked'] ?? 0);
-            $tmp['sent']     = (int) ($r['notifs_sent'] ?? 0);
+
+            $ticketsCheckedVal = 0;
+            if (isset($r['tickets_checked'])) {
+                $ticketsCheckedVal = $r['tickets_checked'];
+            }
+            $tmp['tickets']  = (int) $ticketsCheckedVal;
+
+            $notifsSentVal = 0;
+            if (isset($r['notifs_sent'])) {
+                $notifsSentVal = $r['notifs_sent'];
+            }
+            $tmp['sent']     = (int) $notifsSentVal;
             $failedHtml = '0';
             if ($failed > 0) {
                 $failedHtml = '<span class="text-danger fw-bold">' . $failed . '</span>';
@@ -3371,7 +3470,12 @@ class App extends BaseController
                 $statusHtml = '<span class="badge bg-success">OK</span>';
             }
             $tmp['status']   = $statusHtml;
-            $tmp['summary']  = esc($r['output_summary'] ?? '-');
+
+            $outputSummaryVal = '-';
+            if (isset($r['output_summary'])) {
+                $outputSummaryVal = $r['output_summary'];
+            }
+            $tmp['summary']  = esc($outputSummaryVal);
             $out[] = $tmp;
         }
 
@@ -3860,8 +3964,17 @@ class App extends BaseController
                 $logoutCell = '<span title="' . esc($logoutAt) . '">' . esc(substr($logoutAt, 11, 8)) . '</span>';
             }
 
-            $ua  = strtolower((string) ($r['user_agent'] ?? ''));
-            $mod = strtolower((string) ($r['module'] ?? ''));
+            $uaVal = '';
+            if (isset($r['user_agent'])) {
+                $uaVal = $r['user_agent'];
+            }
+            $ua  = strtolower((string) $uaVal);
+
+            $modVal = '';
+            if (isset($r['module'])) {
+                $modVal = $r['module'];
+            }
+            $mod = strtolower((string) $modVal);
             if ($mod === 'api' || preg_match('/curl|python|java(?!script)|go-http|ruby|axios|requests|okhttp|httpie|wget|postman|insomnia/i', $ua)) {
                 $srcLabel = 'API';
                 $srcClass = 'bg-warning text-dark';
@@ -4111,8 +4224,17 @@ class App extends BaseController
 
         $failedEvents = [];
         foreach ($failedRaw as $fe) {
-            $ua  = strtolower((string) ($fe['user_agent'] ?? ''));
-            $mod = strtolower((string) ($fe['module'] ?? ''));
+            $uaVal = '';
+            if (isset($fe['user_agent'])) {
+                $uaVal = $fe['user_agent'];
+            }
+            $ua  = strtolower((string) $uaVal);
+
+            $modVal = '';
+            if (isset($fe['module'])) {
+                $modVal = $fe['module'];
+            }
+            $mod = strtolower((string) $modVal);
             if ($mod === 'api' || preg_match('/curl|python|java(?!script)|go-http|ruby|axios|requests|okhttp|httpie|wget|postman|insomnia/i', $ua)) {
                 $source = 'API';
             } elseif (preg_match('/android|iphone|ipad|mobile|tablet/i', $ua)) {

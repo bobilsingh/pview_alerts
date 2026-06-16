@@ -38,8 +38,18 @@ $secondaryColor = app_setting('secondary_color', '');
     <meta name="app-setting-datatable_page_length" content="<?= app_setting_int('datatable_page_length', 10); ?>">
     <!-- Live-poll settings — read by initBellLivePoll() in app.js -->
     <meta name="app-setting-live_poll_seconds" content="<?= app_setting_int('live_poll_seconds', 15); ?>">
-    <meta name="app-setting-live_audio_enabled" content="<?= app_setting_bool('live_audio_enabled', true) ? '1' : '0'; ?>">
-    <meta name="app-setting-live_browser_notify" content="<?= app_setting_bool('live_browser_notify', true) ? '1' : '0'; ?>">
+    <?php
+    $liveAudioEnabledVal = '0';
+    if (app_setting_bool('live_audio_enabled', true)) {
+        $liveAudioEnabledVal = '1';
+    }
+    $liveBrowserNotifyVal = '0';
+    if (app_setting_bool('live_browser_notify', true)) {
+        $liveBrowserNotifyVal = '1';
+    }
+    ?>
+    <meta name="app-setting-live_audio_enabled" content="<?= $liveAudioEnabledVal; ?>">
+    <meta name="app-setting-live_browser_notify" content="<?= $liveBrowserNotifyVal; ?>">
     <!-- Session idle timeout and analytics refresh — read by initAutoLogout() / initAnalyticsTab() -->
     <meta name="app-setting-session_idle_timeout_minutes" content="<?= app_setting_int('session_idle_timeout_minutes', 30); ?>">
     <meta name="app-setting-analytics_refresh_seconds" content="<?= app_setting_int('analytics_refresh_seconds', 30); ?>">
