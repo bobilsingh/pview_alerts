@@ -57,7 +57,7 @@ if (is_file(APPPATH . 'Config/Boot/' . ENVIRONMENT . '.php')) {
 \Config\Services::autoloader()->initialize(new \Config\Autoload(), new \Config\Modules())->register();
 \Config\Services::autoloader()->loadHelpers();
 
-require_once APPPATH . 'Helpers/alert_helper.php';
+require_once APPPATH . 'Helpers/app_helper.php';
 
 $appModel = new App_model();
 
