@@ -170,8 +170,7 @@ foreach ($permissions as $p) {
 		<div>
 			<strong><i class="bi bi-puzzle"></i> Manage Modules</strong>
 			<div class="text-muted small mt-1">
-				<span class="badge bg-info text-dark me-1">BUILT-IN</span> modules are part of the system and cannot be removed.
-				<span class="badge bg-secondary ms-1 me-1">CUSTOM</span> modules you added appear with a <strong>Remove</strong> button.
+				Manage custom modules that have been added to the system. Built-in system modules are hidden from this list.
 			</div>
 		</div>
 		<?php if (has_module_access('module_control_panel', 'add') === true) { ?>
@@ -267,7 +266,11 @@ foreach ($permissions as $p) {
 				</tr>
 			</thead>
 			<tbody>
-				<?php foreach ($modules as $modKey => $modInfo) { ?>
+				<?php foreach ($modules as $modKey => $modInfo) { 
+					if (!empty($modInfo['is_builtin'])) {
+						continue;
+					}
+				?>
 					<tr>
 						<td style="padding-left: 20px;"><code><?= esc($modKey); ?></code></td>
 						<td><strong><?= esc($modInfo['name']); ?></strong></td>
