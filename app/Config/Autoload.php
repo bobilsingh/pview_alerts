@@ -64,6 +64,9 @@ class Autoload extends AutoloadConfig
         'App\\Models\\App_model'  => APPPATH . 'Models/app_model.php',
         'App\\Models\\User_model' => APPPATH . 'Models/user_model.php',
         'App\\Models\\Helper_model' => APPPATH . 'Models/helper_model.php',
+        'App\\Models\\app_model'  => APPPATH . 'Models/app_model.php',
+        'App\\Models\\user_model' => APPPATH . 'Models/user_model.php',
+        'App\\Models\\helper_model' => APPPATH . 'Models/helper_model.php',
     ];
 
     /**
