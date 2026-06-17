@@ -28,7 +28,7 @@ if (isset($layoutArr['default_trend_range'])) {
   $defaultTrendRange = (int) $layoutArr['default_trend_range'];
 }
 
-$rangeOptions = app_setting_csv('dashboard_trend_ranges', ['7', '15', '30']);
+$rangeOptions = app_setting_csv('dashboard_trend_ranges');
 $rangesInt = [];
 foreach ($rangeOptions as $r) {
   $n = (int) $r;

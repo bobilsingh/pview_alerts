@@ -23,7 +23,7 @@ class App extends BaseController
         check_module_access('dashboard', 'view');
         log_message('debug', "pview alert >> dashboard page open by user_id=[" . (string) logged_user_id() . "]");
 
-        $rangesRaw = app_setting_csv('dashboard_trend_ranges', ['7', '15', '30']);
+        $rangesRaw = app_setting_csv('dashboard_trend_ranges');
         $trendRangeOptions = [];
         foreach ($rangesRaw as $r) {
             $n = (int) $r;
@@ -85,6 +85,7 @@ class App extends BaseController
             'alertTypeCounts'   => $alertTypeCounts,
             'trendLabels'       => $trend['labels'],
             'trendValues'       => $trend['values'],
+            'trendDates'        => $trend['dates'],
             'trendRange'        => $trendRange,
             'trendRangeOptions' => $trendRangeOptions,
             'recentTickets'     => $this->app_model->ticketRecent(5, $userPk, $isAdmin, $prefDefaultProjectId),
@@ -2803,7 +2804,7 @@ class App extends BaseController
     {
         check_module_access('dashboard', 'view');
 
-        $rangesRaw = app_setting_csv('dashboard_trend_ranges', ['7', '15', '30']);
+        $rangesRaw = app_setting_csv('dashboard_trend_ranges');
         $allowed = [];
         foreach ($rangesRaw as $r) {
             $n = (int) $r;
@@ -2829,6 +2830,7 @@ class App extends BaseController
             'range'  => $range,
             'labels' => $trend['labels'],
             'values' => $trend['values'],
+            'dates'  => $trend['dates'],
         ]);
     }
 

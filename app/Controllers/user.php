@@ -706,7 +706,7 @@ class User extends BaseController
         }
 
         $defaultTrendRange = (int) $this->request->getPost('default_trend_range');
-        $allowedRanges = app_setting_csv('dashboard_trend_ranges', ['7', '15', '30']);
+        $allowedRanges = app_setting_csv('dashboard_trend_ranges');
         $allowedInt = [];
         foreach ($allowedRanges as $r) {
             $n = (int) $r;

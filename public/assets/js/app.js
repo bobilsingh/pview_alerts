@@ -230,6 +230,7 @@ $appDocument.ready(function () {
 
   // --- Tickets ---
   initCopyButtons();
+  initNewApiKeyModal();
   initTicketCreatePage();
   initTicketDetailPage();
   // DEMO: initBulkActions(); — hidden
@@ -820,6 +821,7 @@ function setupChartDefaults() {
 
 // Holds the live trend Chart instance for in-place range updates.
 var trendChart = null;
+var trendDates = [];
 function getTrendGridColor(isDarkTheme) {
   if (isDarkTheme) {
     return "rgba(148, 163, 184, 0.16)";
@@ -857,6 +859,7 @@ function initTrendCharts() {
   }
 
   labels = getArrayFromText($canvas.attr("data-labels"), "||");
+  trendDates = getArrayFromText($canvas.attr("data-dates"), "||");
   values = getNumberArrayFromText($canvas.attr("data-values"));
   context = canvas.getContext("2d");
   gradient = context.createLinearGradient(0, 0, 0, 240);
@@ -890,6 +893,21 @@ function initTrendCharts() {
       maintainAspectRatio: false,
       plugins: {
         legend: { display: false },
+        tooltip: {
+          callbacks: {
+            title: function (context) {
+              var index = context[0].dataIndex;
+              var dateStr = trendDates[index];
+              if (dateStr) {
+                var d = new Date(dateStr);
+                var dayName = d.toLocaleDateString("en-US", { weekday: "long" });
+                var dateFormatted = d.toLocaleDateString("en-US", { day: "numeric", month: "short", year: "numeric" });
+                return dayName + ", " + dateFormatted;
+              }
+              return context[0].label;
+            }
+          }
+        }
       },
       scales: {
         x: {
@@ -1512,6 +1530,35 @@ function initCopyButtons() {
     navigator.clipboard.writeText(text).then(function () {
       showSuccess("Copied: " + text);
     });
+  });
+}
+
+function initNewApiKeyModal() {
+  var $modal = $("#newApiKeyModal");
+  if ($modal.length && typeof bootstrap !== "undefined") {
+    var myModal = new bootstrap.Modal($modal[0]);
+    myModal.show();
+  }
+
+  $appDocument.off("click.copyApiKeyBtn").on("click.copyApiKeyBtn", "#copyApiKeyBtn", function () {
+    var $btn = $(this);
+    var $input = $("#newApiKeyValue");
+    if (!$input.length) return;
+
+    $input.select();
+    if (navigator.clipboard) {
+      navigator.clipboard.writeText($input.val()).then(function () {
+        var originalHtml = $btn.html();
+        $btn.html('<i class="bi bi-check-lg"></i> Copied!')
+            .removeClass("btn-primary")
+            .addClass("btn-success");
+        setTimeout(function () {
+          $btn.html(originalHtml)
+              .removeClass("btn-success")
+              .addClass("btn-primary");
+        }, 3000);
+      });
+    }
   });
 }
 
@@ -3561,6 +3608,7 @@ function initTrendRangePicker() {
       success: function (response) {
         if (response && response.success && response.data) {
           trendChart.data.labels = response.data.labels || [];
+          trendDates = response.data.dates || [];
           trendChart.data.datasets[0].data = response.data.values || [];
           trendChart.update();
         } else {

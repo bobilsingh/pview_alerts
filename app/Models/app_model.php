@@ -1269,6 +1269,7 @@ class App_model
         return [
             'labels' => $labels,
             'values' => array_values($buckets),
+            'dates'  => array_keys($buckets),
         ];
     }
 

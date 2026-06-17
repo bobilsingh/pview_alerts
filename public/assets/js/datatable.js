@@ -1292,12 +1292,6 @@ function initCronRunsTable() {
       url: ajaxUrl,
       type: "GET",
       dataSrc: "data",
-      data: function (d) {
-        d.f_from = $("#cronFrom").val() || "";
-        d.f_to = $("#cronTo").val() || "";
-        d.f_script = $("#cronScript").val() || "";
-        d.f_status = $("#cronStatus").val() || "";
-      },
       error: function (xhr) {
         var msg = "Failed to load cron run history.";
         if (xhr && xhr.responseJSON && xhr.responseJSON.message) {
@@ -1321,10 +1315,6 @@ function initCronRunsTable() {
         api.columns.adjust();
       }
     },
-  });
-
-  $("#cronApplyBtn").on("click", function () {
-    dt.ajax.reload();
   });
 }
 

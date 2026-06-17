@@ -266,18 +266,9 @@ $today = date('Y-m-d');
   <!-- Run History Table -->
   <div class="card">
 
-    <!-- Filter bar with the shared date-range widget -->
-    <?= view('filter', [
-      'fbTitle'          => 'Run History',
-      'fbApplyId'        => 'cronApplyBtn',
-      'show_date_widget' => true,
-      'drFromId'         => 'cronFrom',
-      'drToId'           => 'cronTo',
-      'drDefault'        => 'today',
-      'drFrom'           => $today,
-      'drTo'             => $today,
-      'drInline'         => true,
-    ]); ?>
+    <div class="card-header">
+      <strong><i class="bi bi-list-ul text-primary"></i> Run History</strong>
+    </div>
 
     <div class="card-body p-0">
       <div class="table-responsive">

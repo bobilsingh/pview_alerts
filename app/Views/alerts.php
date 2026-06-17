@@ -380,9 +380,26 @@ if (!isset($view) || $view === '') {
   </div>
 
   <?php if ($newKeyValue !== '') { ?>
-    <div class="alert alert-success">
-      <strong>New key generated - copy it now (it won't be shown again):</strong>
-      <code class="d-block mt-2" style="font-size:14px;"><?= esc($newKeyValue); ?></code>
+    <div class="modal fade" id="newApiKeyModal" tabindex="-1" aria-labelledby="newApiKeyModalLabel" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
+      <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+          <div class="modal-header border-bottom-0 pb-0">
+            <h5 class="modal-title" id="newApiKeyModalLabel"><i class="bi bi-key-fill text-info"></i> New API Key Generated</h5>
+          </div>
+          <div class="modal-body">
+            <p class="text-warning mb-3"><i class="bi bi-exclamation-triangle"></i> Please copy this key immediately. You will not be able to see it again!</p>
+            <div class="input-group mb-2">
+              <input type="text" id="newApiKeyValue" class="form-control font-monospace" value="<?= esc($newKeyValue); ?>" readonly>
+              <button class="btn btn-primary" type="button" id="copyApiKeyBtn" title="Copy to clipboard">
+                <i class="bi bi-clipboard"></i> Copy
+              </button>
+            </div>
+          </div>
+          <div class="modal-footer border-top-0 pt-0">
+            <button type="button" class="btn btn-light" data-bs-dismiss="modal">I have copied it securely</button>
+          </div>
+        </div>
+      </div>
     </div>
   <?php } ?>
 

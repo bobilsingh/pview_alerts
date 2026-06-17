@@ -6,71 +6,86 @@
  */
 
 // Title and badge settings
-$fbTitle = 'Filters';
 if (isset($fbTitle)) {
   $fbTitle = (string) $fbTitle;
+} else {
+  $fbTitle = 'Filters';
 }
-$fbCountId = '';
 if (isset($fbCountId)) {
   $fbCountId = (string) $fbCountId;
+} else {
+  $fbCountId = '';
 }
-$fbCountStart = 0;
 if (isset($fbCountStart)) {
   $fbCountStart = (int) $fbCountStart;
+} else {
+  $fbCountStart = 0;
 }
 
 // Action button settings
-$fbApplyId = '';
 if (isset($fbApplyId)) {
   $fbApplyId = (string) $fbApplyId;
+} else {
+  $fbApplyId = '';
 }
-$fbSubmit = false;
 if (isset($fbSubmit)) {
   $fbSubmit = (bool) $fbSubmit;
+} else {
+  $fbSubmit = false;
 }
 
 // Reset button settings
-$fbResetId = '';
 if (isset($fbResetId)) {
   $fbResetId = (string) $fbResetId;
+} else {
+  $fbResetId = '';
 }
-$fbResetHref = '';
 if (isset($fbResetHref)) {
   $fbResetHref = (string) $fbResetHref;
+} else {
+  $fbResetHref = '';
 }
-$fbResetClass = '';
 if (isset($fbResetClass)) {
   $fbResetClass = (string) $fbResetClass;
+} else {
+  $fbResetClass = '';
 }
 
 // Date Range Widget settings
-$drFromId = '';
 if (isset($drFromId)) {
   $drFromId = (string) $drFromId;
+} else {
+  $drFromId = '';
 }
-$drInline = false;
 if (isset($drInline)) {
   $drInline = (bool) $drInline;
+} else {
+  $drInline = false;
 }
-$drToId = '';
 if (isset($drToId)) {
   $drToId = (string) $drToId;
+} else {
+  $drToId = '';
 }
-$drFromName = 'f_from';
 if (isset($drFromName)) {
   $drFromName = (string) $drFromName;
+} else {
+  $drFromName = 'f_from';
 }
-$drToName = 'f_to';
 if (isset($drToName)) {
   $drToName = (string) $drToName;
+} else {
+  $drToName = 'f_to';
 }
-$drFrom = date('Y-m-d');
 if (isset($drFrom)) {
   $drFrom = (string) $drFrom;
+} else {
+  $drFrom = date('Y-m-d');
 }
-$drTo = date('Y-m-d');
 if (isset($drTo)) {
   $drTo = (string) $drTo;
+} else {
+  $drTo = date('Y-m-d');
 }
 $presetLabels = [
   'today'     => 'Today',
@@ -78,26 +93,30 @@ $presetLabels = [
   '7d'        => '7d',
   '30d'       => '30d',
 ];
-$drDefault = 'today';
 if (isset($drDefault)) {
   $drDefault = (string) $drDefault;
+} else {
+  $drDefault = 'today';
 }
 if (!isset($presetLabels[$drDefault])) {
   $drDefault = 'today';
 }
 
 // Rendering mode control
-$only_widget = false;
 if (isset($only_widget)) {
   $only_widget = (bool) $only_widget;
+} else {
+  $only_widget = false;
 }
-$show_date_widget = false;
 if (isset($show_date_widget)) {
   $show_date_widget = (bool) $show_date_widget;
+} else {
+  $show_date_widget = false;
 }
-$fbDateWidget = '';
 if (isset($fbDateWidget)) {
   $fbDateWidget = (string) $fbDateWidget;
+} else {
+  $fbDateWidget = '';
 }
 
 // ---------------------------------------------------------

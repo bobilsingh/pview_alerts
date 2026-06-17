@@ -1353,6 +1353,7 @@ textarea.form-control {
 }
 .badge.bg-dark {
   background: var(--slate-bg) !important;
+  color: var(--text) !important;
   border: 1px solid var(--border-2);
 }
 

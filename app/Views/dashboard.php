@@ -286,7 +286,7 @@ if (isset($custProjects) && is_array($custProjects)) {
         </div>
       </div>
       <div class="chart-wrap trend-chart-wrap">
-        <canvas id="trendChart" data-chart="trend" data-labels="<?= esc(implode('||', $trendLabels), 'attr'); ?>" data-values="<?= esc(implode(',', array_map('strval', $trendValues)), 'attr'); ?>"></canvas>
+        <canvas id="trendChart" data-chart="trend" data-labels="<?= esc(implode('||', $trendLabels), 'attr'); ?>" data-values="<?= esc(implode(',', array_map('strval', $trendValues)), 'attr'); ?>" data-dates="<?= esc(implode('||', $trendDates), 'attr'); ?>"></canvas>
       </div>
     </div>
   </div>
