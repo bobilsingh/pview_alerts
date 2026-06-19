@@ -1223,15 +1223,19 @@ class App_model
     }
 
     // Fetches ticket creation counts over a day range for trend charts.
-    public function ticketTrendByRange($days, $userPk = null, $isAdmin = false, $projectId = 0)
+    public function ticketTrendByRange($startDate, $endDate, $userPk = null, $isAdmin = false, $projectId = 0)
     {
-        $days = (int) $days;
-        if ($days < 1) {
-            $days = 7;
+        $startObj = new \DateTime($startDate);
+        $endObj   = new \DateTime($endDate);
+
+        if ($startObj > $endObj) {
+            $temp = $startObj;
+            $startObj = $endObj;
+            $endObj = $temp;
         }
-        if ($days > 365) {
-            $days = 365;
-        }
+
+        $diff = $startObj->diff($endObj);
+        $days = (int) $diff->days + 1;
 
         $labels  = [];
         $buckets = [];
@@ -1239,21 +1243,18 @@ class App_model
         if ($days <= 14) {
             $fmt = 'D';
         }
-        $today   = new \DateTime();
-        for ($i = $days - 1; $i >= 0; $i--) {
-            $date   = clone $today;
-            $date->modify("-{$i} days");
-            $dayKey    = $date->format('Y-m-d');
-            $labels[]  = $date->format($fmt);
+
+        $current = clone $startObj;
+        for ($i = 0; $i < $days; $i++) {
+            $dayKey    = $current->format('Y-m-d');
+            $labels[]  = $current->format($fmt);
             $buckets[$dayKey] = 0;
+            $current->modify('+1 day');
         }
 
-        $start = array_key_first($buckets) . ' 00:00:00';
-        $end   = $today->format('Y-m-d') . ' 23:59:59';
-        $q = $this->db->table('tickets')
-            ->select('DATE(tickets.created_at) AS day_key, COUNT(*) AS n', false)
-            ->where('tickets.created_at >=', $start)
-            ->where('tickets.created_at <=', $end);
+        $startLimit = $startObj->format('Y-m-d') . ' 00:00:00';
+        $endLimit   = $endObj->format('Y-m-d') . ' 23:59:59';
+        $q = $this->db->table('tickets')->select('DATE(tickets.created_at) AS day_key, COUNT(*) AS n', false)->where('tickets.created_at >=', $startLimit)->where('tickets.created_at <=', $endLimit);
         $this->applyUserScope($q, 'tickets', $userPk, $isAdmin);
         if ((int) $projectId > 0) {
             $q->where('tickets.project_id', (int) $projectId);

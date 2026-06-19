@@ -1476,9 +1476,14 @@ function initAnalyticsTab() {
     return;
   }
 
+  if (analyticsRefreshTimer) {
+    clearInterval(analyticsRefreshTimer);
+    analyticsRefreshTimer = null;
+  }
+
   loadAnalytics();
 
-  $("#analyticsApplyBtn").on("click", function () {
+  $("#analyticsApplyBtn").off("click.analytics").on("click.analytics", function () {
     loadAnalytics();
   });
 
@@ -1495,13 +1500,13 @@ function initAnalyticsTab() {
     );
   }
 
-  $appDocument.on("visibilitychange.analytics", function () {
+  $appDocument.off("visibilitychange.analytics").on("visibilitychange.analytics", function () {
     if (!document.hidden && analyticsTabActive()) {
       loadAnalytics();
     }
   });
 
-  $appDocument.on("shown.bs.tab", "#tab-analytics-link", function () {
+  $appDocument.off("shown.bs.tab.analytics").on("shown.bs.tab.analytics", "#tab-analytics-link", function () {
     loadAnalytics();
   });
 }

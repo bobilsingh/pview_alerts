@@ -89,6 +89,90 @@ if (!function_exists('app_setting_csv')) {
     }
 }
 
+if (!function_exists('get_global_date_range')) {
+    function get_global_date_range()
+    {
+        $session = \Config\Services::session();
+        $range = $session->get('global_date_range');
+        if (empty($range) || !is_array($range) || !isset($range['preset'])) {
+            $range = [
+                'preset' => '7d',
+                'start'  => date('Y-m-d', strtotime('-6 days')),
+                'end'    => date('Y-m-d')
+            ];
+            $session->set('global_date_range', $range);
+        } else {
+            $preset = $range['preset'];
+            if ($preset !== 'custom') {
+                $start = '';
+                $end = '';
+                if ($preset === 'today') {
+                    $start = date('Y-m-d');
+                    $end = date('Y-m-d');
+                } elseif ($preset === 'yesterday') {
+                    $start = date('Y-m-d', strtotime('-1 day'));
+                    $end = date('Y-m-d', strtotime('-1 day'));
+                } elseif ($preset === '7d') {
+                    $start = date('Y-m-d', strtotime('-6 days'));
+                    $end = date('Y-m-d');
+                } elseif ($preset === '30d') {
+                    $start = date('Y-m-d', strtotime('-29 days'));
+                    $end = date('Y-m-d');
+                } elseif ($preset === '90d') {
+                    $start = date('Y-m-d', strtotime('-89 days'));
+                    $end = date('Y-m-d');
+                } elseif ($preset === 'this_month') {
+                    $start = date('Y-m-01');
+                    $end = date('Y-m-d');
+                } elseif ($preset === 'last_month') {
+                    $start = date('Y-m-01', strtotime('first day of last month'));
+                    $end = date('Y-m-t', strtotime('last day of last month'));
+                } else {
+                    $preset = '7d';
+                    $start = date('Y-m-d', strtotime('-6 days'));
+                    $end = date('Y-m-d');
+                }
+
+                if ($range['start'] !== $start || $range['end'] !== $end || $range['preset'] !== $preset) {
+                    $range['preset'] = $preset;
+                    $range['start'] = $start;
+                    $range['end'] = $end;
+                    $session->set('global_date_range', $range);
+                }
+            }
+        }
+        return $range;
+    }
+}
+
+if (!function_exists('get_global_date_range_label')) {
+    function get_global_date_range_label($preset, $start, $end)
+    {
+        $presetLabels = [
+            'today'      => 'Today',
+            'yesterday'  => 'Yesterday',
+            '7d'         => 'Last 7 Days',
+            '30d'        => 'Last 30 Days',
+            '90d'        => 'Last 90 Days',
+            'this_month' => 'This Month',
+            'last_month' => 'Last Month',
+            'custom'     => 'Custom Range',
+        ];
+        if ($preset === 'custom') {
+            $formattedStart = date('d-M-Y', strtotime($start));
+            if ($start === $end) {
+                return $formattedStart;
+            }
+            $formattedEnd = date('d-M-Y', strtotime($end));
+            return $formattedStart . ' - ' . $formattedEnd;
+        }
+        if (isset($presetLabels[$preset])) {
+            return $presetLabels[$preset];
+        }
+        return 'Last 7 Days';
+    }
+}
+
 if (!function_exists('or_default')) {
     // Returns $value when non-empty, otherwise $default.
     function or_default($value, $default)

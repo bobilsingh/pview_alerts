@@ -54,6 +54,8 @@ $routes->post('roles/delete/(:any)',    'user::role_delete/$1');
 // ===== Dashboard =====
 $routes->get('dashboard',               'app::dashboard');
 $routes->get('dashboard/trend',         'app::dashboard_trend');
+$routes->post('global_date_range/update', 'app::update_global_date_range');
+$routes->post('global_date_range/reset',  'app::reset_global_date_range');
 
 // ===== Projects =====
 $routes->get('projects',                  'app::projects');

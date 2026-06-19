@@ -40,14 +40,11 @@ class App extends BaseController
         $prefDefaultProjectId  = (int) user_dashboard_pref('default_project_id', 0);
         $prefKpiVisible        = user_dashboard_pref('kpi_visible', null);
 
-        $trendRange = (int) $this->request->getGet('range');
-        if (!in_array($trendRange, $trendRangeOptions, true)) {
-            if (in_array($prefDefaultTrendRange, $trendRangeOptions, true)) {
-                $trendRange = $prefDefaultTrendRange;
-            } else {
-                $trendRange = $trendRangeOptions[0];
-            }
-        }
+        $globalRange = get_global_date_range();
+        $startDate = $globalRange['start'];
+        $endDate   = $globalRange['end'];
+        $diff = (new \DateTime($startDate))->diff(new \DateTime($endDate));
+        $trendRange = (int) $diff->days + 1;
 
         $role    = logged_user_role();
         $isAdmin = role_has_admin_scope($role);
@@ -55,7 +52,7 @@ class App extends BaseController
 
         $statusCounts    = $this->app_model->ticketCountByStatus($userPk, $isAdmin, $prefDefaultProjectId);
         $alertTypeCounts = $this->app_model->ticketCountByAlertTypeActive($userPk, $isAdmin, $prefDefaultProjectId);
-        $trend           = $this->app_model->ticketTrendByRange($trendRange, $userPk, $isAdmin, $prefDefaultProjectId);
+        $trend           = $this->app_model->ticketTrendByRange($startDate, $endDate, $userPk, $isAdmin, $prefDefaultProjectId);
 
         $openCount = $statusCounts['open'] + $statusCounts['in_progress'];
         $openCount += $statusCounts['escalated'];
@@ -942,13 +939,23 @@ class App extends BaseController
     {
         check_module_access('tickets', 'view');
         log_message('debug', "pview alert >> tickets MY page open by user_id=[" . (string) logged_user_id() . "]");
+        $globalRange = get_global_date_range();
+        $fFrom = trim((string) $this->request->getGet('f_from'));
+        if ($fFrom === '') {
+            $fFrom = $globalRange['start'];
+        }
+        $fTo = trim((string) $this->request->getGet('f_to'));
+        if ($fTo === '') {
+            $fTo = $globalRange['end'];
+        }
+
         $filters = [
             'status'     => (string) $this->request->getGet('status'),
             'search'     => (string) $this->request->getGet('q'),
             'alert_type' => (string) $this->request->getGet('alert_type'),
             'priority'   => (string) $this->request->getGet('priority'),
-            'f_from'     => trim((string) $this->request->getGet('f_from')),
-            'f_to'       => trim((string) $this->request->getGet('f_to')),
+            'f_from'     => $fFrom,
+            'f_to'       => $fTo,
         ];
         $data = [
             'title'         => 'My Tickets',
@@ -970,6 +977,16 @@ class App extends BaseController
     {
         check_module_access('tickets_all', 'view');
         log_message('debug', "pview alert >> tickets ALL page open by user_id=[" . (string) logged_user_id() . "]");
+        $globalRange = get_global_date_range();
+        $fFrom = trim((string) $this->request->getGet('f_from'));
+        if ($fFrom === '') {
+            $fFrom = $globalRange['start'];
+        }
+        $fTo = trim((string) $this->request->getGet('f_to'));
+        if ($fTo === '') {
+            $fTo = $globalRange['end'];
+        }
+
         $filters = [
             'project_id' => (int) $this->request->getGet('project_id'),
             'flow_id'    => (int) $this->request->getGet('flow_id'),
@@ -977,8 +994,8 @@ class App extends BaseController
             'alert_type' => (string) $this->request->getGet('alert_type'),
             'priority'   => (string) $this->request->getGet('priority'),
             'search'     => (string) $this->request->getGet('q'),
-            'f_from'     => trim((string) $this->request->getGet('f_from')),
-            'f_to'       => trim((string) $this->request->getGet('f_to')),
+            'f_from'     => $fFrom,
+            'f_to'       => $fTo,
         ];
         $data = [
             'title'         => 'All Tickets',
@@ -2063,12 +2080,22 @@ class App extends BaseController
             }
         }
 
+        $globalRange = get_global_date_range();
+        $fFrom = trim((string) $this->request->getGet('f_from'));
+        if ($fFrom === '') {
+            $fFrom = $globalRange['start'];
+        }
+        $fTo = trim((string) $this->request->getGet('f_to'));
+        if ($fTo === '') {
+            $fTo = $globalRange['end'];
+        }
+
         $filters = [
             'status'     => (string) $this->request->getGet('status'),
             'alert_type' => (string) $this->request->getGet('alert_type'),
             'priority'   => (string) $this->request->getGet('priority'),
-            'f_from'     => trim((string) $this->request->getGet('f_from')),
-            'f_to'       => trim((string) $this->request->getGet('f_to')),
+            'f_from'     => $fFrom,
+            'f_to'       => $fTo,
         ];
         if ($mode === 'my') {
             $filters['user_id'] = (string) logged_user_id();
@@ -2348,13 +2375,23 @@ class App extends BaseController
             check_module_access('tickets', 'view');
         }
 
+        $globalRange = get_global_date_range();
+        $fFrom = trim((string) $this->request->getGet('f_from'));
+        if ($fFrom === '') {
+            $fFrom = $globalRange['start'];
+        }
+        $fTo = trim((string) $this->request->getGet('f_to'));
+        if ($fTo === '') {
+            $fTo = $globalRange['end'];
+        }
+
         $filters = [
             'status'     => (string) $this->request->getGet('status'),
             'alert_type' => (string) $this->request->getGet('alert_type'),
             'priority'   => (string) $this->request->getGet('priority'),
             'search'     => (string) $this->request->getGet('q'),
-            'f_from'     => trim((string) $this->request->getGet('f_from')),
-            'f_to'       => trim((string) $this->request->getGet('f_to')),
+            'f_from'     => $fFrom,
+            'f_to'       => $fTo,
         ];
         if ($mode === 'my') {
             $filters['user_id'] = (string) logged_user_id();
@@ -2799,38 +2836,121 @@ class App extends BaseController
         return service('response')->setJSON(['success' => true, 'data' => $rows]);
     }
 
-    // Returns JSON dataset for the dashboard ticket trend chart.
     public function dashboard_trend()
     {
         check_module_access('dashboard', 'view');
 
-        $rangesRaw = app_setting_csv('dashboard_trend_ranges');
-        $allowed = [];
-        foreach ($rangesRaw as $r) {
-            $n = (int) $r;
-            if ($n >= 1 && $n <= 365) {
-                $allowed[] = $n;
-            }
-        }
-        if (empty($allowed)) {
-            $allowed = [7, 15, 30];
-        }
-
-        $range = (int) $this->request->getGet('range');
-        if (!in_array($range, $allowed, true)) {
-            $range = $allowed[0];
-        }
+        $globalRange = get_global_date_range();
+        $startDate = $globalRange['start'];
+        $endDate   = $globalRange['end'];
 
         $role    = logged_user_role();
         $isAdmin = role_has_admin_scope($role);
         $userPk  = logged_user_id();
 
-        $trend = $this->app_model->ticketTrendByRange($range, $userPk, $isAdmin);
+        $trend = $this->app_model->ticketTrendByRange($startDate, $endDate, $userPk, $isAdmin);
+        $diff = (new \DateTime($startDate))->diff(new \DateTime($endDate));
+        $days = (int) $diff->days + 1;
+
         return json_ok([
-            'range'  => $range,
+            'range'  => $days,
             'labels' => $trend['labels'],
             'values' => $trend['values'],
             'dates'  => $trend['dates'],
+        ]);
+    }
+
+    public function update_global_date_range()
+    {
+        check_isvalidated();
+        $preset = $this->request->getPost('preset');
+        if ($preset === null) {
+            $preset = '7d';
+        }
+
+        $start = '';
+        $end = '';
+
+        if ($preset === 'today') {
+            $start = date('Y-m-d');
+            $end = date('Y-m-d');
+        } elseif ($preset === 'yesterday') {
+            $start = date('Y-m-d', strtotime('-1 day'));
+            $end = date('Y-m-d', strtotime('-1 day'));
+        } elseif ($preset === '7d') {
+            $start = date('Y-m-d', strtotime('-6 days'));
+            $end = date('Y-m-d');
+        } elseif ($preset === '30d') {
+            $start = date('Y-m-d', strtotime('-29 days'));
+            $end = date('Y-m-d');
+        } elseif ($preset === '90d') {
+            $start = date('Y-m-d', strtotime('-89 days'));
+            $end = date('Y-m-d');
+        } elseif ($preset === 'this_month') {
+            $start = date('Y-m-01');
+            $end = date('Y-m-t');
+        } elseif ($preset === 'last_month') {
+            $start = date('Y-m-01', strtotime('first day of last month'));
+            $end = date('Y-m-t', strtotime('last day of last month'));
+        } elseif ($preset === 'custom') {
+            $startInput = $this->request->getPost('start');
+            $endInput = $this->request->getPost('end');
+            if (!empty($startInput) && !empty($endInput)) {
+                $start = date('Y-m-d', strtotime($startInput));
+                $end = date('Y-m-d', strtotime($endInput));
+            } else {
+                $start = date('Y-m-d', strtotime('-6 days'));
+                $end = date('Y-m-d');
+                $preset = '7d';
+            }
+        } else {
+            $preset = '7d';
+            $start = date('Y-m-d', strtotime('-6 days'));
+            $end = date('Y-m-d');
+        }
+
+        $todayStr = date('Y-m-d');
+        if (strtotime($start) > strtotime($todayStr)) {
+            $start = $todayStr;
+        }
+        if (strtotime($end) > strtotime($todayStr)) {
+            $end = $todayStr;
+        }
+
+        if (strtotime($start) > strtotime($end)) {
+            $temp = $start;
+            $start = $end;
+            $end = $temp;
+        }
+
+        $session = \Config\Services::session();
+        $session->set('global_date_range', [
+            'preset' => $preset,
+            'start'  => $start,
+            'end'    => $end
+        ]);
+
+        return json_ok([
+            'status' => 'success',
+            'preset' => $preset,
+            'start'  => $start,
+            'end'    => $end,
+            'label'  => get_global_date_range_label($preset, $start, $end)
+        ]);
+    }
+
+    public function reset_global_date_range()
+    {
+        check_isvalidated();
+        $session = \Config\Services::session();
+        $session->remove('global_date_range');
+        $range = get_global_date_range();
+        return json_ok([
+            'status' => 'success',
+            'preset' => $range['preset'],
+            'start'  => $range['start'],
+            'end'    => $range['end'],
+            'label'  => get_global_date_range_label($range['preset'], $range['start'], $range['end'])
         ]);
     }
 
@@ -3801,8 +3921,15 @@ class App extends BaseController
         $fRole    = trim((string) $this->request->getGet('f_role'));
         $fStatus  = trim((string) $this->request->getGet('f_status'));
         $fProject = trim((string) $this->request->getGet('f_project'));
+        $globalRange = get_global_date_range();
         $fFrom    = trim((string) $this->request->getGet('f_from'));
+        if ($fFrom === '') {
+            $fFrom = $globalRange['start'];
+        }
         $fTo      = trim((string) $this->request->getGet('f_to'));
+        if ($fTo === '') {
+            $fTo = $globalRange['end'];
+        }
         if ($fFrom !== '' && $fTo !== '' && $fFrom > $fTo) {
             $tmp   = $fFrom;
             $fFrom = $fTo;
@@ -4029,8 +4156,15 @@ class App extends BaseController
         $fRole    = trim((string) $this->request->getGet('f_role'));
         $fStatus  = trim((string) $this->request->getGet('f_status'));
         $fProject = trim((string) $this->request->getGet('f_project'));
+        $globalRange = get_global_date_range();
         $fFrom    = trim((string) $this->request->getGet('f_from'));
+        if ($fFrom === '') {
+            $fFrom = $globalRange['start'];
+        }
         $fTo      = trim((string) $this->request->getGet('f_to'));
+        if ($fTo === '') {
+            $fTo = $globalRange['end'];
+        }
         $fSearch  = trim((string) $this->request->getGet('q'));
         if ($fFrom !== '' && $fTo !== '' && $fFrom > $fTo) {
             $tmp   = $fFrom;
@@ -4124,15 +4258,14 @@ class App extends BaseController
             return json_fail('Access denied', 403);
         }
 
+        $globalRange = get_global_date_range();
         $fFrom = trim((string) $this->request->getGet('f_from'));
-        $fTo   = trim((string) $this->request->getGet('f_to'));
-
-        // Default to last 30 days when no range is supplied.
         if ($fFrom === '') {
-            $fFrom = date('Y-m-d', strtotime('-30 days'));
+            $fFrom = $globalRange['start'];
         }
+        $fTo   = trim((string) $this->request->getGet('f_to'));
         if ($fTo === '') {
-            $fTo = date('Y-m-d');
+            $fTo = $globalRange['end'];
         }
 
         $fromTs = $fFrom . ' 00:00:00';

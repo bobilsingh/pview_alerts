@@ -2,26 +2,26 @@
 // Activity Log viewer — event log + analytics (analytics tab visible to
 // super_admin by default; other roles need activity_logs.analytics permission).
 if (isset($canAnalytics)) {
-    $canAnalytics = (bool) $canAnalytics;
+  $canAnalytics = (bool) $canAnalytics;
 } else {
-    $canAnalytics = false;
+  $canAnalytics = false;
 }
 if (!isset($modules)) {
-    $modules = [];
+  $modules = [];
 }
 if (!isset($actions)) {
-    $actions = [];
+  $actions = [];
 }
 if (!isset($projects)) {
-    $projects = [];
+  $projects = [];
 }
 if (!isset($roles)) {
-    $roles = [];
+  $roles = [];
 }
 if (!isset($statuses)) {
-    $statuses = ['success', 'fail'];
+  $statuses = ['success', 'fail'];
 }
-$today        = date('Y-m-d');
+$today = date('Y-m-d');
 ?>
 
 <div class="page-head">
@@ -62,13 +62,7 @@ $today        = date('Y-m-d');
         'fbCountId'        => 'activityFilterBadge',
         'fbApplyId'        => 'activityApplyBtn',
         'fbResetId'        => 'activityResetBtn',
-        'show_date_widget' => true,
-        'drFromId'         => 'filterFrom',
-        'drToId'           => 'filterTo',
-        'drFrom'           => $today,
-        'drTo'             => $today,
-        'drDefault'        => 'today',
-        'drInline'         => true,
+        'show_date_widget' => false,
       ]); ?>
       <div class="filter-bar-body">
         <form id="activityFilterForm">
@@ -173,18 +167,6 @@ $today        = date('Y-m-d');
 
       <!-- Analytics date range + refresh controls -->
       <div class="d-flex flex-wrap align-items-center gap-2 mb-3">
-        <label class="form-label small mb-0 fw-semibold">Period:</label>
-        <?= view('filter', [
-          'only_widget' => true,
-          'drFromId'    => 'analyticsFrom',
-          'drToId'      => 'analyticsTo',
-          'drFrom'      => date('Y-m-d', strtotime('-30 days')),
-          'drTo'        => $today,
-          'drDefault'   => '30d',
-        ]); ?>
-        <button type="button" id="analyticsApplyBtn" class="btn btn-sm btn-primary">
-          <i class="bi bi-funnel"></i> Apply
-        </button>
         <span class="text-muted small ms-auto" id="analyticsLastRefresh"></span>
         <span class="badge bg-success" id="analyticsLiveBadge" hidden>
           <i class="bi bi-broadcast"></i> Live

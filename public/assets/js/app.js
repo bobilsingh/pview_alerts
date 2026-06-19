@@ -200,7 +200,7 @@ $appDocument.ready(function () {
   initSearchHotkey();
 
   // --- Date range widget ---
-  initDateRangeWidgets();
+  initGlobalDateFilter();
 
   // --- Forms & UI ---
   initFormValidation();
@@ -905,9 +905,9 @@ function initTrendCharts() {
                 return dayName + ", " + dateFormatted;
               }
               return context[0].label;
-            }
-          }
-        }
+            },
+          },
+        },
       },
       scales: {
         x: {
@@ -1549,13 +1549,9 @@ function initNewApiKeyModal() {
     if (navigator.clipboard) {
       navigator.clipboard.writeText($input.val()).then(function () {
         var originalHtml = $btn.html();
-        $btn.html('<i class="bi bi-check-lg"></i> Copied!')
-            .removeClass("btn-primary")
-            .addClass("btn-success");
+        $btn.html('<i class="bi bi-check-lg"></i> Copied!').removeClass("btn-primary").addClass("btn-success");
         setTimeout(function () {
-          $btn.html(originalHtml)
-              .removeClass("btn-success")
-              .addClass("btn-primary");
+          $btn.html(originalHtml).removeClass("btn-success").addClass("btn-primary");
         }, 3000);
       });
     }
@@ -3859,98 +3855,8 @@ function initMentionAutocomplete() {
   });
 }
 
-// ============================================================
-// 27. DATE RANGE WIDGET — global reusable date-range picker
-// ============================================================
-//
-// Usage: drop <div class="date-range-widget" data-date-range> into any
-// filter form. Call initDateRangeWidgets() once on page load (already
-// wired in page init). Use getDateRange($widget) to read {from, to}.
 
-function drwDateStr(d) {
-  var y = d.getFullYear();
-  var m = ("0" + (d.getMonth() + 1)).slice(-2);
-  var day = ("0" + d.getDate()).slice(-2);
-  return y + "-" + m + "-" + day;
-}
 
-function setDateRangePreset($widget, preset) {
-  var today = new Date();
-  var from = new Date();
-  var to = new Date();
-
-  $widget.find(".drw-preset").removeClass("active");
-  $widget.find('.drw-preset[data-preset="' + preset + '"]').addClass("active");
-
-  switch (preset) {
-    case "today":
-      break;
-    case "yesterday":
-      from.setDate(from.getDate() - 1);
-      to.setDate(to.getDate() - 1);
-      break;
-    case "7d":
-      from.setDate(from.getDate() - 6);
-      break;
-    case "30d":
-      from.setDate(from.getDate() - 29);
-      break;
-    case "month":
-      from = new Date(today.getFullYear(), today.getMonth(), 1);
-      break;
-    case "all":
-      $widget.find("[data-date-range-from]").val("");
-      $widget.find("[data-date-range-to]").val("");
-      return;
-    default:
-      return;
-  }
-
-  $widget.find("[data-date-range-from]").val(drwDateStr(from));
-  $widget.find("[data-date-range-to]").val(drwDateStr(to));
-}
-
-// Returns {from, to} strings from the nearest [data-date-range] ancestor
-// or from the supplied widget element.
-function getDateRange($widget) {
-  if (!$widget || !$widget.length) {
-    $widget = $("[data-date-range]").first();
-  }
-  return {
-    from: $widget.find("[data-date-range-from]").val() || "",
-    to: $widget.find("[data-date-range-to]").val() || "",
-  };
-}
-
-function initDateRangeWidgets() {
-  $("[data-date-range]").each(function () {
-    var $widget = $(this);
-
-    // Apply the active preset to ensure the date inputs start at the right values.
-    var $active = $widget.find(".drw-preset.active").first();
-    if ($active.length) {
-      setDateRangePreset($widget, $active.data("preset"));
-    }
-
-    // Preset button click.
-    $widget.find(".drw-preset").on("click", function () {
-      setDateRangePreset($widget, $(this).data("preset"));
-    });
-
-    // Manual edit clears the active preset marker and validates the range.
-    $widget.find("[data-date-range-from], [data-date-range-to]").on("change", function () {
-      $widget.find(".drw-preset").removeClass("active");
-      var from = $widget.find("[data-date-range-from]").val();
-      var to = $widget.find("[data-date-range-to]").val();
-      var $err = $widget.find(".drw-error");
-      if (from && to && from > to) {
-        $err.text("From date cannot be after To date.").show();
-      } else {
-        $err.hide();
-      }
-    });
-  });
-}
 
 // ============================================================
 // AUTO LOGOUT — idle detection + countdown warning

@@ -156,11 +156,11 @@ if (!function_exists('ticket_activity_icon')) {
   // filters change via AJAX (see #ticketsExportBtn handler in app.js).
   $fFromVal = '';
   if (!empty($filters['f_from'])) {
-      $fFromVal = $filters['f_from'];
+    $fFromVal = $filters['f_from'];
   }
   $fToVal = '';
   if (!empty($filters['f_to'])) {
-      $fToVal = $filters['f_to'];
+    $fToVal = $filters['f_to'];
   }
   $exportParams = [
     'mode'       => $ticketMode,
@@ -175,15 +175,6 @@ if (!function_exists('ticket_activity_icon')) {
   ];
   $exportParams = array_filter($exportParams);
   $exportUrl    = site_url('tickets/export') . '?' . http_build_query($exportParams);
-
-  $drInitFrom = date('Y-m-d');
-  if (!empty($filters['f_from'])) {
-      $drInitFrom = $filters['f_from'];
-  }
-  $drInitTo = date('Y-m-d');
-  if (!empty($filters['f_to'])) {
-      $drInitTo = $filters['f_to'];
-  }
   ?>
 
   <!-- Status pills row -->
@@ -206,7 +197,7 @@ if (!function_exists('ticket_activity_icon')) {
         }
         $activeClass = '';
         if ($cur === $key) {
-            $activeClass = 'active';
+          $activeClass = 'active';
         }
         ?>
         <a class="filter-pill <?= $activeClass ?>" href="<?= esc($url); ?>"><?= esc($label); ?></a>
@@ -225,12 +216,12 @@ if (!function_exists('ticket_activity_icon')) {
         <?php
         $hiddenAttr = '';
         if ($activeFilterCount === 0) {
-            $hiddenAttr = 'hidden';
+          $hiddenAttr = 'hidden';
         }
         ?>
         <span class="badge rounded-pill bg-primary ms-1 filter-bar-badge"
-              id="ticketsFilterBadge"
-              <?= $hiddenAttr ?>>
+          id="ticketsFilterBadge"
+          <?= $hiddenAttr ?>>
           <?= $activeFilterCount ?>
         </span>
       </span>
@@ -274,11 +265,11 @@ if (!function_exists('ticket_activity_icon')) {
             <?php
             $savedFilterBtnHidden = '';
             if (!$hasFilter) {
-                $savedFilterBtnHidden = 'hidden';
+              $savedFilterBtnHidden = 'hidden';
             }
             $savedFilterHintHidden = '';
             if ($hasFilter) {
-                $savedFilterHintHidden = 'hidden';
+              $savedFilterHintHidden = 'hidden';
             }
             ?>
             <button type="button" class="dropdown-item" id="savedFilterAddBtn"
@@ -299,19 +290,7 @@ if (!function_exists('ticket_activity_icon')) {
           </div>
         </div>
 
-        <!-- Date range — left of Apply -->
-        <span class="filter-bar-sep"></span>
-        <div class="filter-bar-date">
-          <?= view('filter', [
-            'only_widget' => true,
-            'drFromName'  => 'f_from',
-            'drToName'    => 'f_to',
-            'drFrom'      => $drInitFrom,
-            'drTo'        => $drInitTo,
-            'drDefault'   => 'today',
-            'drInline'    => true,
-          ]); ?>
-        </div>
+
 
         <!-- Apply -->
         <button type="submit" class="btn btn-sm btn-primary">
@@ -345,12 +324,12 @@ if (!function_exists('ticket_activity_icon')) {
             <label class="filter-label">Project</label>
             <select name="project_id" class="form-select form-select-sm">
               <option value="">All projects</option>
-              <?php foreach ($projects as $p) { 
+              <?php foreach ($projects as $p) {
                 $sel = '';
                 if ($projectSel === (int) $p['id']) {
-                    $sel = 'selected';
+                  $sel = 'selected';
                 }
-                ?>
+              ?>
                 <option value="<?= (int) $p['id']; ?>" <?= $sel; ?>>
                   <?= esc($p['name']); ?>
                 </option>
@@ -361,12 +340,12 @@ if (!function_exists('ticket_activity_icon')) {
             <label class="filter-label">Flow</label>
             <select name="flow_id" class="form-select form-select-sm">
               <option value="">All flows</option>
-              <?php foreach ($flows as $f) { 
+              <?php foreach ($flows as $f) {
                 $sel = '';
                 if ($flowSel === (int) $f['id']) {
-                    $sel = 'selected';
+                  $sel = 'selected';
                 }
-                ?>
+              ?>
                 <option value="<?= (int) $f['id']; ?>" <?= $sel; ?>>
                   <?= esc($f['name']); ?>
                 </option>
@@ -379,12 +358,12 @@ if (!function_exists('ticket_activity_icon')) {
           <label class="filter-label">Severity</label>
           <select name="alert_type" class="form-select form-select-sm">
             <option value="">All</option>
-            <?php foreach ($severityOptions as $key => $label) { 
+            <?php foreach ($severityOptions as $key => $label) {
               $sel = '';
               if ($typeSel === $key) {
-                  $sel = 'selected';
+                $sel = 'selected';
               }
-              ?>
+            ?>
               <option value="<?= $key; ?>" <?= $sel; ?>><?= $label; ?></option>
             <?php } ?>
           </select>
@@ -394,12 +373,12 @@ if (!function_exists('ticket_activity_icon')) {
           <label class="filter-label">Priority</label>
           <select name="priority" class="form-select form-select-sm">
             <option value="">All</option>
-            <?php foreach ($priorityOptions as $key => $label) { 
+            <?php foreach ($priorityOptions as $key => $label) {
               $sel = '';
               if ($prioSel === $key) {
-                  $sel = 'selected';
+                $sel = 'selected';
               }
-              ?>
+            ?>
               <option value="<?= $key; ?>" <?= $sel; ?>><?= $label; ?></option>
             <?php } ?>
           </select>
@@ -618,14 +597,14 @@ if (!function_exists('ticket_activity_icon')) {
     $isTerminal = true;
   }
   if (isset($attachCount)) {
-      $attachCount = (int) $attachCount;
+    $attachCount = (int) $attachCount;
   } else {
-      $attachCount = 0;
+    $attachCount = 0;
   }
   if (isset($attachMax)) {
-      $attachMax = (int) $attachMax;
+    $attachMax = (int) $attachMax;
   } else {
-      $attachMax = 5;
+    $attachMax = 5;
   }
   $attachFull  = $attachCount >= $attachMax;
   ?>
@@ -672,11 +651,11 @@ if (!function_exists('ticket_activity_icon')) {
             data-field="description"
             data-url="<?= site_url('tickets/action/' . $alarmId); ?>"><?= esc($descToShow); ?></div>
 
-          <?php 
-          helper('app'); 
+          <?php
+          helper('app');
           $visAllTransitions = [];
           if (isset($allTransitions)) {
-              $visAllTransitions = $allTransitions;
+            $visAllTransitions = $allTransitions;
           }
           ?>
           <?= flow_widget_html(
@@ -841,16 +820,20 @@ if (!function_exists('ticket_activity_icon')) {
                   <?php } ?>
                 <?php } else { ?>
                   <span class="text-muted small">
-                    <?php if ($isTerminal) { echo 'Ticket is ' . esc($ticketStatus) . '.'; }
-                    elseif ($isFinal)      { echo 'This is the closing state — resolve or close below.'; }
-                    else                   { echo 'No further states in this workflow.'; }
+                    <?php if ($isTerminal) {
+                      echo 'Ticket is ' . esc($ticketStatus) . '.';
+                    } elseif ($isFinal) {
+                      echo 'This is the closing state — resolve or close below.';
+                    } else {
+                      echo 'No further states in this workflow.';
+                    }
                     ?>
                   </span>
                 <?php } ?>
               </div>
 
               <?php if ($hasBwd) { ?>
-              <!-- Send Back: any earlier state, decided at runtime by the assignee -->
+                <!-- Send Back: any earlier state, decided at runtime by the assignee -->
                 <div class="mb-3">
                   <div class="d-flex align-items-center gap-2 mb-2">
                     <i class="bi bi-arrow-left-circle text-danger"></i>
@@ -888,13 +871,17 @@ if (!function_exists('ticket_activity_icon')) {
                 <button id="resolveBtn"
                   data-url="<?= site_url('tickets/resolve/' . $alarmId); ?>"
                   class="btn btn-outline-success"
-                  <?php if ($isTerminal) { echo 'disabled'; } ?>>
+                  <?php if ($isTerminal) {
+                    echo 'disabled';
+                  } ?>>
                   <i class="bi bi-check2-circle"></i> Resolve
                 </button>
                 <button id="closeBtn"
                   data-url="<?= site_url('tickets/close/' . $alarmId); ?>"
                   class="btn btn-outline-secondary"
-                  <?php if ($ticketStatus === 'closed') { echo 'disabled'; } ?>>
+                  <?php if ($ticketStatus === 'closed') {
+                    echo 'disabled';
+                  } ?>>
                   <i class="bi bi-x-circle"></i> Close
                 </button>
                 <!--
@@ -924,10 +911,14 @@ if (!function_exists('ticket_activity_icon')) {
                   </label>
                   <input type="file" name="file" class="form-control"
                     accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.xlsx,.xls,.csv,.txt" required
-                    <?php if ($isTerminal) { echo 'disabled'; } ?>>
+                    <?php if ($isTerminal) {
+                      echo 'disabled';
+                    } ?>>
                   <small class="text-muted">Max 10 MB.</small>
                   <div class="d-flex justify-content-end mt-2">
-                    <button class="btn btn-primary" <?php if ($isTerminal) { echo 'disabled'; } ?>>
+                    <button class="btn btn-primary" <?php if ($isTerminal) {
+                                                      echo 'disabled';
+                                                    } ?>>
                       <i class="bi bi-cloud-upload"></i> Upload
                     </button>
                   </div>
@@ -992,9 +983,9 @@ if (!function_exists('ticket_activity_icon')) {
                       case 'state_changed':
                         $transDir = 'forward';
                         if (isset($a['transition_type'])) {
-                            if ($a['transition_type'] === 'backward') {
-                                $transDir = 'backward';
-                            }
+                          if ($a['transition_type'] === 'backward') {
+                            $transDir = 'backward';
+                          }
                         }
                         if ($transDir === 'backward') {
                           echo '<span class="badge text-bg-danger me-1"><i class="bi bi-arrow-left-circle"></i> Send back</span>';
@@ -1004,13 +995,13 @@ if (!function_exists('ticket_activity_icon')) {
                         // Show user-supplied reason (stored after ": " in the comment).
                         $aCommentStr = '';
                         if (isset($a['comment'])) {
-                            $aCommentStr = $a['comment'];
+                          $aCommentStr = $a['comment'];
                         }
                         $stCommentStr = trim((string) $aCommentStr);
                         $stReasonPos  = strpos($stCommentStr, ': ');
                         $stReason     = '';
                         if ($stReasonPos !== false) {
-                            $stReason = trim(substr($stCommentStr, $stReasonPos + 2));
+                          $stReason = trim(substr($stCommentStr, $stReasonPos + 2));
                         }
                         if ($stReason !== '') {
                           echo '<div class="small text-muted mt-1"><i class="bi bi-chat-quote me-1"></i>' . esc($stReason) . '</div>';
@@ -1136,9 +1127,9 @@ if (!function_exists('ticket_activity_icon')) {
                 <?php
                 $asd = view_value($ticket, 'actual_start_date', '');
                 if ($asd !== '' && $asd !== null) {
-                    echo esc(date('d M Y', strtotime($asd)));
+                  echo esc(date('d M Y', strtotime($asd)));
                 } else {
-                    echo '<span class="text-muted">—</span>';
+                  echo '<span class="text-muted">—</span>';
                 }
                 ?>
               </td>
@@ -1149,9 +1140,9 @@ if (!function_exists('ticket_activity_icon')) {
                 <?php
                 $aed = view_value($ticket, 'actual_end_date', '');
                 if ($aed !== '' && $aed !== null) {
-                    echo esc(date('d M Y', strtotime($aed)));
+                  echo esc(date('d M Y', strtotime($aed)));
                 } else {
-                    echo '<span class="text-muted">—</span>';
+                  echo '<span class="text-muted">—</span>';
                 }
                 ?>
               </td>

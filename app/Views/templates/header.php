@@ -109,6 +109,7 @@ $secondaryColor = app_setting('secondary_color', '');
     <script src="<?= base_url('assets/vendor/sweetalert2/sweetalert2.min.js'); ?>"></script>
     <script src="<?= base_url('assets/vendor/chartjs/chart.umd.min.js'); ?>"></script>
     <script src="<?= base_url('assets/vendor/vis-network/vis-network.min.js'); ?>"></script>
+    <script src="<?= base_url('assets/js/calendar.js'); ?>?v=<?= esc($assetVersion); ?>"></script>
     <script src="<?= base_url('assets/js/app.js'); ?>?v=<?= esc($assetVersion); ?>"></script>
     <script src="<?= base_url('assets/js/datatable.js'); ?>?v=<?= esc($assetVersion); ?>"></script>
 </head>

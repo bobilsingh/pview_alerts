@@ -76,27 +76,27 @@ if (isset($prefProjectName) && $prefProjectName !== '') {
 <?php
 $custKpi = ['open' => 1, 'critical' => 1, 'major' => 1, 'resolved' => 1];
 if (isset($custKpiVisible) && is_array($custKpiVisible)) {
-    $custKpi = $custKpiVisible;
+  $custKpi = $custKpiVisible;
 }
 $defaultProjIdVal = 0;
 if (isset($custDefaultProjectId)) {
-    $defaultProjIdVal = $custDefaultProjectId;
+  $defaultProjIdVal = $custDefaultProjectId;
 }
 $custProjId = (int) $defaultProjIdVal;
 
 $defaultTrendRangeVal = 0;
 if (isset($custDefaultTrendRange)) {
-    $defaultTrendRangeVal = $custDefaultTrendRange;
+  $defaultTrendRangeVal = $custDefaultTrendRange;
 }
 $custTrendRange = (int) $defaultTrendRangeVal;
 
 $custRanges = [7, 15, 30];
 if (isset($custRangesInt) && is_array($custRangesInt)) {
-    $custRanges = $custRangesInt;
+  $custRanges = $custRangesInt;
 }
 $custProjectsList = [];
 if (isset($custProjects) && is_array($custProjects)) {
-    $custProjectsList = $custProjects;
+  $custProjectsList = $custProjects;
 }
 ?>
 
@@ -122,11 +122,11 @@ if (isset($custProjects) && is_array($custProjects)) {
           <select name="default_project_id" class="form-select">
             <option value="0">All projects (no filter)</option>
             <?php foreach ($custProjectsList as $p) {
-                $selectedStr = '';
-                if ($custProjId === (int) $p['id']) {
-                    $selectedStr = 'selected';
-                }
-                ?>
+              $selectedStr = '';
+              if ($custProjId === (int) $p['id']) {
+                $selectedStr = 'selected';
+              }
+            ?>
               <option value="<?= (int) $p['id']; ?>" <?= $selectedStr; ?>>
                 <?= esc($p['name']); ?>
               </option>
@@ -140,22 +140,22 @@ if (isset($custProjects) && is_array($custProjects)) {
             <?php
             $selectedStr = '';
             if ($custTrendRange === 0) {
-                $selectedStr = 'selected';
+              $selectedStr = 'selected';
             }
             $custRange0 = 7;
             if (isset($custRanges[0])) {
-                $custRange0 = $custRanges[0];
+              $custRange0 = $custRanges[0];
             }
             ?>
             <option value="0" <?= $selectedStr; ?>>
               System default (<?= (int) $custRange0; ?> days)
             </option>
             <?php foreach ($custRanges as $r) {
-                $selectedStr = '';
-                if ($custTrendRange === (int) $r) {
-                    $selectedStr = 'selected';
-                }
-                ?>
+              $selectedStr = '';
+              if ($custTrendRange === (int) $r) {
+                $selectedStr = 'selected';
+              }
+            ?>
               <option value="<?= (int) $r; ?>" <?= $selectedStr; ?>>
                 <?= (int) $r; ?> days
               </option>
@@ -170,11 +170,11 @@ if (isset($custProjects) && is_array($custProjects)) {
         <label class="form-label fw-semibold">KPI Cards</label>
         <div class="row g-2">
           <?php foreach (['open' => 'Open Tickets', 'critical' => 'Critical', 'major' => 'Major', 'resolved' => 'Resolved'] as $key => $lbl) {
-              $checkedStr = '';
-              if (!empty($custKpi[$key])) {
-                  $checkedStr = 'checked';
-              }
-              ?>
+            $checkedStr = '';
+            if (!empty($custKpi[$key])) {
+              $checkedStr = 'checked';
+            }
+          ?>
             <div class="col-md-3 col-6">
               <div class="form-check form-switch">
                 <input type="checkbox" class="form-check-input" name="kpi_<?= $key; ?>" id="dkpi_<?= $key; ?>"
@@ -272,18 +272,6 @@ if (isset($custProjects) && is_array($custProjects)) {
       ?>
       <div class="chart-title">
         <h6><i class="bi bi-graph-up text-primary"></i> Ticket Trend - Last <?= (int) $currentRange; ?> days</h6>
-        <div class="trend-range-picker">
-          <?php foreach ($rangeOptions as $days => $label) { ?>
-            <?php
-            $rangeUrl = site_url('dashboard') . '?range=' . $days;
-            $isActiveRange = '';
-            if ($currentRange === $days) {
-              $isActiveRange = 'is-active';
-            }
-            ?>
-            <a class="filter-pill <?= $isActiveRange; ?>" href="<?= esc($rangeUrl); ?>"><?= esc($label); ?></a>
-          <?php } ?>
-        </div>
       </div>
       <div class="chart-wrap trend-chart-wrap">
         <canvas id="trendChart" data-chart="trend" data-labels="<?= esc(implode('||', $trendLabels), 'attr'); ?>" data-values="<?= esc(implode(',', array_map('strval', $trendValues)), 'attr'); ?>" data-dates="<?= esc(implode('||', $trendDates), 'attr'); ?>"></canvas>
@@ -337,27 +325,27 @@ if (isset($custProjects) && is_array($custProjects)) {
           $expires    = tat_expires_at($t);
           $status = '';
           if (isset($t['status'])) {
-              $status = $t['status'];
+            $status = $t['status'];
           }
           $alertType = '';
           if (isset($t['alert_type'])) {
-              $alertType = $t['alert_type'];
+            $alertType = $t['alert_type'];
           }
           $priority = '';
           if (isset($t['priority'])) {
-              $priority = $t['priority'];
+            $priority = $t['priority'];
           }
           $stateName = '-';
           if (isset($t['state_name']) && $t['state_name'] !== '') {
-              $stateName = $t['state_name'];
+            $stateName = $t['state_name'];
           }
           $assignee = 'Unassigned';
           if (isset($t['assignee_name']) && $t['assignee_name'] !== '') {
-              $assignee = $t['assignee_name'];
+            $assignee = $t['assignee_name'];
           }
           $rowClass = '';
           if ($status === 'escalated') {
-              $rowClass = 'row-escalated';
+            $rowClass = 'row-escalated';
           }
           ?>
           <tr class="<?= $rowClass; ?>">
