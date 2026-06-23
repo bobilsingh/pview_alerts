@@ -15,18 +15,18 @@ if (!function_exists('setting_label')) {
 
 // Group keys logically so the page reads top-to-bottom.
 $groups = [
-  'Branding'      => ['app_name', 'client_name', 'app_logo', 'app_favicon', 'primary_color', 'secondary_color', 'login_show_demo_creds'],
-  'Security'      => ['maintenance_mode', 'password_min_length', 'password_require_letter', 'password_require_digit', 'password_rotate_days', 'login_max_attempts', 'login_lockout_minutes', 'session_idle_timeout_minutes'],
+  'Branding' => ['app_name', 'client_name', 'app_logo', 'app_favicon', 'primary_color', 'secondary_color', 'login_show_demo_creds'],
+  'Security' => ['maintenance_mode', 'password_min_length', 'password_require_letter', 'password_require_digit', 'password_rotate_days', 'login_max_attempts', 'login_lockout_minutes', 'session_idle_timeout_minutes'],
   'Rate Limiting' => ['api_rate_per_minute', 'api_rate_per_hour'],
-  'Attachments'   => ['upload_max_mb', 'upload_allowed_ext', 'upload_blocked_ext'],
-  'TAT defaults'  => ['default_tat_l1_minutes', 'default_tat_l2_minutes', 'default_tat_l3_minutes', 'default_tat_l4_minutes'],
-  'UI'            => ['dashboard_trend_ranges', 'datatable_page_length'],
-  'Live polling'  => ['live_poll_seconds', 'live_audio_enabled', 'live_browser_notify', 'analytics_refresh_seconds'],
-  'Email / SMTP'  => ['email_protocol', 'email_smtp_host', 'email_smtp_port', 'email_smtp_user', 'email_smtp_pass', 'email_smtp_crypto', 'email_from_email', 'email_from_name'],
+  'Attachments' => ['upload_max_mb', 'upload_allowed_ext', 'upload_blocked_ext'],
+  'TAT defaults' => ['default_tat_l1_minutes', 'default_tat_l2_minutes', 'default_tat_l3_minutes', 'default_tat_l4_minutes'],
+  'UI' => ['dashboard_trend_ranges', 'datatable_page_length'],
+  'Live polling' => ['live_poll_seconds', 'live_audio_enabled', 'live_browser_notify', 'analytics_refresh_seconds'],
+  'Email / SMTP' => ['email_protocol', 'email_smtp_host', 'email_smtp_port', 'email_smtp_user', 'email_smtp_pass', 'email_smtp_crypto', 'email_from_email', 'email_from_name'],
   'Notification queue' => ['notification_batch_size', 'notification_max_attempts'],
   // Bumping this number invalidates every browser's cached copy of
   // app.css / app.js — handy after a hot-fix edited on the server.
-  'Assets'             => ['asset_version', 'duplicate_detection_window_hours'],
+  'Assets' => ['asset_version', 'duplicate_detection_window_hours'],
 ];
 
 // Keys that must always render as a number input even when their current
@@ -60,48 +60,48 @@ $passwordKeys = ['email_smtp_pass'];
 
 // Authoritative descriptions — override whatever is stored in the DB.
 $descOverrides = [
-  'app_name'                => 'Application name shown in the browser tab and sidebar.',
-  'client_name'             => 'Client organization name shown in footer and headers.',
-  'app_logo'                => 'Application logo shown in sidebar and login page. (max 2MB)',
-  'app_favicon'             => 'Application favicon tab icon. (max 500KB)',
-  'primary_color'           => 'Primary theme brand color (overrides default cyan).',
-  'secondary_color'         => 'Secondary theme brand color (overrides default dark cyan).',
-  'login_show_demo_creds'   => 'Show demo credentials on the login page (disable in production).',
-  'password_min_length'     => 'Minimum number of characters required for a password.',
+  'app_name' => 'Application name shown in the browser tab and sidebar.',
+  'client_name' => 'Client organization name shown in footer and headers.',
+  'app_logo' => 'Application logo shown in sidebar and login page. (max 2MB)',
+  'app_favicon' => 'Application favicon tab icon. (max 500KB)',
+  'primary_color' => 'Primary theme brand color (overrides default cyan).',
+  'secondary_color' => 'Secondary theme brand color (overrides default dark cyan).',
+  'login_show_demo_creds' => 'Show demo credentials on the login page (disable in production).',
+  'password_min_length' => 'Minimum number of characters required for a password.',
   'password_require_letter' => 'Require at least one letter in every password.',
-  'password_require_digit'  => 'Require at least one digit in every password.',
-  'password_rotate_days'    => 'Force password change after this many days (0 = disabled).',
-  'login_max_attempts'       => 'Number of failed login attempts before an IP/account is temporarily locked out (0 = disabled).',
-  'login_lockout_minutes'   => 'How long (in minutes) the lockout lasts after too many failed attempts.',
-  'api_rate_per_minute'     => 'Maximum API requests per API key per minute (0 = no limit).',
-  'api_rate_per_hour'       => 'Maximum API requests per API key per hour (0 = no limit).',
-  'upload_max_mb'           => 'Maximum file size in megabytes allowed for ticket attachments.',
-  'upload_allowed_ext'      => 'Comma-separated list of allowed attachment file extensions.',
-  'upload_blocked_ext'      => 'Extra extensions to block on upload, comma-separated. Added on top of the built-in denylist (php, exe, sh, etc.).',
-  'default_tat_l1_minutes'  => 'Default TAT (minutes) for Level 1 before auto-escalation.',
-  'default_tat_l2_minutes'  => 'Default TAT (minutes) for Level 2 before auto-escalation.',
-  'default_tat_l3_minutes'  => 'Default TAT (minutes) for Level 3 before auto-escalation.',
-  'default_tat_l4_minutes'  => 'Default TAT (minutes) for Level 4 before auto-escalation.',
-  'datatable_page_length'   => 'Default rows per page shown in all data tables across the app.',
-  'dashboard_trend_ranges'  => 'Comma-separated day windows for the dashboard trend chart (e.g. "7,15,30"). The first value is the default range. Each must be between 1 and 365.',
-  'live_poll_seconds'              => 'How often the bell badge / dashboard polls for new actionable tickets, in seconds (5-120). 0 disables polling.',
-  'live_audio_enabled'             => 'Play a short audio cue when the actionable-ticket count rises during live polling.',
-  'live_browser_notify'            => 'Show a browser notification (if the user has granted permission) when the actionable count rises.',
-  'analytics_refresh_seconds'      => 'How often the Activity Log Analytics tab auto-refreshes in seconds (10-300). 0 disables auto-refresh.',
-  'maintenance_mode'               => 'When enabled, non-admin users see a maintenance page instead of the app. Super-admin and admin-scope roles can still log in and work normally.',
-  'session_idle_timeout_minutes'   => 'Client-side idle timeout: log out after this many minutes with no mouse, keyboard, or scroll activity (browser-side check). 0 disables.',
-  'email_protocol'          => 'Mail protocol. Usually "smtp" — alternatives are "sendmail" or "mail".',
-  'email_smtp_host'         => 'SMTP server hostname (e.g. mail.example.com).',
-  'email_smtp_port'         => 'SMTP port. 587 for STARTTLS, 465 for implicit SSL, 25 for plain.',
-  'email_smtp_user'         => 'SMTP username (often the from-address).',
-  'email_smtp_pass'         => 'SMTP password. Stored in plain text in the database — anyone with DB read access can recover it. See the admin note above.',
-  'email_smtp_crypto'       => 'Connection encryption: tls (port 587), ssl (port 465), or leave blank for none.',
-  'email_from_email'        => 'From-address shown to recipients.',
-  'email_from_name'         => 'Display name shown to recipients.',
-  'notification_batch_size'   => 'Max notification_logs rows the cron worker processes per run (1-500).',
+  'password_require_digit' => 'Require at least one digit in every password.',
+  'password_rotate_days' => 'Force password change after this many days (0 = disabled).',
+  'login_max_attempts' => 'Number of failed login attempts before an IP/account is temporarily locked out (0 = disabled).',
+  'login_lockout_minutes' => 'How long (in minutes) the lockout lasts after too many failed attempts.',
+  'api_rate_per_minute' => 'Maximum API requests per API key per minute (0 = no limit).',
+  'api_rate_per_hour' => 'Maximum API requests per API key per hour (0 = no limit).',
+  'upload_max_mb' => 'Maximum file size in megabytes allowed for ticket attachments.',
+  'upload_allowed_ext' => 'Comma-separated list of allowed attachment file extensions.',
+  'upload_blocked_ext' => 'Extra extensions to block on upload, comma-separated. Added on top of the built-in denylist (php, exe, sh, etc.).',
+  'default_tat_l1_minutes' => 'Default TAT (minutes) for Level 1 before auto-escalation.',
+  'default_tat_l2_minutes' => 'Default TAT (minutes) for Level 2 before auto-escalation.',
+  'default_tat_l3_minutes' => 'Default TAT (minutes) for Level 3 before auto-escalation.',
+  'default_tat_l4_minutes' => 'Default TAT (minutes) for Level 4 before auto-escalation.',
+  'datatable_page_length' => 'Default rows per page shown in all data tables across the app.',
+  'dashboard_trend_ranges' => 'Comma-separated day windows for the dashboard trend chart (e.g. "7,15,30"). The first value is the default range. Each must be between 1 and 365.',
+  'live_poll_seconds' => 'How often the bell badge / dashboard polls for new actionable tickets, in seconds (5-120). 0 disables polling.',
+  'live_audio_enabled' => 'Play a short audio cue when the actionable-ticket count rises during live polling.',
+  'live_browser_notify' => 'Show a browser notification (if the user has granted permission) when the actionable count rises.',
+  'analytics_refresh_seconds' => 'How often the Activity Log Analytics tab auto-refreshes in seconds (10-300). 0 disables auto-refresh.',
+  'maintenance_mode' => 'When enabled, non-admin users see a maintenance page instead of the app. Super-admin and admin-scope roles can still log in and work normally.',
+  'session_idle_timeout_minutes' => 'Client-side idle timeout: log out after this many minutes with no mouse, keyboard, or scroll activity (browser-side check). 0 disables.',
+  'email_protocol' => 'Mail protocol. Usually "smtp" — alternatives are "sendmail" or "mail".',
+  'email_smtp_host' => 'SMTP server hostname (e.g. mail.example.com).',
+  'email_smtp_port' => 'SMTP port. 587 for STARTTLS, 465 for implicit SSL, 25 for plain.',
+  'email_smtp_user' => 'SMTP username (often the from-address).',
+  'email_smtp_pass' => 'SMTP password. Stored in plain text in the database — anyone with DB read access can recover it. See the admin note above.',
+  'email_smtp_crypto' => 'Connection encryption: tls (port 587), ssl (port 465), or leave blank for none.',
+  'email_from_email' => 'From-address shown to recipients.',
+  'email_from_name' => 'Display name shown to recipients.',
+  'notification_batch_size' => 'Max notification_logs rows the cron worker processes per run (1-500).',
   'notification_max_attempts' => 'Give up on a pending notification after this many failed send attempts.',
-  'asset_version'                      => 'Cache-buster appended to public/assets/css/app.css and public/assets/js/app.js URLs. Bump this number by 1 after editing those files directly on the server so every browser pulls the fresh copy on next page load.',
-  'duplicate_detection_window_hours'   => 'When raising a ticket, warn if another open ticket with the same alert type exists in the same project within this many hours. Set to 0 to disable the check.',
+  'asset_version' => 'Cache-buster appended to public/assets/css/app.css and public/assets/js/app.js URLs. Bump this number by 1 after editing those files directly on the server so every browser pulls the fresh copy on next page load.',
+  'duplicate_detection_window_hours' => 'When raising a ticket, warn if another open ticket with the same alert type exists in the same project within this many hours. Set to 0 to disable the check.',
 ];
 
 // Index by key for fast lookup, and find any keys that don't fit
@@ -153,11 +153,11 @@ if (!empty($other)) {
     </p>
   </div>
 <?php } else if (empty($settings)) { ?>
-  <div class="alert alert-info">
-    <i class="bi bi-info-circle"></i>
-    The <code>app_settings</code> table is empty. Insert the seed rows from
-    <code>database_upgrade.sql</code> to populate the defaults.
-  </div>
+    <div class="alert alert-info">
+      <i class="bi bi-info-circle"></i>
+      The <code>app_settings</code> table is empty. Insert the seed rows from
+      <code>database_upgrade.sql</code> to populate the defaults.
+    </div>
 <?php } ?>
 
 <form method="post" action="<?= site_url('settings/save'); ?>" data-loading-form="1" enctype="multipart/form-data">
@@ -183,7 +183,9 @@ if (!empty($other)) {
         <?php if ($groupName === 'Email / SMTP') { ?>
           <div class="alert alert-warning py-2 small">
             <i class="bi bi-shield-exclamation"></i>
-            <strong>Admin note:</strong> Configure SMTP settings carefully to ensure email notifications work properly. Use valid SMTP credentials and the correct port/crypto combination (TLS → 587, SSL → 465). Keep the SMTP password secure and avoid sharing database access with unauthorized users..
+            <strong>Admin note:</strong> Configure SMTP settings carefully to ensure email notifications work properly. Use
+            valid SMTP credentials and the correct port/crypto combination (TLS → 587, SSL → 465). Keep the SMTP password
+            secure and avoid sharing database access with unauthorized users..
           </div>
         <?php } ?>
         <div class="row g-3">
@@ -192,15 +194,15 @@ if (!empty($other)) {
             if (!isset($byKey[$key])) {
               continue;
             }
-            $row    = $byKey[$key];
-            $value  = (string) $row['setting_value'];
+            $row = $byKey[$key];
+            $value = (string) $row['setting_value'];
             if (isset($descOverrides[$key])) {
-                $desc = $descOverrides[$key];
+              $desc = $descOverrides[$key];
             } else {
-                $desc = '';
-                if (isset($row['description'])) {
-                    $desc = (string) $row['description'];
-                }
+              $desc = '';
+              if (isset($row['description'])) {
+                $desc = (string) $row['description'];
+              }
             }
             $isBool = ($value === '0' || $value === '1') && !in_array($key, $numericKeys, true);
             $isLong = (mb_strlen($value) > 80);
@@ -210,12 +212,10 @@ if (!empty($other)) {
               <?php if ($isBool) { ?>
                 <div class="d-flex align-items-center gap-3">
                   <div class="form-check form-switch mb-0 ps-0">
-                    <input type="checkbox" class="form-check-input ms-0"
-                      role="switch"
-                      name="<?= esc($key); ?>" id="set_<?= esc($key); ?>"
-                      value="1" <?php if ($value === '1') {
-                                  echo 'checked';
-                                } ?>>
+                    <input type="checkbox" class="form-check-input ms-0" role="switch" name="<?= esc($key); ?>"
+                      id="set_<?= esc($key); ?>" value="1" <?php if ($value === '1') {
+                          echo 'checked';
+                        } ?>>
                   </div>
                   <label class="form-label mb-0 fw-semibold" for="set_<?= esc($key); ?>">
                     <?= esc(setting_label($key)); ?>
@@ -231,12 +231,17 @@ if (!empty($other)) {
                 <?php if ($key === 'app_logo') { ?>
                   <!-- Logo Preview and File Input -->
                   <div class="mb-2 d-flex align-items-center gap-3">
-                    <div class="brand-logo-preview-box p-2 border rounded bg-dark d-flex align-items-center justify-content-center" style="width: 120px; height: 60px;">
+                    <div
+                      class="brand-logo-preview-box p-2 border rounded bg-dark d-flex align-items-center justify-content-center"
+                      style="width: 120px; height: 60px;">
                       <?php if ($value !== '') { ?>
-                        <img id="logoPreview" src="<?= base_url($value); ?>?v=<?= esc(app_setting('asset_version', '1')); ?>" alt="Logo Preview" style="max-width: 100%; max-height: 100%; object-fit: contain;">
+                        <img id="logoPreview" src="<?= base_url($value); ?>?v=<?= esc(app_setting('asset_version', '1')); ?>"
+                          alt="Logo Preview" style="max-width: 100%; max-height: 100%; object-fit: contain;">
                       <?php } else { ?>
-                        <div id="logoPreviewDefault" class="brand-mark" style="font-size: 24px;"><i class="bi bi-broadcast-pin"></i></div>
-                        <img id="logoPreview" src="" alt="Logo Preview" class="d-none" style="max-width: 100%; max-height: 100%; object-fit: contain;">
+                        <div id="logoPreviewDefault" class="brand-mark" style="font-size: 24px;"><i
+                            class="bi bi-broadcast-pin"></i></div>
+                        <img id="logoPreview" src="" alt="Logo Preview" class="d-none"
+                          style="max-width: 100%; max-height: 100%; object-fit: contain;">
                       <?php } ?>
                     </div>
                     <div>
@@ -248,72 +253,76 @@ if (!empty($other)) {
                       <?php } ?>
                     </div>
                   </div>
-                  <input type="file" class="form-control" name="app_logo" id="set_app_logo" accept="image/png, image/jpeg, image/jpg, image/svg+xml, image/webp">
+                  <input type="file" class="form-control" name="app_logo" id="set_app_logo"
+                    accept="image/png, image/jpeg, image/jpg, image/svg+xml, image/webp">
 
                 <?php } else if ($key === 'app_favicon') { ?>
-                  <!-- Favicon Preview and File Input -->
-                  <div class="mb-2 d-flex align-items-center gap-3">
-                    <div class="brand-favicon-preview-box p-2 border rounded bg-dark d-flex align-items-center justify-content-center" style="width: 60px; height: 60px;">
+                    <!-- Favicon Preview and File Input -->
+                    <div class="mb-2 d-flex align-items-center gap-3">
+                      <div
+                        class="brand-favicon-preview-box p-2 border rounded bg-dark d-flex align-items-center justify-content-center"
+                        style="width: 60px; height: 60px;">
                       <?php if ($value !== '') { ?>
-                        <img id="faviconPreview" src="<?= base_url($value); ?>?v=<?= esc(app_setting('asset_version', '1')); ?>" alt="Favicon Preview" style="max-width: 32px; max-height: 32px; object-fit: contain;">
+                          <img id="faviconPreview" src="<?= base_url($value); ?>?v=<?= esc(app_setting('asset_version', '1')); ?>"
+                            alt="Favicon Preview" style="max-width: 32px; max-height: 32px; object-fit: contain;">
                       <?php } else { ?>
-                        <div id="faviconPreviewDefault" class="brand-mark" style="font-size: 20px;"><i class="bi bi-broadcast-pin"></i></div>
-                        <img id="faviconPreview" src="" alt="Favicon Preview" class="d-none" style="max-width: 32px; max-height: 32px; object-fit: contain;">
+                          <div id="faviconPreviewDefault" class="brand-mark" style="font-size: 20px;"><i
+                              class="bi bi-broadcast-pin"></i></div>
+                          <img id="faviconPreview" src="" alt="Favicon Preview" class="d-none"
+                            style="max-width: 32px; max-height: 32px; object-fit: contain;">
                       <?php } ?>
-                    </div>
-                    <div>
-                      <small class="text-muted d-block">Preview</small>
+                      </div>
+                      <div>
+                        <small class="text-muted d-block">Preview</small>
                       <?php if ($value !== '') { ?>
-                        <button type="submit" name="clear_favicon" value="1" class="btn btn-sm btn-outline-danger mt-1">
-                          <i class="bi bi-trash"></i> Reset
-                        </button>
+                          <button type="submit" name="clear_favicon" value="1" class="btn btn-sm btn-outline-danger mt-1">
+                            <i class="bi bi-trash"></i> Reset
+                          </button>
                       <?php } ?>
+                      </div>
                     </div>
-                  </div>
-                  <input type="file" class="form-control" name="app_favicon" id="set_app_favicon" accept="image/png, image/jpeg, image/jpg, image/x-icon, image/vnd.microsoft.icon, image/svg+xml, image/webp">
+                    <input type="file" class="form-control" name="app_favicon" id="set_app_favicon"
+                      accept="image/png, image/jpeg, image/jpg, image/x-icon, image/vnd.microsoft.icon, image/svg+xml, image/webp">
 
                 <?php } else if ($key === 'primary_color' || $key === 'secondary_color') { ?>
-                  <!-- Theme Color Inputs -->
-                  <?php
-                  $defaultColor = '#0792cd';
-                  if ($key === 'secondary_color') {
+                      <!-- Theme Color Inputs -->
+                    <?php
+                    $defaultColor = '#0792cd';
+                    if ($key === 'secondary_color') {
                       $defaultColor = '#0476a7';
-                  }
-                  $colorVal = $value;
-                  if ($colorVal === '') {
+                    }
+                    $colorVal = $value;
+                    if ($colorVal === '') {
                       $colorVal = $defaultColor;
-                  }
-                  ?>
-                  <div class="input-group">
-                    <input type="color" class="form-control form-control-color" style="max-width: 60px; padding: 4px; height: 38px;"
-                      id="color_picker_<?= esc($key); ?>" value="<?= esc($colorVal); ?>">
-                    <input type="text" class="form-control color-text-input" name="<?= esc($key); ?>" id="set_<?= esc($key); ?>"
-                      value="<?= esc($value); ?>" placeholder="<?= esc($defaultColor); ?>" data-picker-id="color_picker_<?= esc($key); ?>">
-                  </div>
+                    }
+                    ?>
+                      <div class="input-group">
+                        <input type="color" class="form-control form-control-color"
+                          style="max-width: 60px; padding: 4px; height: 38px;" id="color_picker_<?= esc($key); ?>"
+                          value="<?= esc($colorVal); ?>">
+                        <input type="text" class="form-control color-text-input" name="<?= esc($key); ?>" id="set_<?= esc($key); ?>"
+                          value="<?= esc($value); ?>" placeholder="<?= esc($defaultColor); ?>"
+                          data-picker-id="color_picker_<?= esc($key); ?>">
+                      </div>
 
                 <?php } else if ($isPass) { ?>
-                  <input type="password" class="form-control"
-                    name="<?= esc($key); ?>" id="set_<?= esc($key); ?>"
-                    autocomplete="new-password"
-                    value="<?= esc($value); ?>">
+                        <input type="password" class="form-control" name="<?= esc($key); ?>" id="set_<?= esc($key); ?>"
+                          autocomplete="new-password" value="<?= esc($value); ?>">
                 <?php } else if ($isLong) { ?>
-                  <textarea class="form-control" rows="2"
-                    name="<?= esc($key); ?>" id="set_<?= esc($key); ?>"><?= esc($value); ?></textarea>
+                          <textarea class="form-control" rows="2" name="<?= esc($key); ?>"
+                            id="set_<?= esc($key); ?>"><?= esc($value); ?></textarea>
                 <?php } else if ($key === 'asset_version') { ?>
-                  <div class="input-group">
-                    <input type="text" class="form-control"
-                      name="<?= esc($key); ?>" id="set_<?= esc($key); ?>"
-                      value="<?= esc($value); ?>">
-                    <button type="button" id="bumpAssetVersionBtn"
-                      class="btn btn-outline-primary"
-                      data-url="<?= site_url('settings/bump_asset_version'); ?>">
-                      <i class="bi bi-arrow-up-circle"></i> Bump version
-                    </button>
-                  </div>
+                            <div class="input-group">
+                              <input type="text" class="form-control" name="<?= esc($key); ?>" id="set_<?= esc($key); ?>"
+                                value="<?= esc($value); ?>">
+                              <button type="button" id="bumpAssetVersionBtn" class="btn btn-outline-primary"
+                                data-url="<?= site_url('settings/bump_asset_version'); ?>">
+                                <i class="bi bi-arrow-up-circle"></i> Bump version
+                              </button>
+                            </div>
                 <?php } else { ?>
-                  <input type="text" class="form-control"
-                    name="<?= esc($key); ?>" id="set_<?= esc($key); ?>"
-                    value="<?= esc($value); ?>">
+                            <input type="text" class="form-control" name="<?= esc($key); ?>" id="set_<?= esc($key); ?>"
+                              value="<?= esc($value); ?>">
                 <?php } ?>
               <?php } ?>
 
@@ -326,12 +335,12 @@ if (!empty($other)) {
 
         <?php if ($groupName === 'Email / SMTP') { ?>
           <div class="mt-3 d-flex align-items-center gap-2">
-            <button type="button" id="sendTestEmailBtn"
-              class="btn btn-outline-primary btn-sm"
+            <button type="button" id="sendTestEmailBtn" class="btn btn-outline-primary btn-sm"
               data-url="<?= site_url('settings/send_test_email'); ?>">
               <i class="bi bi-envelope-check"></i> Send test email to me
             </button>
-            <small class="text-muted">Sends a one-line test using the saved settings, to <code><?= esc(session('user_email')); ?></code>. Save changes first.</small>
+            <small class="text-muted">Sends a one-line test using the saved settings, to
+              <code><?= esc(session('user_email')); ?></code>. Save changes first.</small>
           </div>
         <?php } ?>
 
@@ -346,7 +355,9 @@ if (!empty($other)) {
     <div class="card-body">
       <div class="row align-items-center">
         <div class="col-md-8">
-          <p class="text-muted mb-0">Define the operator and administrator roles available in the system. Each role gets its own tab in the Module Permissions panel where you toggle View / Add / Edit / Delete access per module, and an admin-tier flag that controls whether the role sees all tickets system-wide.</p>
+          <p class="text-muted mb-0">Define the operator and administrator roles available in the system. Each role gets
+            its own tab in the Module Permissions panel where you toggle View / Add / Edit / Delete access per module,
+            and an admin-tier flag that controls whether the role sees all tickets system-wide.</p>
         </div>
         <div class="col-md-4 text-md-end mt-3 mt-md-0">
           <a href="<?= site_url('roles'); ?>" class="btn btn-light">
@@ -364,7 +375,9 @@ if (!empty($other)) {
     <div class="card-body">
       <div class="row align-items-center">
         <div class="col-md-8">
-          <p class="text-muted mb-0">Centralized read-only history of user events — logins, mutations, navigation, exports. Use it to investigate incidents, audit configuration changes, or track time-on-platform per operator.</p>
+          <p class="text-muted mb-0">Centralized read-only history of user events — logins, mutations, navigation,
+            exports. Use it to investigate incidents, audit configuration changes, or track time-on-platform per
+            operator.</p>
         </div>
         <div class="col-md-4 text-md-end mt-3 mt-md-0">
           <a href="<?= site_url('activity_logs'); ?>" class="btn btn-light">
@@ -382,7 +395,8 @@ if (!empty($other)) {
     <div class="card-body">
       <div class="row align-items-center">
         <div class="col-md-8">
-          <p class="text-muted mb-0">Monitor the last run status, duration, and notification counts for all scheduled cron scripts (e.g. TAT monitor). Tracks the last 100 runs per script.</p>
+          <p class="text-muted mb-0">Monitor the last run status, duration, and notification counts for all scheduled
+            cron scripts (e.g. TAT monitor). Tracks the last 100 runs per script.</p>
         </div>
         <div class="col-md-4 text-md-end mt-3 mt-md-0">
           <a href="<?= site_url('cron_panel'); ?>" class="btn btn-light">
@@ -400,7 +414,8 @@ if (!empty($other)) {
     <div class="card-body">
       <div class="row align-items-center">
         <div class="col-md-8">
-          <p class="text-muted mb-0">Control sidebar visibility, dynamic page access, and granular CRUD action privileges (View, Add, Edit, Delete) for each role.</p>
+          <p class="text-muted mb-0">Control sidebar visibility, dynamic page access, and granular CRUD action
+            privileges (View, Add, Edit, Delete) for each role.</p>
         </div>
         <div class="col-md-4 text-md-end mt-3 mt-md-0">
           <a href="<?= site_url('module_control_panel'); ?>" class="btn btn-light">
@@ -412,8 +427,7 @@ if (!empty($other)) {
   </div>
 
   <div class="d-flex justify-content-between align-items-center mb-4">
-    <button type="button" id="clearSettingsCacheBtn"
-      class="btn btn-outline-secondary btn-sm"
+    <button type="button" id="clearSettingsCacheBtn" class="btn btn-outline-secondary btn-sm"
       data-url="<?= site_url('settings/clear_cache'); ?>">
       <i class="bi bi-arrow-clockwise"></i> Clear Settings Cache
     </button>

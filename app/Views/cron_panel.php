@@ -29,17 +29,17 @@ $today = date('Y-m-d');
   <?php else: ?>
     <?php
     // Pre-compute stats from $runs (last 100 records already fetched).
-    $todayStr       = date('Y-m-d');
-    $totalRuns      = count($runs);
-    $okRuns         = 0;
-    $todayRuns      = 0;
-    $todayTickets   = 0;
-    $todayNotifs    = 0;
-    $durTotal       = 0;
+    $todayStr = date('Y-m-d');
+    $totalRuns = count($runs);
+    $okRuns = 0;
+    $todayRuns = 0;
+    $todayTickets = 0;
+    $todayNotifs = 0;
+    $durTotal = 0;
     foreach ($runs as $r) {
       $statusVal = 'ok';
       if (isset($r['status'])) {
-          $statusVal = $r['status'];
+        $statusVal = $r['status'];
       }
       if ($statusVal === 'ok') {
         $okRuns++;
@@ -47,53 +47,53 @@ $today = date('Y-m-d');
 
       $durMsVal = 0;
       if (isset($r['duration_ms'])) {
-          $durMsVal = $r['duration_ms'];
+        $durMsVal = $r['duration_ms'];
       }
       $durTotal += (int) $durMsVal;
 
       $startedAtVal = '';
       if (isset($r['started_at'])) {
-          $startedAtVal = $r['started_at'];
+        $startedAtVal = $r['started_at'];
       }
       if (substr($startedAtVal, 0, 10) === $todayStr) {
         $todayRuns++;
 
         $ticketsCheckedVal = 0;
         if (isset($r['tickets_checked'])) {
-            $ticketsCheckedVal = $r['tickets_checked'];
+          $ticketsCheckedVal = $r['tickets_checked'];
         }
         $todayTickets += (int) $ticketsCheckedVal;
 
         $notifsSentVal = 0;
         if (isset($r['notifs_sent'])) {
-            $notifsSentVal = $r['notifs_sent'];
+          $notifsSentVal = $r['notifs_sent'];
         }
-        $todayNotifs  += (int) $notifsSentVal;
+        $todayNotifs += (int) $notifsSentVal;
       }
     }
 
     $successRate = 0;
     if ($totalRuns > 0) {
-        $successRate = round($okRuns / $totalRuns * 100, 1);
+      $successRate = round($okRuns / $totalRuns * 100, 1);
     }
 
     $avgDurSec = 0;
     if ($totalRuns > 0) {
-        $avgDurSec = round($durTotal / $totalRuns / 1000, 2);
+      $avgDurSec = round($durTotal / $totalRuns / 1000, 2);
     }
 
     $successCls = 'text-danger';
     if ($successRate >= 95) {
-        $successCls = 'text-success';
+      $successCls = 'text-success';
     } elseif ($successRate >= 80) {
-        $successCls = 'text-warning';
+      $successCls = 'text-warning';
     }
 
     $progressBarCls = 'bg-danger';
     if ($successRate >= 95) {
-        $progressBarCls = 'bg-success';
+      $progressBarCls = 'bg-success';
     } elseif ($successRate >= 80) {
-        $progressBarCls = 'bg-warning';
+      $progressBarCls = 'bg-warning';
     }
     ?>
     <div class="row g-3 mb-4">
@@ -103,23 +103,23 @@ $today = date('Y-m-d');
         <?php
         $runStatusVal = 'ok';
         if (isset($run['status'])) {
-            $runStatusVal = $run['status'];
+          $runStatusVal = $run['status'];
         }
-        $isOk      = $runStatusVal === 'ok';
+        $isOk = $runStatusVal === 'ok';
         $statusCls = 'bg-danger';
         if ($isOk) {
-            $statusCls = 'bg-success';
+          $statusCls = 'bg-success';
         }
         $statusLbl = 'FAILED';
         if ($isOk) {
-            $statusLbl = 'OK';
+          $statusLbl = 'OK';
         }
 
         $runDurMsVal = 0;
         if (isset($run['duration_ms'])) {
-            $runDurMsVal = $run['duration_ms'];
+          $runDurMsVal = $run['duration_ms'];
         }
-        $durSec    = round((int) $runDurMsVal / 1000, 2);
+        $durSec = round((int) $runDurMsVal / 1000, 2);
 
         $minutesAgo = '';
         if (!empty($run['started_at'])) {
@@ -135,26 +135,26 @@ $today = date('Y-m-d');
 
         $runStartedAt = '-';
         if (isset($run['started_at'])) {
-            $runStartedAt = $run['started_at'];
+          $runStartedAt = $run['started_at'];
         }
 
         $runTicketsChecked = 0;
         if (isset($run['tickets_checked'])) {
-            $runTicketsChecked = (int) $run['tickets_checked'];
+          $runTicketsChecked = (int) $run['tickets_checked'];
         }
 
         $runNotifsSent = 0;
         if (isset($run['notifs_sent'])) {
-            $runNotifsSent = (int) $run['notifs_sent'];
+          $runNotifsSent = (int) $run['notifs_sent'];
         }
 
         $runNotifsFailed = 0;
         if (isset($run['notifs_failed'])) {
-            $runNotifsFailed = (int) $run['notifs_failed'];
+          $runNotifsFailed = (int) $run['notifs_failed'];
         }
         $failedCls = '';
         if ($runNotifsFailed > 0) {
-            $failedCls = 'text-danger';
+          $failedCls = 'text-danger';
         }
         ?>
         <div class="col-lg-4">
@@ -227,8 +227,7 @@ $today = date('Y-m-d');
                 <span class="fw-bold <?= $successCls; ?>"><?= $successRate; ?>%</span>
               </div>
               <div class="progress" style="height:6px;">
-                <div class="progress-bar <?= $progressBarCls; ?>"
-                  style="width:<?= $successRate; ?>%"></div>
+                <div class="progress-bar <?= $progressBarCls; ?>" style="width:<?= $successRate; ?>%"></div>
               </div>
               <div class="d-flex justify-content-between small mt-2">
                 <span class="text-muted">Avg duration</span>
@@ -247,7 +246,8 @@ $today = date('Y-m-d');
           </div>
           <div class="card-body">
             <p class="small text-muted mb-2">Add this line to your server crontab (<code>crontab -e</code>):</p>
-            <pre class="small rounded p-2 mb-2" style="background:#1e293b;color:#7dd3fc;word-break:break-all;white-space:pre-wrap;border:1px solid #334155;">* * * * * /home/pview/apache_pview/php/bin/php <?= esc(ROOTPATH); ?>tat_monitor.php >> <?= esc(WRITEPATH); ?>logs/tat_monitor.log 2>&amp;1</pre>
+            <pre class="small rounded p-2 mb-2"
+              style="background:#1e293b;color:#7dd3fc;word-break:break-all;white-space:pre-wrap;border:1px solid #334155;">* * * * * /home/pview/apache_pview/php/bin/php <?= esc(ROOTPATH); ?>tat_monitor.php >> <?= esc(WRITEPATH); ?>logs/tat_monitor.log 2>&amp;1</pre>
             <div class="small text-muted">
               <i class="bi bi-info-circle"></i>
               Runs every minute. The script enforces a single-instance lock so overlapping runs are skipped automatically.

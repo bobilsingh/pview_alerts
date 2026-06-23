@@ -25,7 +25,8 @@ foreach ($permissions as $p) {
 <div class="page-head">
 	<div>
 		<h2>Module Control Panel</h2>
-		<div class="subtitle">Manage page visibility, sidebar menus, and operational action permissions dynamically per role.</div>
+		<div class="subtitle">Manage page visibility, sidebar menus, and operational action permissions dynamically per
+			role.</div>
 	</div>
 	<a href="<?= site_url('settings'); ?>" class="btn btn-light"><i class="bi bi-arrow-left"></i> Settings</a>
 </div>
@@ -37,19 +38,13 @@ foreach ($permissions as $p) {
 				<?php
 				$firstTab = true;
 				foreach ($roles as $roleKey => $roleLabel) {
-				?>
+					?>
 					<li class="nav-item" role="presentation">
 						<button class="nav-link py-3 px-4 <?php if ($firstTab === true) {
-																			echo 'active';
-																			$firstTab = false;
-																		} ?>"
-							id="tab-<?= esc($roleKey); ?>"
-							data-bs-toggle="tab"
-							data-bs-target="#pane-<?= esc($roleKey); ?>"
-							type="button"
-							role="tab"
-							aria-controls="pane-<?= esc($roleKey); ?>"
-							aria-selected="true">
+							echo 'active';
+							$firstTab = false;
+						} ?>" id="tab-<?= esc($roleKey); ?>" data-bs-toggle="tab" data-bs-target="#pane-<?= esc($roleKey); ?>"
+							type="button" role="tab" aria-controls="pane-<?= esc($roleKey); ?>" aria-selected="true">
 							<strong><?= esc($roleLabel); ?></strong>
 						</button>
 					</li>
@@ -61,14 +56,11 @@ foreach ($permissions as $p) {
 			<?php
 			$firstPane = true;
 			foreach ($roles as $roleKey => $roleLabel) {
-			?>
+				?>
 				<div class="tab-pane fade show <?php if ($firstPane === true) {
-																echo 'active';
-																$firstPane = false;
-															} ?>"
-					id="pane-<?= esc($roleKey); ?>"
-					role="tabpanel"
-					aria-labelledby="tab-<?= esc($roleKey); ?>">
+					echo 'active';
+					$firstPane = false;
+				} ?>" id="pane-<?= esc($roleKey); ?>" role="tabpanel" aria-labelledby="tab-<?= esc($roleKey); ?>">
 
 					<div class="table-responsive">
 						<table class="table table-hover align-middle mb-0">
@@ -90,16 +82,16 @@ foreach ($permissions as $p) {
 										continue;
 									}
 									$viewVal = 0;
-									$addVal  = 0;
+									$addVal = 0;
 									$editVal = 0;
-									$delVal  = 0;
+									$delVal = 0;
 
 									if (isset($indexed[$roleKey][$modKey])) {
-										$row     = $indexed[$roleKey][$modKey];
+										$row = $indexed[$roleKey][$modKey];
 										$viewVal = (int) $row['can_view'];
-										$addVal  = (int) $row['can_add'];
+										$addVal = (int) $row['can_add'];
 										$editVal = (int) $row['can_edit'];
-										$delVal  = (int) $row['can_delete'];
+										$delVal = (int) $row['can_delete'];
 									}
 									?>
 									<tr>
@@ -110,41 +102,33 @@ foreach ($permissions as $p) {
 										<td class="text-center">
 											<div class="form-check form-switch d-inline-block">
 												<input class="form-check-input" type="checkbox"
-													name="perms[<?= esc($roleKey); ?>][<?= esc($modKey); ?>][view]"
-													value="1"
-													<?php if ($viewVal === 1) {
-														echo 'checked';
-													} ?>>
+													name="perms[<?= esc($roleKey); ?>][<?= esc($modKey); ?>][view]" value="1" <?php if ($viewVal === 1) {
+															 echo 'checked';
+														 } ?>>
 											</div>
 										</td>
 										<td class="text-center">
 											<div class="form-check form-switch d-inline-block">
 												<input class="form-check-input" type="checkbox"
-													name="perms[<?= esc($roleKey); ?>][<?= esc($modKey); ?>][add]"
-													value="1"
-													<?php if ($addVal === 1) {
-														echo 'checked';
-													} ?>>
+													name="perms[<?= esc($roleKey); ?>][<?= esc($modKey); ?>][add]" value="1" <?php if ($addVal === 1) {
+															 echo 'checked';
+														 } ?>>
 											</div>
 										</td>
 										<td class="text-center">
 											<div class="form-check form-switch d-inline-block">
 												<input class="form-check-input" type="checkbox"
-													name="perms[<?= esc($roleKey); ?>][<?= esc($modKey); ?>][edit]"
-													value="1"
-													<?php if ($editVal === 1) {
-														echo 'checked';
-													} ?>>
+													name="perms[<?= esc($roleKey); ?>][<?= esc($modKey); ?>][edit]" value="1" <?php if ($editVal === 1) {
+															 echo 'checked';
+														 } ?>>
 											</div>
 										</td>
 										<td class="text-center">
 											<div class="form-check form-switch d-inline-block">
 												<input class="form-check-input" type="checkbox"
-													name="perms[<?= esc($roleKey); ?>][<?= esc($modKey); ?>][delete]"
-													value="1"
-													<?php if ($delVal === 1) {
-														echo 'checked';
-													} ?>>
+													name="perms[<?= esc($roleKey); ?>][<?= esc($modKey); ?>][delete]" value="1" <?php if ($delVal === 1) {
+															 echo 'checked';
+														 } ?>>
 											</div>
 										</td>
 									</tr>
@@ -174,7 +158,8 @@ foreach ($permissions as $p) {
 			</div>
 		</div>
 		<?php if (has_module_access('module_control_panel', 'add') === true) { ?>
-			<button type="button" class="btn btn-sm btn-primary" data-bs-toggle="collapse" data-bs-target="#addModulePanel" aria-expanded="false">
+			<button type="button" class="btn btn-sm btn-primary" data-bs-toggle="collapse" data-bs-target="#addModulePanel"
+				aria-expanded="false">
 				<i class="bi bi-plus-lg"></i> Add Module
 			</button>
 		<?php } ?>
@@ -184,20 +169,22 @@ foreach ($permissions as $p) {
 		<div class="collapse" id="addModulePanel">
 			<div class="card-body border-bottom bg-light">
 				<form method="post" action="<?= site_url('module_control_panel/module/add'); ?>" data-loading-form="1">
-					<?= csrf_field(); ?>
 					<div class="row g-3">
 						<!-- Row 1 -->
 						<div class="col-md-3">
 							<label class="form-label fw-semibold">Module Key <span class="text-danger">*</span></label>
-							<input type="text" name="module_key" class="form-control form-control-sm" placeholder="e.g. my_reports" pattern="[a-z][a-z0-9_]{1,49}" required>
+							<input type="text" name="module_key" class="form-control form-control-sm"
+								placeholder="e.g. my_reports" pattern="[a-z][a-z0-9_]{1,49}" required>
 						</div>
 						<div class="col-md-3">
 							<label class="form-label fw-semibold">Display Name <span class="text-danger">*</span></label>
-							<input type="text" name="name" class="form-control form-control-sm" placeholder="e.g. My Reports" required>
+							<input type="text" name="name" class="form-control form-control-sm" placeholder="e.g. My Reports"
+								required>
 						</div>
 						<div class="col-md-3">
 							<label class="form-label fw-semibold">Category / Group <span class="text-danger">*</span></label>
-							<input type="text" name="category" class="form-control form-control-sm" placeholder="e.g. Operations" list="categoriesList" required>
+							<input type="text" name="category" class="form-control form-control-sm" placeholder="e.g. Operations"
+								list="categoriesList" required>
 							<datalist id="categoriesList">
 								<option value="Overview">
 								<option value="Configuration">
@@ -208,13 +195,15 @@ foreach ($permissions as $p) {
 						</div>
 						<div class="col-md-3">
 							<label class="form-label fw-semibold">Sort Order</label>
-							<input type="number" name="sort_order" class="form-control form-control-sm" placeholder="e.g. 100" min="1">
+							<input type="number" name="sort_order" class="form-control form-control-sm" placeholder="e.g. 100"
+								min="1">
 						</div>
 
 						<!-- Row 2 -->
 						<div class="col-md-3">
 							<label class="form-label fw-semibold">Bootstrap Icon</label>
-							<input type="text" name="icon" class="form-control form-control-sm" placeholder="e.g. bi-file-earmark-bar-graph">
+							<input type="text" name="icon" class="form-control form-control-sm"
+								placeholder="e.g. bi-file-earmark-bar-graph">
 						</div>
 						<div class="col-md-3">
 							<label class="form-label fw-semibold">URI Path (URL Route)</label>
@@ -222,7 +211,8 @@ foreach ($permissions as $p) {
 						</div>
 						<div class="col-md-3">
 							<label class="form-label fw-semibold">Permission Module Key</label>
-							<input type="text" name="permission_module_key" class="form-control form-control-sm" placeholder="e.g. tickets (default to key)">
+							<input type="text" name="permission_module_key" class="form-control form-control-sm"
+								placeholder="e.g. tickets (default to key)">
 						</div>
 						<div class="col-md-3">
 							<label class="form-label fw-semibold">Permission Action</label>
@@ -237,16 +227,20 @@ foreach ($permissions as $p) {
 						<!-- Row 3 -->
 						<div class="col-md-10">
 							<label class="form-label fw-semibold">Description</label>
-							<input type="text" name="description" class="form-control form-control-sm" placeholder="Short description shown in the permission grid">
+							<input type="text" name="description" class="form-control form-control-sm"
+								placeholder="Short description shown in the permission grid">
 						</div>
 						<div class="col-md-2 d-flex align-items-end">
-							<button type="submit" class="btn btn-primary btn-sm w-100 py-2"><i class="bi bi-plus-lg"></i> Add Module</button>
+							<button type="submit" class="btn btn-primary btn-sm w-100 py-2"><i class="bi bi-plus-lg"></i> Add
+								Module</button>
 						</div>
 					</div>
 					<div class="mt-2 small text-muted">
 						<i class="bi bi-info-circle"></i>
-						<strong>Module Key</strong> must match the first argument of <code>check_module_access()</code> in your controller.
-						Example: if your controller calls <code>check_module_access('my_reports', 'view')</code> then the key is <code>my_reports</code>.
+						<strong>Module Key</strong> must match the first argument of <code>check_module_access()</code> in your
+						controller.
+						Example: if your controller calls <code>check_module_access('my_reports', 'view')</code> then the key is
+						<code>my_reports</code>.
 						Use lowercase letters, digits, and underscores only.
 					</div>
 				</form>
@@ -266,11 +260,11 @@ foreach ($permissions as $p) {
 				</tr>
 			</thead>
 			<tbody>
-				<?php foreach ($modules as $modKey => $modInfo) { 
+				<?php foreach ($modules as $modKey => $modInfo) {
 					if (!empty($modInfo['is_builtin'])) {
 						continue;
 					}
-				?>
+					?>
 					<tr>
 						<td style="padding-left: 20px;"><code><?= esc($modKey); ?></code></td>
 						<td><strong><?= esc($modInfo['name']); ?></strong></td>
@@ -285,9 +279,8 @@ foreach ($permissions as $p) {
 						<td class="text-end" style="padding-right: 16px;">
 							<?php if (empty($modInfo['is_builtin']) && has_module_access('module_control_panel', 'delete') === true) { ?>
 								<a href="<?= site_url('module_control_panel/module/delete/' . esc($modKey)); ?>"
-								   class="btn btn-sm btn-outline-danger"
-								   data-method="post"
-								   data-confirm-message="Remove module '<?= esc($modInfo['name']); ?>'? This will also delete all its role permissions.">
+									class="btn btn-sm btn-outline-danger" data-method="post"
+									data-confirm-message="Remove module '<?= esc($modInfo['name']); ?>'? This will also delete all its role permissions.">
 									<i class="bi bi-trash"></i> Remove
 								</a>
 							<?php } else { ?>

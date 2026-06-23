@@ -58,10 +58,10 @@ $today = date('Y-m-d');
     <!-- Filter bar -->
     <div class="card mb-3">
       <?= view('filter', [
-        'fbTitle'          => 'Filters',
-        'fbCountId'        => 'activityFilterBadge',
-        'fbApplyId'        => 'activityApplyBtn',
-        'fbResetId'        => 'activityResetBtn',
+        'fbTitle' => 'Filters',
+        'fbCountId' => 'activityFilterBadge',
+        'fbApplyId' => 'activityApplyBtn',
+        'fbResetId' => 'activityResetBtn',
         'show_date_widget' => false,
       ]); ?>
       <div class="filter-bar-body">
@@ -308,4 +308,4 @@ $today = date('Y-m-d');
 
 
 <?php } // end if canAnalytics 
-?>
+    ?>

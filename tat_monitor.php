@@ -26,8 +26,8 @@
  */
 
 if (PHP_SAPI !== 'cli') {
-    http_response_code(404);
-    exit;
+	http_response_code(404);
+	exit;
 }
 
 use App\Models\App_model;
@@ -37,12 +37,12 @@ require __DIR__ . '/app/Config/Paths.php';
 
 $paths = new Config\Paths();
 
-define('FCPATH',     realpath(__DIR__ . '/public')                       . DIRECTORY_SEPARATOR);
-define('APPPATH',    realpath(rtrim($paths->appDirectory,      '\\/ ')) . DIRECTORY_SEPARATOR);
-define('ROOTPATH',   realpath(APPPATH . '..')                            . DIRECTORY_SEPARATOR);
-define('SYSTEMPATH', realpath(rtrim($paths->systemDirectory,   '\\/ ')) . DIRECTORY_SEPARATOR);
-define('WRITEPATH',  realpath(rtrim($paths->writableDirectory, '\\/ ')) . DIRECTORY_SEPARATOR);
-define('TESTPATH',   realpath(rtrim($paths->testsDirectory,    '\\/ ') ?: __DIR__) . DIRECTORY_SEPARATOR);
+define('FCPATH', realpath(__DIR__ . '/public') . DIRECTORY_SEPARATOR);
+define('APPPATH', realpath(rtrim($paths->appDirectory, '\\/ ')) . DIRECTORY_SEPARATOR);
+define('ROOTPATH', realpath(APPPATH . '..') . DIRECTORY_SEPARATOR);
+define('SYSTEMPATH', realpath(rtrim($paths->systemDirectory, '\\/ ')) . DIRECTORY_SEPARATOR);
+define('WRITEPATH', realpath(rtrim($paths->writableDirectory, '\\/ ')) . DIRECTORY_SEPARATOR);
+define('TESTPATH', realpath(rtrim($paths->testsDirectory, '\\/ ') ?: __DIR__) . DIRECTORY_SEPARATOR);
 
 (new \CodeIgniter\Config\DotEnv(ROOTPATH))->load();
 $envName = $_ENV['CI_ENVIRONMENT'] ?? $_SERVER['CI_ENVIRONMENT'] ?? getenv('CI_ENVIRONMENT') ?: 'production';
@@ -51,7 +51,7 @@ define('ENVIRONMENT', $envName);
 require_once APPPATH . 'Config/Constants.php';
 require_once SYSTEMPATH . 'Common.php';
 if (is_file(APPPATH . 'Config/Boot/' . ENVIRONMENT . '.php')) {
-    require_once APPPATH . 'Config/Boot/' . ENVIRONMENT . '.php';
+	require_once APPPATH . 'Config/Boot/' . ENVIRONMENT . '.php';
 }
 
 \Config\Services::autoloader()->initialize(new \Config\Autoload(), new \Config\Modules())->register();
@@ -65,19 +65,19 @@ $appModel = new App_model();
 $lockFile = WRITEPATH . 'cache/tat_monitor.lock';
 $lockFp = @fopen($lockFile, 'w');
 if ($lockFp === false) {
-    // Cannot open lock file — log and exit safely rather than running unguarded.
-    echo "TAT monitor - " . date('Y-m-d H:i:s') . " - cannot open lock file; skipping run.\n";
-    exit;
+	// Cannot open lock file — log and exit safely rather than running unguarded.
+	echo "TAT monitor - " . date('Y-m-d H:i:s') . " - cannot open lock file; skipping run.\n";
+	exit;
 }
 if (!flock($lockFp, LOCK_EX | LOCK_NB)) {
-    echo "TAT monitor - " . date('Y-m-d H:i:s') . " - already running. Exiting.\n";
-    fclose($lockFp);
-    exit;
+	echo "TAT monitor - " . date('Y-m-d H:i:s') . " - already running. Exiting.\n";
+	fclose($lockFp);
+	exit;
 }
 
-$cronStartTime  = microtime(true);
-$cronStartedAt  = date('Y-m-d H:i:s');
-$cronStatus     = 'ok';
+$cronStartTime = microtime(true);
+$cronStartedAt = date('Y-m-d H:i:s');
+$cronStatus = 'ok';
 $cronSummaryLog = [];
 
 $tickets = $appModel->ticketActiveForTatCheck();
@@ -86,197 +86,197 @@ $cronTicketsChecked = count($tickets);
 echo "TAT monitor - " . date('Y-m-d H:i:s') . " - checking " . $cronTicketsChecked . " active tickets\n";
 
 foreach ($tickets as $ticket) {
-    $level         = (int) ($ticket['current_level'] ?? 1);
-    $flowId        = (int) ($ticket['flow_id'] ?? 0);
-    $stateId       = (int) ($ticket['current_state_id'] ?? 0);
-    $enteredAt     = strtotime((string) ($ticket['state_entered_at'] ?? ''));
-    $tatLevelCount = max(1, min(4, (int) ($ticket['tat_level_count'] ?? 4)));
+	$level = (int) ($ticket['current_level'] ?? 1);
+	$flowId = (int) ($ticket['flow_id'] ?? 0);
+	$stateId = (int) ($ticket['current_state_id'] ?? 0);
+	$enteredAt = strtotime((string) ($ticket['state_entered_at'] ?? ''));
+	$tatLevelCount = max(1, min(4, (int) ($ticket['tat_level_count'] ?? 4)));
 
-    if ($enteredAt === false) {
-        echo "  [" . $ticket['alarm_id'] . "] skipped: invalid state_entered_at\n";
-        continue;
-    }
+	if ($enteredAt === false) {
+		echo "  [" . $ticket['alarm_id'] . "] skipped: invalid state_entered_at\n";
+		continue;
+	}
 
-    // Override → state fallback. Matrix wins when present.
-    $tatMinutes = (int) ($ticket['l' . $level . '_tat_minutes'] ?? 60);
-    $notifyList = $appModel->stateLevelUsers($ticket, $level);
-    $rule = $appModel->escalationRule($flowId, $stateId, $level);
-    if (!empty($rule)) {
-        $tatMinutes = (int) $rule['tat_minutes'];
-        if (!empty($rule['notify_users'])) {
-            $notifyList = $rule['notify_users'];
-        }
-    }
+	// Override → state fallback. Matrix wins when present.
+	$tatMinutes = (int) ($ticket['l' . $level . '_tat_minutes'] ?? 60);
+	$notifyList = $appModel->stateLevelUsers($ticket, $level);
+	$rule = $appModel->escalationRule($flowId, $stateId, $level);
+	if (!empty($rule)) {
+		$tatMinutes = (int) $rule['tat_minutes'];
+		if (!empty($rule['notify_users'])) {
+			$notifyList = $rule['notify_users'];
+		}
+	}
 
-    $expiresAt = $enteredAt + ($tatMinutes * 60);
-    if (time() < $expiresAt) {
-        continue;
-    }
+	$expiresAt = $enteredAt + ($tatMinutes * 60);
+	if (time() < $expiresAt) {
+		continue;
+	}
 
-    if ($level < $tatLevelCount) {
-        $newLevel = $level + 1;
+	if ($level < $tatLevelCount) {
+		$newLevel = $level + 1;
 
-        $appModel->ticketEscalateLevel((int) $ticket['id'], $newLevel);
-        $appModel->ticketLogAction((int) $ticket['id'], 'level_escalated', [
-            'from_level'          => $level,
-            'to_level'            => $newLevel,
-            'comment'             => 'Auto-escalated: TAT breached at L' . $level,
-            'performed_by_system' => 'tat_monitor',
-        ]);
+		$appModel->ticketEscalateLevel((int) $ticket['id'], $newLevel);
+		$appModel->ticketLogAction((int) $ticket['id'], 'level_escalated', [
+			'from_level' => $level,
+			'to_level' => $newLevel,
+			'comment' => 'Auto-escalated: TAT breached at L' . $level,
+			'performed_by_system' => 'tat_monitor',
+		]);
 
-        $state = $appModel->stateGetById($stateId);
-        // Re-resolve notify list for the NEW level (override-aware).
-        $nextLevelUsers = $appModel->stateLevelUsers($state, $newLevel);
-        $nextRule = $appModel->escalationRule($flowId, $stateId, $newLevel);
-        if (!empty($nextRule) && !empty($nextRule['notify_users'])) {
-            $nextLevelUsers = $nextRule['notify_users'];
-        }
+		$state = $appModel->stateGetById($stateId);
+		// Re-resolve notify list for the NEW level (override-aware).
+		$nextLevelUsers = $appModel->stateLevelUsers($state, $newLevel);
+		$nextRule = $appModel->escalationRule($flowId, $stateId, $newLevel);
+		if (!empty($nextRule) && !empty($nextRule['notify_users'])) {
+			$nextLevelUsers = $nextRule['notify_users'];
+		}
 
-        if (!empty($nextLevelUsers)) {
-            notify_ticket_event('level_escalated', $ticket, [
-                'from_level'    => $level,
-                'to_level'      => $newLevel,
-                'current_level' => $newLevel,
-                'actor_name'    => 'tat_monitor',
-            ], $nextLevelUsers);
-        }
+		if (!empty($nextLevelUsers)) {
+			notify_ticket_event('level_escalated', $ticket, [
+				'from_level' => $level,
+				'to_level' => $newLevel,
+				'current_level' => $newLevel,
+				'actor_name' => 'tat_monitor',
+			], $nextLevelUsers);
+		}
 
-        echo "  [" . $ticket['alarm_id'] . "] L" . $level . " -> L" . $newLevel . "\n";
-        continue;
-    }
+		echo "  [" . $ticket['alarm_id'] . "] L" . $level . " -> L" . $newLevel . "\n";
+		continue;
+	}
 
-    // Terminal escalation: flip status and notify the top-level pool.
-    $appModel->ticketUpdate((int) $ticket['id'], [
-        'status'     => 'escalated',
-        'updated_at' => date('Y-m-d H:i:s'),
-    ]);
+	// Terminal escalation: flip status and notify the top-level pool.
+	$appModel->ticketUpdate((int) $ticket['id'], [
+		'status' => 'escalated',
+		'updated_at' => date('Y-m-d H:i:s'),
+	]);
 
-    $appModel->ticketLogAction((int) $ticket['id'], 'level_escalated', [
-        'from_level'          => 4,
-        'to_level'            => 4,
-        'comment'             => 'L4 TAT breached - admin attention required',
-        'performed_by_system' => 'tat_monitor',
-    ]);
+	$appModel->ticketLogAction((int) $ticket['id'], 'level_escalated', [
+		'from_level' => 4,
+		'to_level' => 4,
+		'comment' => 'L4 TAT breached - admin attention required',
+		'performed_by_system' => 'tat_monitor',
+	]);
 
-    if (!empty($notifyList)) {
-        notify_ticket_event('tat_breach', $ticket, [
-            'level'      => 4,
-            'actor_name' => 'tat_monitor',
-        ], $notifyList);
-    }
+	if (!empty($notifyList)) {
+		notify_ticket_event('tat_breach', $ticket, [
+			'level' => 4,
+			'actor_name' => 'tat_monitor',
+		], $notifyList);
+	}
 
-    echo "  [" . $ticket['alarm_id'] . "] L4 breached - flagged escalated and notified L4 pool\n";
+	echo "  [" . $ticket['alarm_id'] . "] L4 breached - flagged escalated and notified L4 pool\n";
 }
 
 $qResult = process_notification_queue();
 echo "Notification queue drained: sent=" . $qResult['sent']
-    . " failed=" . $qResult['failed']
-    . " retried=" . $qResult['retried'] . "\n";
-$cronNotifsSent   = (int) ($qResult['sent']   ?? 0);
+	. " failed=" . $qResult['failed']
+	. " retried=" . $qResult['retried'] . "\n";
+$cronNotifsSent = (int) ($qResult['sent'] ?? 0);
 $cronNotifsFailed = (int) ($qResult['failed'] ?? 0);
 
 // Prune stale log tables once per cron sweep.
 try {
-    $db = \Config\Database::connect();
-    $retainDays    = (int) app_setting_int('log_retention_days', 30);
-    if ($retainDays < 1) {
-        $retainDays = 30;
-    }
-    $oldCutoff     = date('Y-m-d H:i:s', time() - ($retainDays * 86400));
-    $apiCutoff     = date('Y-m-d H:i:s', time() - 86400); // api_request_log: always 1 day
-    $db->table('api_request_log')->where('requested_at <', $apiCutoff)->delete();
-    $db->table('login_attempts')->where('attempted_at <', $oldCutoff)->delete();
-    echo "Log tables pruned: api_request_log < " . $apiCutoff . ", login_attempts < " . $oldCutoff . "\n";
+	$db = \Config\Database::connect();
+	$retainDays = (int) app_setting_int('log_retention_days', 30);
+	if ($retainDays < 1) {
+		$retainDays = 30;
+	}
+	$oldCutoff = date('Y-m-d H:i:s', time() - ($retainDays * 86400));
+	$apiCutoff = date('Y-m-d H:i:s', time() - 86400); // api_request_log: always 1 day
+	$db->table('api_request_log')->where('requested_at <', $apiCutoff)->delete();
+	$db->table('login_attempts')->where('attempted_at <', $oldCutoff)->delete();
+	echo "Log tables pruned: api_request_log < " . $apiCutoff . ", login_attempts < " . $oldCutoff . "\n";
 
-    // Clean up file logs and session files once every 24 hours.
-    $lastCleanup = cache('last_log_cleanup_time');
-    $currentTime = time();
-    $shouldClean = false;
-    if ($lastCleanup === null) {
-        $shouldClean = true;
-    } else {
-        if (($currentTime - (int)$lastCleanup) >= 86400) {
-            $shouldClean = true;
-        }
-    }
+	// Clean up file logs and session files once every 24 hours.
+	$lastCleanup = cache('last_log_cleanup_time');
+	$currentTime = time();
+	$shouldClean = false;
+	if ($lastCleanup === null) {
+		$shouldClean = true;
+	} else {
+		if (($currentTime - (int) $lastCleanup) >= 86400) {
+			$shouldClean = true;
+		}
+	}
 
-    if ($shouldClean) {
-        // Clean up file logs (older than 7 days)
-        $logDir = WRITEPATH . 'logs';
-        if (is_dir($logDir)) {
-            $files = glob($logDir . '/*.log');
-            if (is_array($files)) {
-                $sevenDaysAgo = $currentTime - (7 * 86400);
-                $prunedLogsCount = 0;
-                foreach ($files as $file) {
-                    if (is_file($file) && filemtime($file) < $sevenDaysAgo) {
-                        if (@unlink($file)) {
-                            $prunedLogsCount = $prunedLogsCount + 1;
-                        }
-                    }
-                }
-                if ($prunedLogsCount > 0) {
-                    echo "Pruned " . $prunedLogsCount . " log files older than 7 days.\n";
-                }
-            }
-        }
+	if ($shouldClean) {
+		// Clean up file logs (older than 7 days)
+		$logDir = WRITEPATH . 'logs';
+		if (is_dir($logDir)) {
+			$files = glob($logDir . '/*.log');
+			if (is_array($files)) {
+				$sevenDaysAgo = $currentTime - (7 * 86400);
+				$prunedLogsCount = 0;
+				foreach ($files as $file) {
+					if (is_file($file) && filemtime($file) < $sevenDaysAgo) {
+						if (@unlink($file)) {
+							$prunedLogsCount = $prunedLogsCount + 1;
+						}
+					}
+				}
+				if ($prunedLogsCount > 0) {
+					echo "Pruned " . $prunedLogsCount . " log files older than 7 days.\n";
+				}
+			}
+		}
 
-        // Clean up session files (older than 7 days)
-        $sessionDir = WRITEPATH . 'session';
-        if (is_dir($sessionDir)) {
-            $files = glob($sessionDir . '/ci_session*');
-            if (is_array($files)) {
-                $sevenDaysAgo = $currentTime - (7 * 86400);
-                $prunedSessionsCount = 0;
-                foreach ($files as $file) {
-                    if (is_file($file) && filemtime($file) < $sevenDaysAgo) {
-                        if (@unlink($file)) {
-                            $prunedSessionsCount = $prunedSessionsCount + 1;
-                        }
-                    }
-                }
-                if ($prunedSessionsCount > 0) {
-                    echo "Pruned " . $prunedSessionsCount . " session files older than 7 days.\n";
-                }
-            }
-        }
+		// Clean up session files (older than 7 days)
+		$sessionDir = WRITEPATH . 'session';
+		if (is_dir($sessionDir)) {
+			$files = glob($sessionDir . '/ci_session*');
+			if (is_array($files)) {
+				$sevenDaysAgo = $currentTime - (7 * 86400);
+				$prunedSessionsCount = 0;
+				foreach ($files as $file) {
+					if (is_file($file) && filemtime($file) < $sevenDaysAgo) {
+						if (@unlink($file)) {
+							$prunedSessionsCount = $prunedSessionsCount + 1;
+						}
+					}
+				}
+				if ($prunedSessionsCount > 0) {
+					echo "Pruned " . $prunedSessionsCount . " session files older than 7 days.\n";
+				}
+			}
+		}
 
-        // Save current timestamp to cache (expires in 48 hours to ensure persistent tracking)
-        cache()->save('last_log_cleanup_time', $currentTime, 172800);
-    }
+		// Save current timestamp to cache (expires in 48 hours to ensure persistent tracking)
+		cache()->save('last_log_cleanup_time', $currentTime, 172800);
+	}
 } catch (\Throwable $e) {
-    error_log('pview alert >> tat_monitor log prune failed: ' . $e->getMessage());
+	error_log('pview alert >> tat_monitor log prune failed: ' . $e->getMessage());
 }
 
 try {
-    $cronDb          = \Config\Database::connect();
-    $cronDurationMs  = (int) round((microtime(true) - $cronStartTime) * 1000);
-    $cronSummaryText = 'Checked ' . $cronTicketsChecked . ' tickets; sent ' . $cronNotifsSent . ' notifs';
-    $cronDb->table('cron_runs')->insert([
-        'script'          => 'tat_monitor',
-        'started_at'      => $cronStartedAt,
-        'finished_at'     => date('Y-m-d H:i:s'),
-        'duration_ms'     => $cronDurationMs,
-        'status'          => $cronStatus,
-        'tickets_checked' => $cronTicketsChecked,
-        'notifs_sent'     => $cronNotifsSent,
-        'notifs_failed'   => $cronNotifsFailed,
-        'output_summary'  => $cronSummaryText,
-    ]);
-    $minKeep = $cronDb->table('cron_runs')
-        ->where('script', 'tat_monitor')
-        ->orderBy('id', 'desc')
-        ->limit(1)
-        ->offset(99)
-        ->get()->getRowArray();
-    if (!empty($minKeep)) {
-        $cronDb->table('cron_runs')
-            ->where('script', 'tat_monitor')
-            ->where('id <', (int) $minKeep['id'])
-            ->delete();
-    }
+	$cronDb = \Config\Database::connect();
+	$cronDurationMs = (int) round((microtime(true) - $cronStartTime) * 1000);
+	$cronSummaryText = 'Checked ' . $cronTicketsChecked . ' tickets; sent ' . $cronNotifsSent . ' notifs';
+	$cronDb->table('cron_runs')->insert([
+		'script' => 'tat_monitor',
+		'started_at' => $cronStartedAt,
+		'finished_at' => date('Y-m-d H:i:s'),
+		'duration_ms' => $cronDurationMs,
+		'status' => $cronStatus,
+		'tickets_checked' => $cronTicketsChecked,
+		'notifs_sent' => $cronNotifsSent,
+		'notifs_failed' => $cronNotifsFailed,
+		'output_summary' => $cronSummaryText,
+	]);
+	$minKeep = $cronDb->table('cron_runs')
+		->where('script', 'tat_monitor')
+		->orderBy('id', 'desc')
+		->limit(1)
+		->offset(99)
+		->get()->getRowArray();
+	if (!empty($minKeep)) {
+		$cronDb->table('cron_runs')
+			->where('script', 'tat_monitor')
+			->where('id <', (int) $minKeep['id'])
+			->delete();
+	}
 } catch (\Throwable $e) {
-    error_log('pview alert >> tat_monitor cron_runs insert failed: ' . $e->getMessage());
+	error_log('pview alert >> tat_monitor cron_runs insert failed: ' . $e->getMessage());
 }
 
 flock($lockFp, LOCK_UN);

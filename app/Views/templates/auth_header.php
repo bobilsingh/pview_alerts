@@ -1,7 +1,7 @@
 <?php
 $authTitle = 'Sign in';
 if (isset($title) && $title !== '') {
-    $authTitle = esc($title);
+  $authTitle = esc($title);
 }
 $authBrand = esc(app_setting('app_name', 'pView Alert System'));
 
@@ -12,13 +12,13 @@ $authBrand = esc(app_setting('app_name', 'pView Alert System'));
 // fresh tab on the same browser still picks up the user's last choice.
 $theme = 'dark';
 if (isset($_COOKIE['theme'])) {
-    $theme = $_COOKIE['theme'];
+  $theme = $_COOKIE['theme'];
 }
 
 $appFavicon = app_setting('app_favicon', '');
 $faviconUrl = base_url('favicon.ico');
 if ($appFavicon !== '') {
-    $faviconUrl = base_url($appFavicon);
+  $faviconUrl = base_url($appFavicon);
 }
 
 $primaryColor = app_setting('primary_color', '');
@@ -37,34 +37,44 @@ $appLogo = app_setting('app_logo', '');
   <link rel="stylesheet" href="<?= base_url('assets/vendor/bootstrap-icons/bootstrap-icons.css'); ?>">
   <link rel="stylesheet" href="<?= base_url('assets/css/app.css'); ?>?v=<?= esc(app_setting('asset_version', '1')); ?>">
   <?php if ($primaryColor !== '' || $secondaryColor !== '') { ?>
-  <style>
-  :root {
-    <?php if ($primaryColor !== '') { ?>
-    --primary: <?= esc($primaryColor); ?>;
-    --primary-300: <?= esc($primaryColor); ?>;
-    <?php } ?>
-    <?php if ($secondaryColor !== '') { ?>
-    --primary-700: <?= esc($secondaryColor); ?>;
-    <?php } ?>
-    <?php
-    $gradStart = '#0792cd';
-    if ($primaryColor !== '') {
-        $gradStart = $primaryColor;
-    }
-    $gradEnd = '#0476a7';
-    if ($secondaryColor !== '') {
-        $gradEnd = $secondaryColor;
-    }
-    ?>
-    --grad-primary: linear-gradient(135deg, <?= esc($gradStart); ?> 0%, <?= esc($gradEnd); ?> 100%);
-  }
-  </style>
+    <style>
+      :root {
+        <?php if ($primaryColor !== '') { ?>
+          --primary:
+            <?= esc($primaryColor); ?>
+          ;
+          --primary-300:
+            <?= esc($primaryColor); ?>
+          ;
+        <?php } ?>
+        <?php if ($secondaryColor !== '') { ?>
+          --primary-700:
+            <?= esc($secondaryColor); ?>
+          ;
+        <?php } ?>
+        <?php
+        $gradStart = '#0792cd';
+        if ($primaryColor !== '') {
+          $gradStart = $primaryColor;
+        }
+        $gradEnd = '#0476a7';
+        if ($secondaryColor !== '') {
+          $gradEnd = $secondaryColor;
+        }
+        ?>
+        --grad-primary: linear-gradient(135deg,
+            <?= esc($gradStart); ?>
+            0%,
+            <?= esc($gradEnd); ?>
+            100%);
+      }
+    </style>
   <?php } ?>
   <script>
-  (function(){
-    var t = localStorage.getItem('noc-theme') || '<?= esc($theme); ?>';
-    document.documentElement.setAttribute('data-theme', t);
-  })();
+    (function () {
+      var t = localStorage.getItem('noc-theme') || '<?= esc($theme); ?>';
+      document.documentElement.setAttribute('data-theme', t);
+    })();
   </script>
   <script src="<?= base_url('assets/vendor/jquery/jquery-3.7.1.min.js'); ?>"></script>
   <script src="<?= base_url('assets/js/datatable.js'); ?>?v=<?= esc(app_setting('asset_version', '1')); ?>"></script>
@@ -76,7 +86,8 @@ $appLogo = app_setting('app_logo', '');
     <div class="auth-card">
       <div class="auth-brand">
         <?php if ($appLogo !== '') { ?>
-          <img src="<?= base_url($appLogo); ?>?v=<?= esc(app_setting('asset_version', '1')); ?>" alt="Logo" style="max-height: 42px; width: auto; object-fit: contain;">
+          <img src="<?= base_url($appLogo); ?>?v=<?= esc(app_setting('asset_version', '1')); ?>" alt="Logo"
+            style="max-height: 42px; width: auto; object-fit: contain;">
         <?php } else { ?>
           <div class="brand-mark"><i class="bi bi-broadcast-pin"></i></div>
         <?php } ?>

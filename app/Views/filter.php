@@ -7,48 +7,48 @@
 
 // Title and badge settings
 if (isset($fbTitle)) {
-    $fbTitle = (string) $fbTitle;
+  $fbTitle = (string) $fbTitle;
 } else {
-    $fbTitle = 'Filters';
+  $fbTitle = 'Filters';
 }
 if (isset($fbCountId)) {
-    $fbCountId = (string) $fbCountId;
+  $fbCountId = (string) $fbCountId;
 } else {
-    $fbCountId = '';
+  $fbCountId = '';
 }
 if (isset($fbCountStart)) {
-    $fbCountStart = (int) $fbCountStart;
+  $fbCountStart = (int) $fbCountStart;
 } else {
-    $fbCountStart = 0;
+  $fbCountStart = 0;
 }
 
 // Action button settings
 if (isset($fbApplyId)) {
-    $fbApplyId = (string) $fbApplyId;
+  $fbApplyId = (string) $fbApplyId;
 } else {
-    $fbApplyId = '';
+  $fbApplyId = '';
 }
 if (isset($fbSubmit)) {
-    $fbSubmit = (bool) $fbSubmit;
+  $fbSubmit = (bool) $fbSubmit;
 } else {
-    $fbSubmit = false;
+  $fbSubmit = false;
 }
 
 // Reset button settings
 if (isset($fbResetId)) {
-    $fbResetId = (string) $fbResetId;
+  $fbResetId = (string) $fbResetId;
 } else {
-    $fbResetId = '';
+  $fbResetId = '';
 }
 if (isset($fbResetHref)) {
-    $fbResetHref = (string) $fbResetHref;
+  $fbResetHref = (string) $fbResetHref;
 } else {
-    $fbResetHref = '';
+  $fbResetHref = '';
 }
 if (isset($fbResetClass)) {
-    $fbResetClass = (string) $fbResetClass;
+  $fbResetClass = (string) $fbResetClass;
 } else {
-    $fbResetClass = '';
+  $fbResetClass = '';
 }
 ?>
 <div class="card-header filter-bar-header">
@@ -56,9 +56,7 @@ if (isset($fbResetClass)) {
     <i class="bi bi-funnel"></i>
     <?= esc($fbTitle) ?>
     <?php if ($fbCountId !== '') { ?>
-      <span class="badge rounded-pill bg-primary ms-1 filter-bar-badge"
-        id="<?= esc($fbCountId) ?>"
-        <?php if ($fbCountStart === 0) { ?>hidden<?php } ?>>
+      <span class="badge rounded-pill bg-primary ms-1 filter-bar-badge" id="<?= esc($fbCountId) ?>" <?php if ($fbCountStart === 0) { ?>hidden<?php } ?>>
         <?= $fbCountStart ?>
       </span>
     <?php } ?>
@@ -76,8 +74,7 @@ if (isset($fbResetClass)) {
     <?php } ?>
 
     <?php if ($fbResetHref !== '') { ?>
-      <a href="<?= esc($fbResetHref) ?>"
-        class="btn btn-sm btn-light <?= esc($fbResetClass) ?>">
+      <a href="<?= esc($fbResetHref) ?>" class="btn btn-sm btn-light <?= esc($fbResetClass) ?>">
         <i class="bi bi-x-lg"></i> Reset
       </a>
     <?php } elseif ($fbResetId !== '') { ?>

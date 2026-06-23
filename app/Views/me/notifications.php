@@ -29,7 +29,8 @@ function notif_pref_checked($existing, $project_id, $severity)
 <div class="page-head">
   <div>
     <h2>Notification Preferences</h2>
-    <div class="subtitle">Pick which severity emails you want, per project. "All projects" is a catch-all — used when a specific project row is unset.</div>
+    <div class="subtitle">Pick which severity emails you want, per project. "All projects" is a catch-all — used when a
+      specific project row is unset.</div>
   </div>
   <a href="<?= site_url('dashboard'); ?>" class="btn btn-light"><i class="bi bi-arrow-left"></i> Back to Dashboard</a>
 </div>
@@ -60,11 +61,9 @@ function notif_pref_checked($existing, $project_id, $severity)
               <?php $checked = notif_pref_checked($existing, 0, $sevKey); ?>
               <td class="text-center">
                 <div class="form-check form-switch d-inline-block">
-                  <input type="checkbox" class="form-check-input"
-                    name="pref_0_<?= esc($sevKey); ?>"
-                    value="1" <?php if ($checked) {
-                                echo 'checked';
-                              } ?>>
+                  <input type="checkbox" class="form-check-input" name="pref_0_<?= esc($sevKey); ?>" value="1" <?php if ($checked) {
+                      echo 'checked';
+                    } ?>>
                 </div>
               </td>
             <?php } ?>
@@ -79,11 +78,10 @@ function notif_pref_checked($existing, $project_id, $severity)
                 <?php $checked = notif_pref_checked($existing, (int) $p['id'], $sevKey); ?>
                 <td class="text-center">
                   <div class="form-check form-switch d-inline-block">
-                    <input type="checkbox" class="form-check-input"
-                      name="pref_<?= (int) $p['id']; ?>_<?= esc($sevKey); ?>"
+                    <input type="checkbox" class="form-check-input" name="pref_<?= (int) $p['id']; ?>_<?= esc($sevKey); ?>"
                       value="1" <?php if ($checked) {
-                                  echo 'checked';
-                                } ?>>
+                        echo 'checked';
+                      } ?>>
                   </div>
                 </td>
               <?php } ?>

@@ -163,18 +163,18 @@ if (!function_exists('ticket_activity_icon')) {
     $fToVal = $filters['f_to'];
   }
   $exportParams = [
-    'mode'       => $ticketMode,
-    'status'     => $cur,
-    'q'          => $search,
+    'mode' => $ticketMode,
+    'status' => $cur,
+    'q' => $search,
     'project_id' => $projectSel,
-    'flow_id'    => $flowSel,
+    'flow_id' => $flowSel,
     'alert_type' => $typeSel,
-    'priority'   => $prioSel,
-    'f_from'     => $fFromVal,
-    'f_to'       => $fToVal,
+    'priority' => $prioSel,
+    'f_from' => $fFromVal,
+    'f_to' => $fToVal,
   ];
   $exportParams = array_filter($exportParams);
-  $exportUrl    = site_url('tickets/export') . '?' . http_build_query($exportParams);
+  $exportUrl = site_url('tickets/export') . '?' . http_build_query($exportParams);
   ?>
 
   <!-- Status pills row -->
@@ -219,9 +219,7 @@ if (!function_exists('ticket_activity_icon')) {
           $hiddenAttr = 'hidden';
         }
         ?>
-        <span class="badge rounded-pill bg-primary ms-1 filter-bar-badge"
-          id="ticketsFilterBadge"
-          <?= $hiddenAttr ?>>
+        <span class="badge rounded-pill bg-primary ms-1 filter-bar-badge" id="ticketsFilterBadge" <?= $hiddenAttr ?>>
           <?= $activeFilterCount ?>
         </span>
       </span>
@@ -252,9 +250,7 @@ if (!function_exists('ticket_activity_icon')) {
                     <i class="bi bi-funnel"></i> <?= esc($sf['name']); ?>
                   </a>
                   <button type="button" class="btn btn-sm btn-link text-danger saved-filter-delete"
-                    title="Remove saved filter"
-                    aria-label="Remove saved filter"
-                    data-saved-id="<?= (int) $sf['id']; ?>"
+                    title="Remove saved filter" aria-label="Remove saved filter" data-saved-id="<?= (int) $sf['id']; ?>"
                     data-saved-url="<?= site_url('tickets/saved/delete/' . (int) $sf['id']); ?>">
                     <i class="bi bi-trash" aria-hidden="true"></i>
                   </button>
@@ -273,20 +269,18 @@ if (!function_exists('ticket_activity_icon')) {
             }
             ?>
             <button type="button" class="dropdown-item" id="savedFilterAddBtn"
-              data-save-url="<?= site_url('tickets/saved/save'); ?>"
-              data-current-qs="<?= esc(http_build_query(array_filter([
-                                  'status'     => $cur,
-                                  'q'          => $search,
-                                  'project_id' => $projectSel,
-                                  'flow_id'    => $flowSel,
-                                  'alert_type' => $typeSel,
-                                  'priority'   => $prioSel,
-                                ])), 'attr'); ?>"
-              <?= $savedFilterBtnHidden ?>>
+              data-save-url="<?= site_url('tickets/saved/save'); ?>" data-current-qs="<?= esc(http_build_query(array_filter([
+                  'status' => $cur,
+                  'q' => $search,
+                  'project_id' => $projectSel,
+                  'flow_id' => $flowSel,
+                  'alert_type' => $typeSel,
+                  'priority' => $prioSel,
+                ])), 'attr'); ?>" <?= $savedFilterBtnHidden ?>>
               <i class="bi bi-plus-circle text-primary"></i> Save current filter…
             </button>
-            <span class="dropdown-item-text text-muted small" id="savedFilterAddHint"
-              <?= $savedFilterHintHidden ?>>Apply a filter to save it.</span>
+            <span class="dropdown-item-text text-muted small" id="savedFilterAddHint" <?= $savedFilterHintHidden ?>>Apply a
+              filter to save it.</span>
           </div>
         </div>
 
@@ -315,8 +309,8 @@ if (!function_exists('ticket_activity_icon')) {
 
         <div class="filter-item filter-item--search">
           <label class="filter-label">Search</label>
-          <input type="text" name="q" class="form-control form-control-sm"
-            placeholder="Alarm ID or title…" value="<?= esc($search); ?>">
+          <input type="text" name="q" class="form-control form-control-sm" placeholder="Alarm ID or title…"
+            value="<?= esc($search); ?>">
         </div>
 
         <?php if ($isAll && !empty($projects)) { ?>
@@ -329,7 +323,7 @@ if (!function_exists('ticket_activity_icon')) {
                 if ($projectSel === (int) $p['id']) {
                   $sel = 'selected';
                 }
-              ?>
+                ?>
                 <option value="<?= (int) $p['id']; ?>" <?= $sel; ?>>
                   <?= esc($p['name']); ?>
                 </option>
@@ -345,7 +339,7 @@ if (!function_exists('ticket_activity_icon')) {
                 if ($flowSel === (int) $f['id']) {
                   $sel = 'selected';
                 }
-              ?>
+                ?>
                 <option value="<?= (int) $f['id']; ?>" <?= $sel; ?>>
                   <?= esc($f['name']); ?>
                 </option>
@@ -363,7 +357,7 @@ if (!function_exists('ticket_activity_icon')) {
               if ($typeSel === $key) {
                 $sel = 'selected';
               }
-            ?>
+              ?>
               <option value="<?= $key; ?>" <?= $sel; ?>><?= $label; ?></option>
             <?php } ?>
           </select>
@@ -378,7 +372,7 @@ if (!function_exists('ticket_activity_icon')) {
               if ($prioSel === $key) {
                 $sel = 'selected';
               }
-            ?>
+              ?>
               <option value="<?= $key; ?>" <?= $sel; ?>><?= $label; ?></option>
             <?php } ?>
           </select>
@@ -390,42 +384,38 @@ if (!function_exists('ticket_activity_icon')) {
   </form>
 
   <?php /* DEMO: bulk toolbar hidden
-  <div id="bulkToolbar" class="bulk-toolbar" hidden>
-    <span class="bulk-summary">
-      <span id="bulkSelectedCount">0</span> selected
-    </span>
-    <div class="bulk-actions">
-      <button type="button" class="btn btn-sm btn-success" data-bulk-action="resolve" data-bulk-url="<?= site_url('tickets/bulk'); ?>">
-        <i class="bi bi-check-circle"></i> Resolve selected
-      </button>
-      <button type="button" class="btn btn-sm btn-dark" data-bulk-action="close" data-bulk-url="<?= site_url('tickets/bulk'); ?>">
-        <i class="bi bi-x-circle"></i> Close selected
-      </button>
-      <button type="button" class="btn btn-sm btn-light" id="bulkClearBtn">Clear</button>
-    </div>
-  </div>
-  */ ?>
+<div id="bulkToolbar" class="bulk-toolbar" hidden>
+<span class="bulk-summary">
+<span id="bulkSelectedCount">0</span> selected
+</span>
+<div class="bulk-actions">
+<button type="button" class="btn btn-sm btn-success" data-bulk-action="resolve" data-bulk-url="<?= site_url('tickets/bulk'); ?>">
+  <i class="bi bi-check-circle"></i> Resolve selected
+</button>
+<button type="button" class="btn btn-sm btn-dark" data-bulk-action="close" data-bulk-url="<?= site_url('tickets/bulk'); ?>">
+  <i class="bi bi-x-circle"></i> Close selected
+</button>
+<button type="button" class="btn btn-sm btn-light" id="bulkClearBtn">Clear</button>
+</div>
+</div>
+*/ ?>
 
   <div class="card">
     <div class="card-body p-0">
       <table id="ticketsTable" class="table align-middle mb-0" style="width:100%;"
-        data-table-url="<?= site_url('tickets/data_table'); ?>"
-        data-ticket-mode="<?= esc($ticketMode, 'attr'); ?>"
-        data-filter-status="<?= esc($cur, 'attr'); ?>"
-        data-filter-q="<?= esc($search, 'attr'); ?>"
-        data-filter-project-id="<?= (int) $projectSel; ?>"
-        data-filter-flow-id="<?= (int) $flowSel; ?>"
-        data-filter-alert-type="<?= esc($typeSel, 'attr'); ?>"
-        data-filter-priority="<?= esc($prioSel, 'attr'); ?>"
+        data-table-url="<?= site_url('tickets/data_table'); ?>" data-ticket-mode="<?= esc($ticketMode, 'attr'); ?>"
+        data-filter-status="<?= esc($cur, 'attr'); ?>" data-filter-q="<?= esc($search, 'attr'); ?>"
+        data-filter-project-id="<?= (int) $projectSel; ?>" data-filter-flow-id="<?= (int) $flowSel; ?>"
+        data-filter-alert-type="<?= esc($typeSel, 'attr'); ?>" data-filter-priority="<?= esc($prioSel, 'attr'); ?>"
         data-export-base="<?= esc(site_url('tickets/export'), 'attr'); ?>"
         data-export-mode="<?= esc($ticketMode, 'attr'); ?>">
         <thead>
           <tr>
             <?php /* DEMO: bulk select-all column hidden
-            <th class="ticket-bulk-cell text-center">
-              <input type="checkbox" class="form-check-input" id="bulkSelectAll" aria-label="Select all on this page">
-            </th>
-            */ ?>
+      <th class="ticket-bulk-cell text-center">
+        <input type="checkbox" class="form-check-input" id="bulkSelectAll" aria-label="Select all on this page">
+      </th>
+      */ ?>
             <th>Alarm ID</th>
             <th>Title</th>
             <th>Severity</th>
@@ -445,381 +435,375 @@ if (!function_exists('ticket_activity_icon')) {
 
 <?php } else if ($view === 'create') { ?>
 
-  <div class="page-head">
-    <div>
-      <h2>Raise Ticket</h2>
-      <div class="subtitle">Manually create a new alert in a project's flow.</div>
+    <div class="page-head">
+      <div>
+        <h2>Raise Ticket</h2>
+        <div class="subtitle">Manually create a new alert in a project's flow.</div>
+      </div>
+      <a href="<?= site_url('tickets'); ?>" class="btn btn-light"><i class="bi bi-arrow-left"></i> Back</a>
     </div>
-    <a href="<?= site_url('tickets'); ?>" class="btn btn-light"><i class="bi bi-arrow-left"></i> Back</a>
-  </div>
 
-  <div class="card">
-    <div class="card-body">
-      <form method="post" action="<?= site_url('tickets/save'); ?>" data-loading-form="1" data-dirty-guard="1" enctype="multipart/form-data">
-        <div class="row g-3">
-          <div class="col-md-6">
-            <label class="form-label">Project *</label>
-            <select name="project_id" id="projectSelect" class="form-select"
-              data-load-target="#flowSelect"
-              data-load-url="<?= site_url('tickets/flows_by_project'); ?>"
-              data-item-type="flow"
-              data-empty-text="Select project first"
-              data-default-text="Select flow"
-              data-loading-text="Loading..."
-              data-no-data-text="No flows found"
-              data-error-text="Failed to load flows"
-              autofocus
-              required>
-              <option value="">Select project</option>
+    <div class="card">
+      <div class="card-body">
+        <form method="post" action="<?= site_url('tickets/save'); ?>" data-loading-form="1" data-dirty-guard="1"
+          enctype="multipart/form-data">
+          <div class="row g-3">
+            <div class="col-md-6">
+              <label class="form-label">Project *</label>
+              <select name="project_id" id="projectSelect" class="form-select" data-load-target="#flowSelect"
+                data-load-url="<?= site_url('tickets/flows_by_project'); ?>" data-item-type="flow"
+                data-empty-text="Select project first" data-default-text="Select flow" data-loading-text="Loading..."
+                data-no-data-text="No flows found" data-error-text="Failed to load flows" autofocus required>
+                <option value="">Select project</option>
               <?php foreach ($projects as $p) { ?>
-                <option value="<?= (int) $p['id']; ?>"><?= esc($p['name']); ?></option>
+                  <option value="<?= (int) $p['id']; ?>"><?= esc($p['name']); ?></option>
               <?php } ?>
-            </select>
+              </select>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">Flow *</label>
+              <select name="flow_id" id="flowSelect" class="form-select" required disabled
+                data-load-target="#assigneeSelect" data-load-url="<?= site_url('tickets/assignable_users'); ?>"
+                data-item-type="user" data-empty-text="Select flow first" data-default-text="Unassigned"
+                data-loading-text="Loading..." data-no-data-text="No L1 users configured"
+                data-error-text="Failed to load users">
+                <option value="">Select project first</option>
+              </select>
+            </div>
+
+            <div class="col-12">
+              <label class="form-label">Title *</label>
+              <input type="text" name="title" class="form-control" required maxlength="300" data-char-counter="1"
+                placeholder="Short summary of the alert">
+            </div>
+
+            <div class="col-12">
+              <label class="form-label">Description</label>
+              <textarea name="description" class="form-control" rows="4" maxlength="10000" data-char-counter="1"
+                placeholder="What happened?"></textarea>
+            </div>
+
+            <div class="col-md-6">
+              <label class="form-label">Severity</label>
+              <select name="alert_type" class="form-select">
+                <option value="info">Info</option>
+                <option value="major">Major</option>
+                <option value="critical">Critical</option>
+              </select>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">Priority</label>
+              <select name="priority" class="form-select">
+                <option value="low">Low</option>
+                <option value="medium" selected>Medium</option>
+                <option value="high">High</option>
+                <option value="urgent">Urgent</option>
+              </select>
+            </div>
+
+            <div class="col-md-6">
+              <label class="form-label">Assign To</label>
+              <select name="assignee_user_id" id="assigneeSelect" class="form-select" disabled>
+                <option value="">Select flow first</option>
+              </select>
+              <small class="text-muted">Optional — leave blank to let an L1 operator pick it up.</small>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">Attachment <small class="text-muted">(optional)</small></label>
+              <input type="file" name="attachment" class="form-control"
+                accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.xlsx,.xls,.csv,.txt">
+              <small class="text-muted">Max <?= app_setting_int('upload_max_mb', 10); ?> MB &nbsp;·&nbsp; PDF, Word, Excel,
+                image, CSV, TXT.</small>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">Start Date</label>
+              <input type="date" name="actual_start_date" class="form-control" value="<?= date('Y-m-d'); ?>">
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">End Date</label>
+              <input type="date" name="actual_end_date" class="form-control" value="<?= date('Y-m-d'); ?>">
+            </div>
           </div>
-          <div class="col-md-6">
-            <label class="form-label">Flow *</label>
-            <select name="flow_id" id="flowSelect" class="form-select" required disabled
-              data-load-target="#assigneeSelect"
-              data-load-url="<?= site_url('tickets/assignable_users'); ?>"
-              data-item-type="user"
-              data-empty-text="Select flow first"
-              data-default-text="Unassigned"
-              data-loading-text="Loading..."
-              data-no-data-text="No L1 users configured"
-              data-error-text="Failed to load users">
-              <option value="">Select project first</option>
-            </select>
+          <div class="mt-3 d-flex justify-content-end gap-2">
+            <a href="<?= site_url('tickets'); ?>" class="btn btn-light">Cancel</a>
+            <button class="btn btn-primary"><i class="bi bi-bell-fill"></i> Raise Ticket</button>
           </div>
-
-          <div class="col-12">
-            <label class="form-label">Title *</label>
-            <input type="text" name="title" class="form-control" required maxlength="300"
-              data-char-counter="1"
-              placeholder="Short summary of the alert">
-          </div>
-
-          <div class="col-12">
-            <label class="form-label">Description</label>
-            <textarea name="description" class="form-control" rows="4" maxlength="10000"
-              data-char-counter="1"
-              placeholder="What happened?"></textarea>
-          </div>
-
-          <div class="col-md-6">
-            <label class="form-label">Severity</label>
-            <select name="alert_type" class="form-select">
-              <option value="info">Info</option>
-              <option value="major">Major</option>
-              <option value="critical">Critical</option>
-            </select>
-          </div>
-          <div class="col-md-6">
-            <label class="form-label">Priority</label>
-            <select name="priority" class="form-select">
-              <option value="low">Low</option>
-              <option value="medium" selected>Medium</option>
-              <option value="high">High</option>
-              <option value="urgent">Urgent</option>
-            </select>
-          </div>
-
-          <div class="col-md-6">
-            <label class="form-label">Assign To</label>
-            <select name="assignee_user_id" id="assigneeSelect" class="form-select" disabled>
-              <option value="">Select flow first</option>
-            </select>
-            <small class="text-muted">Optional — leave blank to let an L1 operator pick it up.</small>
-          </div>
-          <div class="col-md-6">
-            <label class="form-label">Attachment <small class="text-muted">(optional)</small></label>
-            <input type="file" name="attachment" class="form-control"
-              accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.xlsx,.xls,.csv,.txt">
-            <small class="text-muted">Max <?= app_setting_int('upload_max_mb', 10); ?> MB &nbsp;·&nbsp; PDF, Word, Excel, image, CSV, TXT.</small>
-          </div>
-          <div class="col-md-6">
-            <label class="form-label">Start Date</label>
-            <input type="date" name="actual_start_date" class="form-control" value="<?= date('Y-m-d'); ?>">
-          </div>
-          <div class="col-md-6">
-            <label class="form-label">End Date</label>
-            <input type="date" name="actual_end_date" class="form-control" value="<?= date('Y-m-d'); ?>">
-          </div>
-        </div>
-        <div class="mt-3 d-flex justify-content-end gap-2">
-          <a href="<?= site_url('tickets'); ?>" class="btn btn-light">Cancel</a>
-          <button class="btn btn-primary"><i class="bi bi-bell-fill"></i> Raise Ticket</button>
-        </div>
-      </form>
-    </div>
-  </div>
-
-<?php } else if ($view === 'detail') { ?>
-  <?php
-  $alarmId = view_value($ticket, 'alarm_id');
-  $ticketTitle = view_value($ticket, 'title');
-  $ticketDesc = (string) view_value($ticket, 'description', '');
-  $ticketStatus = view_value($ticket, 'status');
-  $ticketType = view_value($ticket, 'alert_type');
-  $ticketPrio = view_value($ticket, 'priority');
-  $currentLevel = (int) view_value($ticket, 'current_level', 0);
-  $currentStateId = (int) view_value($ticket, 'current_state_id', 0);
-  $isFinal = !empty($ticket['state_is_final']);
-  $isClosed = in_array($ticketStatus, ['closed', 'resolved'], true);
-
-  $descToShow = $ticketDesc;
-  if ($descToShow === '') {
-    $descToShow = 'Click to add description...';
-  }
-
-  $projectName = null;
-  $flowName = null;
-  if (isset($ticket['project_name'])) {
-    $projectName = $ticket['project_name'];
-  }
-  if (isset($ticket['flow_name'])) {
-    $flowName = $ticket['flow_name'];
-  }
-
-  if (!isset($tatExpiresAt)) {
-    $tatExpiresAt = '';
-  }
-  if (!isset($tatMinutes)) {
-    $tatMinutes = 0;
-  }
-
-  $priorityOptions = ['low', 'medium', 'high', 'urgent'];
-
-  // Lock the inline editors when the lifecycle has ended — the server
-  // also rejects edits but disabling the UI prevents the misleading
-  // "edit succeeded then was rolled back" feeling.
-  $isTerminal = false;
-  if ($ticketStatus === 'resolved' || $ticketStatus === 'closed') {
-    $isTerminal = true;
-  }
-  if (isset($attachCount)) {
-    $attachCount = (int) $attachCount;
-  } else {
-    $attachCount = 0;
-  }
-  if (isset($attachMax)) {
-    $attachMax = (int) $attachMax;
-  } else {
-    $attachMax = 5;
-  }
-  $attachFull  = $attachCount >= $attachMax;
-  ?>
-
-  <div class="page-head">
-    <div>
-      <h2 class="d-flex align-items-center gap-2">
-        <span>Ticket</span>
-        <code class="alarm-id-big" data-copy="<?= esc($alarmId); ?>"
-          style="cursor:pointer;" title="Click to copy"><?= esc($alarmId); ?></code>
-      </h2>
-      <div class="subtitle">
-        <?= esc(or_default($projectName, '-')); ?> &nbsp;-&nbsp;
-        <?= esc(or_default($flowName, '-')); ?> &nbsp;-&nbsp;
-        raised <?= esc($ticket['created_at']); ?>
+        </form>
       </div>
     </div>
-    <div class="d-flex gap-2" id="ticketHeaderBadges">
+
+<?php } else if ($view === 'detail') { ?>
+    <?php
+    $alarmId = view_value($ticket, 'alarm_id');
+    $ticketTitle = view_value($ticket, 'title');
+    $ticketDesc = (string) view_value($ticket, 'description', '');
+    $ticketStatus = view_value($ticket, 'status');
+    $ticketType = view_value($ticket, 'alert_type');
+    $ticketPrio = view_value($ticket, 'priority');
+    $currentLevel = (int) view_value($ticket, 'current_level', 0);
+    $currentStateId = (int) view_value($ticket, 'current_state_id', 0);
+    $isFinal = !empty($ticket['state_is_final']);
+    $isClosed = in_array($ticketStatus, ['closed', 'resolved'], true);
+
+    $descToShow = $ticketDesc;
+    if ($descToShow === '') {
+      $descToShow = 'Click to add description...';
+    }
+
+    $projectName = null;
+    $flowName = null;
+    if (isset($ticket['project_name'])) {
+      $projectName = $ticket['project_name'];
+    }
+    if (isset($ticket['flow_name'])) {
+      $flowName = $ticket['flow_name'];
+    }
+
+    if (!isset($tatExpiresAt)) {
+      $tatExpiresAt = '';
+    }
+    if (!isset($tatMinutes)) {
+      $tatMinutes = 0;
+    }
+
+    $priorityOptions = ['low', 'medium', 'high', 'urgent'];
+
+    // Lock the inline editors when the lifecycle has ended — the server
+    // also rejects edits but disabling the UI prevents the misleading
+    // "edit succeeded then was rolled back" feeling.
+    $isTerminal = false;
+    if ($ticketStatus === 'resolved' || $ticketStatus === 'closed') {
+      $isTerminal = true;
+    }
+    if (isset($attachCount)) {
+      $attachCount = (int) $attachCount;
+    } else {
+      $attachCount = 0;
+    }
+    if (isset($attachMax)) {
+      $attachMax = (int) $attachMax;
+    } else {
+      $attachMax = 5;
+    }
+    $attachFull = $attachCount >= $attachMax;
+    ?>
+
+      <div class="page-head">
+        <div>
+          <h2 class="d-flex align-items-center gap-2">
+            <span>Ticket</span>
+            <code class="alarm-id-big" data-copy="<?= esc($alarmId); ?>" style="cursor:pointer;"
+              title="Click to copy"><?= esc($alarmId); ?></code>
+          </h2>
+          <div class="subtitle">
+        <?= esc(or_default($projectName, '-')); ?> &nbsp;-&nbsp;
+        <?= esc(or_default($flowName, '-')); ?> &nbsp;-&nbsp;
+            raised <?= esc($ticket['created_at']); ?>
+          </div>
+        </div>
+        <div class="d-flex gap-2" id="ticketHeaderBadges">
       <?= alert_badge($ticketType); ?>
       <?= status_badge($ticketStatus); ?>
-    </div>
-  </div>
+        </div>
+      </div>
 
-  <div class="row g-3">
+      <div class="row g-3">
 
-    <div class="col-lg-8">
+        <div class="col-lg-8">
 
-      <div class="card mb-3">
-        <div class="card-body">
-          <?php
-          // Terminal tickets render the same fields but without the
-          // editable-inline class, so the JS edit-on-click handler skips them.
-          $titleCls = 'ticket-title editable-inline mb-2';
-          $descCls  = 'ticket-desc editable-inline mb-4';
-          if ($isTerminal) {
-            $titleCls = 'ticket-title mb-2';
-            $descCls  = 'ticket-desc mb-4';
-          }
-          ?>
-          <h3 class="<?= $titleCls; ?>"
-            data-field="title"
-            data-url="<?= site_url('tickets/action/' . $alarmId); ?>"><?= esc($ticketTitle); ?></h3>
-          <div class="<?= $descCls; ?>"
-            data-field="description"
-            data-url="<?= site_url('tickets/action/' . $alarmId); ?>"><?= esc($descToShow); ?></div>
+          <div class="card mb-3">
+            <div class="card-body">
+            <?php
+            // Terminal tickets render the same fields but without the
+            // editable-inline class, so the JS edit-on-click handler skips them.
+            $titleCls = 'ticket-title editable-inline mb-2';
+            $descCls = 'ticket-desc editable-inline mb-4';
+            if ($isTerminal) {
+              $titleCls = 'ticket-title mb-2';
+              $descCls = 'ticket-desc mb-4';
+            }
+            ?>
+              <h3 class="<?= $titleCls; ?>" data-field="title" data-url="<?= site_url('tickets/action/' . $alarmId); ?>">
+            <?= esc($ticketTitle); ?>
+              </h3>
+              <div class="<?= $descCls; ?>" data-field="description"
+                data-url="<?= site_url('tickets/action/' . $alarmId); ?>"><?= esc($descToShow); ?></div>
 
-          <?php
-          helper('app');
-          $visAllTransitions = [];
-          if (isset($allTransitions)) {
-            $visAllTransitions = $allTransitions;
-          }
-          ?>
+            <?php
+            helper('app');
+            $visAllTransitions = [];
+            if (isset($allTransitions)) {
+              $visAllTransitions = $allTransitions;
+            }
+            ?>
           <?= flow_widget_html(
             flow_vis_ticket_data($allStates, (int) $currentStateId, $visAllTransitions),
             ['subtitle' => 'Ticket progress through this flow', 'variant' => 'ticket', 'legend' => false]
           ); ?>
 
-          <div class="flow-graph-legend">
-            <span class="lg passed">Completed</span>
-            <span class="lg current">Live</span>
-            <span class="lg pending">Pending</span>
-          </div>
+              <div class="flow-graph-legend">
+                <span class="lg passed">Completed</span>
+                <span class="lg current">Live</span>
+                <span class="lg pending">Pending</span>
+              </div>
 
-          <div class="row g-3 mt-3">
-            <div class="col-md-6">
-              <div class="tat-block">
-                <div>
-                  <div class="tat-label">Escalation Level</div>
-                  <div class="level-indicator mt-2">
+              <div class="row g-3 mt-3">
+                <div class="col-md-6">
+                  <div class="tat-block">
+                    <div>
+                      <div class="tat-label">Escalation Level</div>
+                      <div class="level-indicator mt-2">
                     <?php for ($lvl = 1; $lvl <= 4; $lvl++) { ?>
-                      <?php
-                      $levelClass = '';
-                      if ($lvl === $currentLevel) {
-                        $levelClass = 'is-active';
-                      } else if ($lvl < $currentLevel) {
-                        $levelClass = 'is-passed';
-                      }
-                      ?>
-                      <span class="lvl <?= $levelClass; ?>">L<?= $lvl; ?></span>
+                        <?php
+                        $levelClass = '';
+                        if ($lvl === $currentLevel) {
+                          $levelClass = 'is-active';
+                        } else if ($lvl < $currentLevel) {
+                          $levelClass = 'is-passed';
+                        }
+                        ?>
+                          <span class="lvl <?= $levelClass; ?>">L<?= $lvl; ?></span>
                     <?php } ?>
+                      </div>
+                    </div>
                   </div>
                 </div>
-              </div>
-            </div>
-            <div class="col-md-6">
-              <div class="tat-block">
-                <div>
-                  <?php
-                  // Single rule for the label:
-                  //   - resolved / closed: lifecycle over, no countdown
-                  //   - final state:        same, no countdown
-                  //   - otherwise:          show "TAT remaining @ Lx - Nm"
-                  $tatLabel = 'TAT remaining @ L' . $currentLevel . ' - ' . $tatMinutes . 'm';
-                  if ($ticketStatus === 'resolved') {
-                    $tatLabel = 'TAT stopped - ticket resolved';
-                  } else if ($ticketStatus === 'closed') {
-                    $tatLabel = 'TAT stopped - ticket closed';
-                  } else if (!empty($state['is_final'])) {
-                    $tatLabel = 'TAT stopped - final state';
-                  }
-                  ?>
-                  <div class="tat-label"><?= esc($tatLabel); ?></div>
-                  <div class="tat-big mt-2"><span class="tat-countdown" data-tat-expires="<?= esc($tatExpiresAt); ?>" data-tat-total-ms="<?= (int) (tat_total_minutes($ticket, $state) * 60000); ?>"></span></div>
+                <div class="col-md-6">
+                  <div class="tat-block">
+                    <div>
+                    <?php
+                    // Single rule for the label:
+                    //   - resolved / closed: lifecycle over, no countdown
+                    //   - final state:        same, no countdown
+                    //   - otherwise:          show "TAT remaining @ Lx - Nm"
+                    $tatLabel = 'TAT remaining @ L' . $currentLevel . ' - ' . $tatMinutes . 'm';
+                    if ($ticketStatus === 'resolved') {
+                      $tatLabel = 'TAT stopped - ticket resolved';
+                    } else if ($ticketStatus === 'closed') {
+                      $tatLabel = 'TAT stopped - ticket closed';
+                    } else if (!empty($state['is_final'])) {
+                      $tatLabel = 'TAT stopped - final state';
+                    }
+                    ?>
+                      <div class="tat-label"><?= esc($tatLabel); ?></div>
+                      <div class="tat-big mt-2"><span class="tat-countdown" data-tat-expires="<?= esc($tatExpiresAt); ?>"
+                          data-tat-total-ms="<?= (int) (tat_total_minutes($ticket, $state) * 60000); ?>"></span></div>
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
           </div>
-        </div>
-      </div>
 
-      <div class="card mb-3" id="ticketActionCard">
-        <div class="card-header">
-          <strong><i class="bi bi-lightning-charge text-primary"></i> Take Action</strong>
-        </div>
-        <div class="card-body">
+          <div class="card mb-3" id="ticketActionCard">
+            <div class="card-header">
+              <strong><i class="bi bi-lightning-charge text-primary"></i> Take Action</strong>
+            </div>
+            <div class="card-body">
           <?php if ($isTerminal) { ?>
-            <div class="alert alert-secondary py-2 mb-3">
-              <i class="bi bi-lock"></i>
-              This ticket is <strong><?= esc(strtoupper($ticketStatus)); ?></strong> — comments, assignment, state moves and attachments are read-only.
-            </div>
+                <div class="alert alert-secondary py-2 mb-3">
+                  <i class="bi bi-lock"></i>
+                  This ticket is <strong><?= esc(strtoupper($ticketStatus)); ?></strong> — comments, assignment, state moves and
+                  attachments are read-only.
+                </div>
           <?php } ?>
-          <ul class="nav nav-tabs">
-            <li class="nav-item"><a class="nav-link active" data-bs-toggle="tab" href="#tab-comment"><i class="bi bi-chat-left-text"></i> Comment</a></li>
-            <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#tab-assign"><i class="bi bi-person-check"></i> Assign</a></li>
-            <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#tab-state"><i class="bi bi-arrow-right-circle"></i> Move State</a></li>
-            <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#tab-attach"><i class="bi bi-paperclip"></i> Attach</a></li>
-          </ul>
-          <div class="tab-content pt-3">
+              <ul class="nav nav-tabs">
+                <li class="nav-item"><a class="nav-link active" data-bs-toggle="tab" href="#tab-comment"><i
+                      class="bi bi-chat-left-text"></i> Comment</a></li>
+                <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#tab-assign"><i
+                      class="bi bi-person-check"></i> Assign</a></li>
+                <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#tab-state"><i
+                      class="bi bi-arrow-right-circle"></i> Move State</a></li>
+                <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#tab-attach"><i
+                      class="bi bi-paperclip"></i> Attach</a></li>
+              </ul>
+              <div class="tab-content pt-3">
 
-            <div class="tab-pane fade show active" id="tab-comment">
-              <form id="commentForm" data-url="<?= site_url('tickets/action/' . $alarmId); ?>">
-                <input type="hidden" name="type" value="comment">
-                <textarea name="comment" rows="3" class="form-control"
-                  maxlength="5000"
-                  data-mentions="1"
-                  data-mention-source="<?= site_url('users/active_json'); ?>"
-                  placeholder="Add a comment for the activity log... (type @ to mention a teammate)" required
-                  <?php if ($isTerminal) {
-                    echo 'disabled';
-                  } ?>></textarea>
-                <div class="d-flex justify-content-end mt-2">
-                  <button class="btn btn-primary" <?php if ($isTerminal) {
-                                                    echo 'disabled';
-                                                  } ?>><i class="bi bi-send"></i> Add comment</button>
+                <div class="tab-pane fade show active" id="tab-comment">
+                  <form id="commentForm" data-url="<?= site_url('tickets/action/' . $alarmId); ?>">
+                    <input type="hidden" name="type" value="comment">
+                    <textarea name="comment" rows="3" class="form-control" maxlength="5000" data-mentions="1"
+                      data-mention-source="<?= site_url('users/active_json'); ?>"
+                      placeholder="Add a comment for the activity log... (type @ to mention a teammate)" required <?php if ($isTerminal) {
+                        echo 'disabled';
+                      } ?>></textarea>
+                    <div class="d-flex justify-content-end mt-2">
+                      <button class="btn btn-primary" <?php if ($isTerminal) {
+                        echo 'disabled';
+                      } ?>><i
+                          class="bi bi-send"></i> Add comment</button>
+                    </div>
+                  </form>
                 </div>
-              </form>
-            </div>
 
-            <div class="tab-pane fade" id="tab-assign">
-              <form id="assignForm" data-url="<?= site_url('tickets/assign/' . $alarmId); ?>">
-                <div class="d-flex align-items-end gap-2 flex-wrap">
-                  <div class="flex-grow-1" style="min-width: 250px;">
-                    <label class="form-label">Assignee <small class="text-muted">(all operators in current state)</small></label>
-                    <select name="user_id" class="form-select" required <?php if ($isTerminal) {
-                                                                          echo 'disabled';
-                                                                        } ?>>
-                      <option value="">Select user</option>
+                <div class="tab-pane fade" id="tab-assign">
+                  <form id="assignForm" data-url="<?= site_url('tickets/assign/' . $alarmId); ?>">
+                    <div class="d-flex align-items-end gap-2 flex-wrap">
+                      <div class="flex-grow-1" style="min-width: 250px;">
+                        <label class="form-label">Assignee <small class="text-muted">(all operators in current
+                            state)</small></label>
+                        <select name="user_id" class="form-select" required <?php if ($isTerminal) {
+                          echo 'disabled';
+                        } ?>>
+                          <option value="">Select user</option>
                       <?php foreach ($assignableUsers as $u) { ?>
-                        <option value="<?= esc((string) $u['user_id']); ?>"><?= esc($u['name']); ?> - <?= esc($u['email']); ?></option>
+                            <option value="<?= esc((string) $u['user_id']); ?>"><?= esc($u['name']); ?> -
+                          <?= esc($u['email']); ?>
+                            </option>
                       <?php } ?>
-                    </select>
-                  </div>
-                  <div>
-                    <button class="btn btn-primary" <?php if ($isTerminal) {
-                                                      echo 'disabled';
-                                                    } ?>><i class="bi bi-person-check"></i> Assign</button>
-                  </div>
-                </div>
-              </form>
-            </div>
-
-            <div class="tab-pane fade" id="tab-state">
-              <?php
-              $hasFwd = !empty($nextStates) && !$isTerminal && !$isFinal;
-              $hasBwd = !empty($previousStates) && !$isTerminal;
-              ?>
-
-              <!-- Move Forward: next state in sort_order sequence -->
-              <div class="mb-3">
-                <div class="d-flex align-items-center gap-2 mb-2">
-                  <i class="bi bi-arrow-right-circle text-success"></i>
-                  <span class="fw-semibold small">Move Forward</span>
-                </div>
-                <?php if ($hasFwd) { ?>
-                  <?php if (count($nextStates) === 1) { ?>
-                    <button id="moveStateBtn"
-                      data-url="<?= site_url('tickets/move_state/' . $alarmId); ?>"
-                      data-transition-type="forward"
-                      data-target-id="<?= (int) $nextStates[0]['id']; ?>"
-                      class="btn btn-success">
-                      <i class="bi bi-arrow-right-circle"></i>
-                      Move to <?= esc($nextStates[0]['name']); ?>
-                    </button>
-                  <?php } else { ?>
-                    <form class="move-state-typed-form d-flex align-items-end gap-2 flex-wrap"
-                      data-url="<?= site_url('tickets/move_state/' . $alarmId); ?>">
-                      <input type="hidden" name="transition_type" value="forward">
-                      <div class="flex-grow-1" style="min-width:220px;">
-                        <select name="target_state_id" class="form-select" required>
-                          <option value="">Select next state…</option>
-                          <?php foreach ($nextStates as $ns) { ?>
-                            <option value="<?= (int) $ns['id']; ?>"><?= esc($ns['name']); ?></option>
-                          <?php } ?>
                         </select>
                       </div>
                       <div>
-                        <button type="submit" class="btn btn-success">
-                          <i class="bi bi-arrow-right-circle"></i> Move Forward
-                        </button>
+                        <button class="btn btn-primary" <?php if ($isTerminal) {
+                          echo 'disabled';
+                        } ?>><i
+                            class="bi bi-person-check"></i> Assign</button>
                       </div>
-                    </form>
+                    </div>
+                  </form>
+                </div>
+
+                <div class="tab-pane fade" id="tab-state">
+                <?php
+                $hasFwd = !empty($nextStates) && !$isTerminal && !$isFinal;
+                $hasBwd = !empty($previousStates) && !$isTerminal;
+                ?>
+
+                  <!-- Move Forward: next state in sort_order sequence -->
+                  <div class="mb-3">
+                    <div class="d-flex align-items-center gap-2 mb-2">
+                      <i class="bi bi-arrow-right-circle text-success"></i>
+                      <span class="fw-semibold small">Move Forward</span>
+                    </div>
+                <?php if ($hasFwd) { ?>
+                  <?php if (count($nextStates) === 1) { ?>
+                        <button id="moveStateBtn" data-url="<?= site_url('tickets/move_state/' . $alarmId); ?>"
+                          data-transition-type="forward" data-target-id="<?= (int) $nextStates[0]['id']; ?>"
+                          class="btn btn-success">
+                          <i class="bi bi-arrow-right-circle"></i>
+                          Move to <?= esc($nextStates[0]['name']); ?>
+                        </button>
+                  <?php } else { ?>
+                        <form class="move-state-typed-form d-flex align-items-end gap-2 flex-wrap"
+                          data-url="<?= site_url('tickets/move_state/' . $alarmId); ?>">
+                          <input type="hidden" name="transition_type" value="forward">
+                          <div class="flex-grow-1" style="min-width:220px;">
+                            <select name="target_state_id" class="form-select" required>
+                              <option value="">Select next state…</option>
+                          <?php foreach ($nextStates as $ns) { ?>
+                                <option value="<?= (int) $ns['id']; ?>"><?= esc($ns['name']); ?></option>
+                          <?php } ?>
+                            </select>
+                          </div>
+                          <div>
+                            <button type="submit" class="btn btn-success">
+                              <i class="bi bi-arrow-right-circle"></i> Move Forward
+                            </button>
+                          </div>
+                        </form>
                   <?php } ?>
                 <?php } else { ?>
-                  <span class="text-muted small">
+                      <span class="text-muted small">
                     <?php if ($isTerminal) {
                       echo 'Ticket is ' . esc($ticketStatus) . '.';
                     } elseif ($isFinal) {
@@ -828,63 +812,59 @@ if (!function_exists('ticket_activity_icon')) {
                       echo 'No further states in this workflow.';
                     }
                     ?>
-                  </span>
+                      </span>
                 <?php } ?>
-              </div>
+                  </div>
 
               <?php if ($hasBwd) { ?>
-                <!-- Send Back: any earlier state, decided at runtime by the assignee -->
-                <div class="mb-3">
-                  <div class="d-flex align-items-center gap-2 mb-2">
-                    <i class="bi bi-arrow-left-circle text-danger"></i>
-                    <span class="fw-semibold small">Send Back</span>
-                    <small class="text-muted">Select an earlier state and provide a reason.</small>
-                  </div>
-                  <form class="move-state-typed-form d-flex align-items-end gap-2 flex-wrap"
-                    data-url="<?= site_url('tickets/move_state/' . $alarmId); ?>">
-                    <input type="hidden" name="transition_type" value="backward">
-                    <div style="min-width:200px;">
-                      <select name="target_state_id" class="form-select" required>
-                        <option value="">Select state to send back to…</option>
+                    <!-- Send Back: any earlier state, decided at runtime by the assignee -->
+                    <div class="mb-3">
+                      <div class="d-flex align-items-center gap-2 mb-2">
+                        <i class="bi bi-arrow-left-circle text-danger"></i>
+                        <span class="fw-semibold small">Send Back</span>
+                        <small class="text-muted">Select an earlier state and provide a reason.</small>
+                      </div>
+                      <form class="move-state-typed-form d-flex align-items-end gap-2 flex-wrap"
+                        data-url="<?= site_url('tickets/move_state/' . $alarmId); ?>">
+                        <input type="hidden" name="transition_type" value="backward">
+                        <div style="min-width:200px;">
+                          <select name="target_state_id" class="form-select" required>
+                            <option value="">Select state to send back to…</option>
                         <?php foreach ($previousStates as $ps) { ?>
-                          <option value="<?= (int) $ps['id']; ?>"><?= esc($ps['name']); ?></option>
+                              <option value="<?= (int) $ps['id']; ?>"><?= esc($ps['name']); ?></option>
                         <?php } ?>
-                      </select>
+                          </select>
+                        </div>
+                        <div class="flex-grow-1" style="min-width:200px;">
+                          <input type="text" name="reason" class="form-control" placeholder="Reason for sending back (required)"
+                            required>
+                        </div>
+                        <div>
+                          <button type="submit" class="btn btn-outline-danger">
+                            <i class="bi bi-arrow-left-circle"></i> Send Back
+                          </button>
+                        </div>
+                      </form>
                     </div>
-                    <div class="flex-grow-1" style="min-width:200px;">
-                      <input type="text" name="reason" class="form-control"
-                        placeholder="Reason for sending back (required)" required>
-                    </div>
-                    <div>
-                      <button type="submit" class="btn btn-outline-danger">
-                        <i class="bi bi-arrow-left-circle"></i> Send Back
-                      </button>
-                    </div>
-                  </form>
-                </div>
               <?php } ?>
 
-              <hr class="my-3">
+                  <hr class="my-3">
 
-              <!-- Resolve / Close / Reopen -->
-              <div class="d-flex gap-2 flex-wrap">
-                <button id="resolveBtn"
-                  data-url="<?= site_url('tickets/resolve/' . $alarmId); ?>"
-                  class="btn btn-outline-success"
-                  <?php if ($isTerminal) {
-                    echo 'disabled';
-                  } ?>>
-                  <i class="bi bi-check2-circle"></i> Resolve
-                </button>
-                <button id="closeBtn"
-                  data-url="<?= site_url('tickets/close/' . $alarmId); ?>"
-                  class="btn btn-outline-secondary"
-                  <?php if ($ticketStatus === 'closed') {
-                    echo 'disabled';
-                  } ?>>
-                  <i class="bi bi-x-circle"></i> Close
-                </button>
-                <!--
+                  <!-- Resolve / Close / Reopen -->
+                  <div class="d-flex gap-2 flex-wrap">
+                    <button id="resolveBtn" data-url="<?= site_url('tickets/resolve/' . $alarmId); ?>"
+                      class="btn btn-outline-success" <?php if ($isTerminal) {
+                        echo 'disabled';
+                      } ?>>
+                      <i class="bi bi-check2-circle"></i> Resolve
+                    </button>
+                    <button id="closeBtn" data-url="<?= site_url('tickets/close/' . $alarmId); ?>"
+                      class="btn btn-outline-secondary" <?php if ($ticketStatus === 'closed') {
+                        echo 'disabled';
+                      } ?>>
+                      <i class="bi bi-x-circle"></i> Close
+                    </button>
+                    <!--
                 <?php if ($ticketStatus === 'resolved') { ?>
                   <button id="reopenBtn"
                     data-url="<?= site_url('tickets/reopen/' . $alarmId); ?>"
@@ -893,308 +873,306 @@ if (!function_exists('ticket_activity_icon')) {
                   </button>
                 <?php } ?>
                 -->
+                  </div>
+                </div>
+
+                <div class="tab-pane fade" id="tab-attach">
+              <?php if ($attachFull): ?>
+                    <div class="alert alert-warning mb-0">
+                      <i class="bi bi-paperclip"></i>
+                      Attachment limit reached (<?= $attachMax ?> of <?= $attachMax ?> files used).
+                    </div>
+              <?php else: ?>
+                    <form id="attachForm" data-url="<?= site_url('tickets/attach/' . $alarmId); ?>"
+                      enctype="multipart/form-data">
+                      <label class="form-label">
+                        Attach evidence
+                        <small class="text-muted">(<?= $attachCount ?>/<?= $attachMax ?>)</small>
+                      </label>
+                      <input type="file" name="file" class="form-control"
+                        accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.xlsx,.xls,.csv,.txt" required <?php if ($isTerminal) {
+                          echo 'disabled';
+                        } ?>>
+                      <small class="text-muted">Max 10 MB.</small>
+                      <div class="d-flex justify-content-end mt-2">
+                        <button class="btn btn-primary" <?php if ($isTerminal) {
+                          echo 'disabled';
+                        } ?>>
+                          <i class="bi bi-cloud-upload"></i> Upload
+                        </button>
+                      </div>
+                    </form>
+              <?php endif; ?>
+                </div>
               </div>
             </div>
+          </div>
 
-            <div class="tab-pane fade" id="tab-attach">
-              <?php if ($attachFull): ?>
-                <div class="alert alert-warning mb-0">
-                  <i class="bi bi-paperclip"></i>
-                  Attachment limit reached (<?= $attachMax ?> of <?= $attachMax ?> files used).
-                </div>
-              <?php else: ?>
-                <form id="attachForm" data-url="<?= site_url('tickets/attach/' . $alarmId); ?>"
-                  enctype="multipart/form-data">
-                  <label class="form-label">
-                    Attach evidence
-                    <small class="text-muted">(<?= $attachCount ?>/<?= $attachMax ?>)</small>
-                  </label>
-                  <input type="file" name="file" class="form-control"
-                    accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.xlsx,.xls,.csv,.txt" required
-                    <?php if ($isTerminal) {
-                      echo 'disabled';
-                    } ?>>
-                  <small class="text-muted">Max 10 MB.</small>
-                  <div class="d-flex justify-content-end mt-2">
-                    <button class="btn btn-primary" <?php if ($isTerminal) {
-                                                      echo 'disabled';
-                                                    } ?>>
-                      <i class="bi bi-cloud-upload"></i> Upload
-                    </button>
-                  </div>
-                </form>
-              <?php endif; ?>
+          <div class="card">
+            <div class="card-header">
+              <strong><i class="bi bi-clock-history text-primary"></i> Activity Timeline</strong>
+            </div>
+            <div class="card-body">
+              <ul class="activity-feed" id="timelineList">
+            <?php foreach ($timeline as $a) { ?>
+                <?php
+                $performer = 'System';
+                if (!empty($a['performer_name'])) {
+                  $performer = $a['performer_name'];
+                } else if (!empty($a['performed_by_system'])) {
+                  $performer = $a['performed_by_system'];
+                }
+                $cmt = (string) view_value($a, 'comment', '');
+                $actionType = view_value($a, 'action_type', '');
+                $fromStateName = null;
+                $toStateName = null;
+                $performedBySystem = null;
+                if (isset($a['from_state_name'])) {
+                  $fromStateName = $a['from_state_name'];
+                }
+                if (isset($a['to_state_name'])) {
+                  $toStateName = $a['to_state_name'];
+                }
+                if (isset($a['performed_by_system'])) {
+                  $performedBySystem = $a['performed_by_system'];
+                }
+                ?>
+                  <li class="activity-item">
+                    <div class="activity-icon"><?= ticket_activity_icon($actionType); ?></div>
+                    <div class="activity-body">
+                      <div class="activity-meta">
+                        <strong><?= esc($performer); ?></strong>
+                        <span class="text-muted"><?= esc($a['created_at']); ?></span>
+                      </div>
+                      <div class="activity-text">
+                      <?php
+                      switch ($actionType) {
+                        case 'created':
+                          echo 'Created the ticket';
+                          if ($cmt !== '') {
+                            echo '. <em>' . esc($cmt) . '</em>';
+                          }
+                          break;
+                        case 'commented':
+                          // highlight_mentions() escapes the body first, then
+                          // wraps any @user_id tokens in .mention-chip so
+                          // mentions stand out from regular comment text.
+                          echo highlight_mentions($cmt);
+                          break;
+                        case 'state_changed':
+                          $transDir = 'forward';
+                          if (isset($a['transition_type'])) {
+                            if ($a['transition_type'] === 'backward') {
+                              $transDir = 'backward';
+                            }
+                          }
+                          if ($transDir === 'backward') {
+                            echo '<span class="badge text-bg-danger me-1"><i class="bi bi-arrow-left-circle"></i> Send back</span>';
+                          }
+                          echo 'Moved state from <strong>' . esc(or_default($fromStateName, '?')) . '</strong>';
+                          echo ' to <strong>' . esc(or_default($toStateName, '?')) . '</strong>';
+                          // Show user-supplied reason (stored after ": " in the comment).
+                          $aCommentStr = '';
+                          if (isset($a['comment'])) {
+                            $aCommentStr = $a['comment'];
+                          }
+                          $stCommentStr = trim((string) $aCommentStr);
+                          $stReasonPos = strpos($stCommentStr, ': ');
+                          $stReason = '';
+                          if ($stReasonPos !== false) {
+                            $stReason = trim(substr($stCommentStr, $stReasonPos + 2));
+                          }
+                          if ($stReason !== '') {
+                            echo '<div class="small text-muted mt-1"><i class="bi bi-chat-quote me-1"></i>' . esc($stReason) . '</div>';
+                          }
+                          break;
+                        case 'level_escalated':
+                          echo 'Escalated to <strong>L' . (int) $a['to_level'] . '</strong>';
+                          if ($cmt !== '') {
+                            echo '. <em>' . esc($cmt) . '</em>';
+                          }
+                          break;
+                        case 'assigned':
+                          if ($cmt !== '') {
+                            echo esc($cmt);
+                          } else {
+                            echo 'Assigned the ticket';
+                          }
+                          break;
+                        case 'attachment':
+                          $label = $cmt;
+                          if ($label === '') {
+                            $label = 'a file';
+                          }
+                          echo 'Attached <a href="' . esc(site_url('tickets/download/' . $alarmId . '/' . (int) $a['id'])) . '">' . esc($label) . '</a>';
+                          break;
+                        case 'resolved':
+                          echo 'Resolved the ticket';
+                          break;
+                        case 'closed':
+                          echo 'Closed the ticket';
+                          break;
+                        case 'reopened':
+                          echo 'Reopened the ticket';
+                          break;
+                        case 'api_update':
+                          echo 'API update from <code>' . esc(or_default($performedBySystem, '?')) . '</code>';
+                          if ($cmt !== '') {
+                            echo ' - ' . esc($cmt);
+                          }
+                          break;
+                        case 'title_changed':
+                        case 'description_changed':
+                        case 'priority_changed':
+                          echo esc($cmt);
+                          break;
+                        default:
+                          echo esc($cmt);
+                          break;
+                      }
+                      ?>
+                      </div>
+                    </div>
+                  </li>
+            <?php } ?>
+            <?php if (empty($timeline)) { ?>
+                  <li class="text-muted small">No activity yet.</li>
+            <?php } ?>
+              </ul>
+            </div>
+          </div>
+        </div>
+
+        <div class="col-lg-4">
+          <div class="card mb-3" id="ticketDetailsCard">
+            <div class="card-header">
+              <strong><i class="bi bi-info-circle text-primary"></i> Details</strong>
+            </div>
+            <div class="card-body p-0">
+              <table class="meta-table">
+                <tr>
+                  <td>Project</td>
+                  <td><?= esc(or_default($projectName, '-')); ?></td>
+                </tr>
+                <tr>
+                  <td>Flow</td>
+                  <td><?= esc(or_default($flowName, '-')); ?></td>
+                </tr>
+                <tr>
+                  <td>State</td>
+                  <td><?= esc(or_default(view_value($ticket, 'state_name', null), '-')); ?></td>
+                </tr>
+                <tr>
+                  <td>Status</td>
+                  <td><?= status_badge($ticketStatus); ?></td>
+                </tr>
+                <tr>
+                  <td>Severity</td>
+                  <td><?= alert_badge($ticketType); ?></td>
+                </tr>
+                <tr>
+                  <td>Priority</td>
+                  <td>
+                    <select id="priorityInline" class="form-select form-select-sm"
+                      data-url="<?= site_url('tickets/action/' . $alarmId); ?>" <?php if ($isTerminal) {
+                            echo 'disabled';
+                          } ?>>
+                  <?php foreach ($priorityOptions as $priority) { ?>
+                        <option value="<?= $priority; ?>" <?php if ($ticketPrio === $priority) {
+                            echo 'selected';
+                          } ?>>
+                      <?= ucfirst($priority); ?>
+                        </option>
+                  <?php } ?>
+                    </select>
+                  </td>
+                </tr>
+                <tr>
+                  <td>Assignee</td>
+                  <td id="assigneeValue"><?= esc(or_default(view_value($ticket, 'assignee_name', null), '-')); ?></td>
+                </tr>
+                <tr>
+                  <td>Source</td>
+                  <td><?= esc(strtoupper(or_default(view_value($ticket, 'source', null), 'UI'))); ?></td>
+                </tr>
+                <tr>
+                  <td>Raised By</td>
+                  <td><?= esc(or_default(view_value($ticket, 'raised_by_name', null), '-')); ?></td>
+                </tr>
+                <tr>
+                  <td>Actual Start</td>
+                  <td class="small">
+                  <?php
+                  $asd = view_value($ticket, 'actual_start_date', '');
+                  if ($asd !== '' && $asd !== null) {
+                    echo esc(date('d M Y', strtotime($asd)));
+                  } else {
+                    echo '<span class="text-muted">—</span>';
+                  }
+                  ?>
+                  </td>
+                </tr>
+                <tr>
+                  <td>Actual End</td>
+                  <td class="small">
+                  <?php
+                  $aed = view_value($ticket, 'actual_end_date', '');
+                  if ($aed !== '' && $aed !== null) {
+                    echo esc(date('d M Y', strtotime($aed)));
+                  } else {
+                    echo '<span class="text-muted">—</span>';
+                  }
+                  ?>
+                  </td>
+                </tr>
+                <tr>
+                  <td>Created</td>
+                  <td class="text-muted small"><?= esc($ticket['created_at']); ?></td>
+                </tr>
+                <tr>
+                  <td>Updated</td>
+                  <td class="text-muted small"><?= esc($ticket['updated_at']); ?></td>
+                </tr>
+              </table>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-header">
+              <strong><i class="bi bi-bell text-primary"></i> Recent Notifications</strong>
+            </div>
+            <div class="card-body p-0">
+              <ul class="list-group list-group-flush small">
+            <?php foreach ($notifications as $n) { ?>
+                <?php
+                $cls = 'bg-secondary';
+                if ($n['status'] === 'sent') {
+                  $cls = 'bg-success';
+                } else if ($n['status'] === 'failed') {
+                  $cls = 'bg-danger';
+                }
+
+                $recipient = '';
+                if (!empty($n['recipient_email'])) {
+                  $recipient = $n['recipient_email'];
+                } else if (!empty($n['recipient_phone'])) {
+                  $recipient = $n['recipient_phone'];
+                }
+                ?>
+                  <li class="list-group-item">
+                    <div class="d-flex justify-content-between align-items-center">
+                      <span><i class="bi bi-envelope text-primary"></i> <?= esc($recipient); ?></span>
+                      <span class="badge <?= $cls; ?>"><?= esc(strtoupper($n['status'])); ?></span>
+                    </div>
+                    <div class="text-muted small mt-1"><?= esc($n['created_at']); ?></div>
+                  </li>
+            <?php } ?>
+            <?php if (empty($notifications)) { ?>
+                  <li class="list-group-item text-muted small">No notifications yet.</li>
+            <?php } ?>
+              </ul>
             </div>
           </div>
         </div>
       </div>
-
-      <div class="card">
-        <div class="card-header">
-          <strong><i class="bi bi-clock-history text-primary"></i> Activity Timeline</strong>
-        </div>
-        <div class="card-body">
-          <ul class="activity-feed" id="timelineList">
-            <?php foreach ($timeline as $a) { ?>
-              <?php
-              $performer = 'System';
-              if (!empty($a['performer_name'])) {
-                $performer = $a['performer_name'];
-              } else if (!empty($a['performed_by_system'])) {
-                $performer = $a['performed_by_system'];
-              }
-              $cmt = (string) view_value($a, 'comment', '');
-              $actionType = view_value($a, 'action_type', '');
-              $fromStateName = null;
-              $toStateName = null;
-              $performedBySystem = null;
-              if (isset($a['from_state_name'])) {
-                $fromStateName = $a['from_state_name'];
-              }
-              if (isset($a['to_state_name'])) {
-                $toStateName = $a['to_state_name'];
-              }
-              if (isset($a['performed_by_system'])) {
-                $performedBySystem = $a['performed_by_system'];
-              }
-              ?>
-              <li class="activity-item">
-                <div class="activity-icon"><?= ticket_activity_icon($actionType); ?></div>
-                <div class="activity-body">
-                  <div class="activity-meta">
-                    <strong><?= esc($performer); ?></strong>
-                    <span class="text-muted"><?= esc($a['created_at']); ?></span>
-                  </div>
-                  <div class="activity-text">
-                    <?php
-                    switch ($actionType) {
-                      case 'created':
-                        echo 'Created the ticket';
-                        if ($cmt !== '') {
-                          echo '. <em>' . esc($cmt) . '</em>';
-                        }
-                        break;
-                      case 'commented':
-                        // highlight_mentions() escapes the body first, then
-                        // wraps any @user_id tokens in .mention-chip so
-                        // mentions stand out from regular comment text.
-                        echo highlight_mentions($cmt);
-                        break;
-                      case 'state_changed':
-                        $transDir = 'forward';
-                        if (isset($a['transition_type'])) {
-                          if ($a['transition_type'] === 'backward') {
-                            $transDir = 'backward';
-                          }
-                        }
-                        if ($transDir === 'backward') {
-                          echo '<span class="badge text-bg-danger me-1"><i class="bi bi-arrow-left-circle"></i> Send back</span>';
-                        }
-                        echo 'Moved state from <strong>' . esc(or_default($fromStateName, '?')) . '</strong>';
-                        echo ' to <strong>' . esc(or_default($toStateName, '?')) . '</strong>';
-                        // Show user-supplied reason (stored after ": " in the comment).
-                        $aCommentStr = '';
-                        if (isset($a['comment'])) {
-                          $aCommentStr = $a['comment'];
-                        }
-                        $stCommentStr = trim((string) $aCommentStr);
-                        $stReasonPos  = strpos($stCommentStr, ': ');
-                        $stReason     = '';
-                        if ($stReasonPos !== false) {
-                          $stReason = trim(substr($stCommentStr, $stReasonPos + 2));
-                        }
-                        if ($stReason !== '') {
-                          echo '<div class="small text-muted mt-1"><i class="bi bi-chat-quote me-1"></i>' . esc($stReason) . '</div>';
-                        }
-                        break;
-                      case 'level_escalated':
-                        echo 'Escalated to <strong>L' . (int) $a['to_level'] . '</strong>';
-                        if ($cmt !== '') {
-                          echo '. <em>' . esc($cmt) . '</em>';
-                        }
-                        break;
-                      case 'assigned':
-                        if ($cmt !== '') {
-                          echo esc($cmt);
-                        } else {
-                          echo 'Assigned the ticket';
-                        }
-                        break;
-                      case 'attachment':
-                        $label = $cmt;
-                        if ($label === '') {
-                          $label = 'a file';
-                        }
-                        echo 'Attached <a href="' . esc(site_url('tickets/download/' . $alarmId . '/' . (int) $a['id'])) . '">' . esc($label) . '</a>';
-                        break;
-                      case 'resolved':
-                        echo 'Resolved the ticket';
-                        break;
-                      case 'closed':
-                        echo 'Closed the ticket';
-                        break;
-                      case 'reopened':
-                        echo 'Reopened the ticket';
-                        break;
-                      case 'api_update':
-                        echo 'API update from <code>' . esc(or_default($performedBySystem, '?')) . '</code>';
-                        if ($cmt !== '') {
-                          echo ' - ' . esc($cmt);
-                        }
-                        break;
-                      case 'title_changed':
-                      case 'description_changed':
-                      case 'priority_changed':
-                        echo esc($cmt);
-                        break;
-                      default:
-                        echo esc($cmt);
-                        break;
-                    }
-                    ?>
-                  </div>
-                </div>
-              </li>
-            <?php } ?>
-            <?php if (empty($timeline)) { ?>
-              <li class="text-muted small">No activity yet.</li>
-            <?php } ?>
-          </ul>
-        </div>
-      </div>
-    </div>
-
-    <div class="col-lg-4">
-      <div class="card mb-3" id="ticketDetailsCard">
-        <div class="card-header">
-          <strong><i class="bi bi-info-circle text-primary"></i> Details</strong>
-        </div>
-        <div class="card-body p-0">
-          <table class="meta-table">
-            <tr>
-              <td>Project</td>
-              <td><?= esc(or_default($projectName, '-')); ?></td>
-            </tr>
-            <tr>
-              <td>Flow</td>
-              <td><?= esc(or_default($flowName, '-')); ?></td>
-            </tr>
-            <tr>
-              <td>State</td>
-              <td><?= esc(or_default(view_value($ticket, 'state_name', null), '-')); ?></td>
-            </tr>
-            <tr>
-              <td>Status</td>
-              <td><?= status_badge($ticketStatus); ?></td>
-            </tr>
-            <tr>
-              <td>Severity</td>
-              <td><?= alert_badge($ticketType); ?></td>
-            </tr>
-            <tr>
-              <td>Priority</td>
-              <td>
-                <select id="priorityInline" class="form-select form-select-sm"
-                  data-url="<?= site_url('tickets/action/' . $alarmId); ?>"
-                  <?php if ($isTerminal) {
-                    echo 'disabled';
-                  } ?>>
-                  <?php foreach ($priorityOptions as $priority) { ?>
-                    <option value="<?= $priority; ?>" <?php if ($ticketPrio === $priority) {
-                                                        echo 'selected';
-                                                      } ?>>
-                      <?= ucfirst($priority); ?>
-                    </option>
-                  <?php } ?>
-                </select>
-              </td>
-            </tr>
-            <tr>
-              <td>Assignee</td>
-              <td id="assigneeValue"><?= esc(or_default(view_value($ticket, 'assignee_name', null), '-')); ?></td>
-            </tr>
-            <tr>
-              <td>Source</td>
-              <td><?= esc(strtoupper(or_default(view_value($ticket, 'source', null), 'UI'))); ?></td>
-            </tr>
-            <tr>
-              <td>Raised By</td>
-              <td><?= esc(or_default(view_value($ticket, 'raised_by_name', null), '-')); ?></td>
-            </tr>
-            <tr>
-              <td>Actual Start</td>
-              <td class="small">
-                <?php
-                $asd = view_value($ticket, 'actual_start_date', '');
-                if ($asd !== '' && $asd !== null) {
-                  echo esc(date('d M Y', strtotime($asd)));
-                } else {
-                  echo '<span class="text-muted">—</span>';
-                }
-                ?>
-              </td>
-            </tr>
-            <tr>
-              <td>Actual End</td>
-              <td class="small">
-                <?php
-                $aed = view_value($ticket, 'actual_end_date', '');
-                if ($aed !== '' && $aed !== null) {
-                  echo esc(date('d M Y', strtotime($aed)));
-                } else {
-                  echo '<span class="text-muted">—</span>';
-                }
-                ?>
-              </td>
-            </tr>
-            <tr>
-              <td>Created</td>
-              <td class="text-muted small"><?= esc($ticket['created_at']); ?></td>
-            </tr>
-            <tr>
-              <td>Updated</td>
-              <td class="text-muted small"><?= esc($ticket['updated_at']); ?></td>
-            </tr>
-          </table>
-        </div>
-      </div>
-
-      <div class="card">
-        <div class="card-header">
-          <strong><i class="bi bi-bell text-primary"></i> Recent Notifications</strong>
-        </div>
-        <div class="card-body p-0">
-          <ul class="list-group list-group-flush small">
-            <?php foreach ($notifications as $n) { ?>
-              <?php
-              $cls = 'bg-secondary';
-              if ($n['status'] === 'sent') {
-                $cls = 'bg-success';
-              } else if ($n['status'] === 'failed') {
-                $cls = 'bg-danger';
-              }
-
-              $recipient = '';
-              if (!empty($n['recipient_email'])) {
-                $recipient = $n['recipient_email'];
-              } else if (!empty($n['recipient_phone'])) {
-                $recipient = $n['recipient_phone'];
-              }
-              ?>
-              <li class="list-group-item">
-                <div class="d-flex justify-content-between align-items-center">
-                  <span><i class="bi bi-envelope text-primary"></i> <?= esc($recipient); ?></span>
-                  <span class="badge <?= $cls; ?>"><?= esc(strtoupper($n['status'])); ?></span>
-                </div>
-                <div class="text-muted small mt-1"><?= esc($n['created_at']); ?></div>
-              </li>
-            <?php } ?>
-            <?php if (empty($notifications)) { ?>
-              <li class="list-group-item text-muted small">No notifications yet.</li>
-            <?php } ?>
-          </ul>
-        </div>
-      </div>
-    </div>
-  </div>
 <?php } ?>

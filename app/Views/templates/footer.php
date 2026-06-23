@@ -1,7 +1,7 @@
-  </main>
-  </div>
-  </div><!-- /.layout -->
+</main>
+</div>
+</div><!-- /.layout -->
 
-  </body>
+</body>
 
-  </html>
+</html>

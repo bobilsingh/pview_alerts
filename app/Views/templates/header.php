@@ -51,8 +51,10 @@ $secondaryColor = app_setting('secondary_color', '');
     <meta name="app-setting-live_audio_enabled" content="<?= $liveAudioEnabledVal; ?>">
     <meta name="app-setting-live_browser_notify" content="<?= $liveBrowserNotifyVal; ?>">
     <!-- Session idle timeout and analytics refresh — read by initAutoLogout() / initAnalyticsTab() -->
-    <meta name="app-setting-session_idle_timeout_minutes" content="<?= app_setting_int('session_idle_timeout_minutes', 30); ?>">
-    <meta name="app-setting-analytics_refresh_seconds" content="<?= app_setting_int('analytics_refresh_seconds', 30); ?>">
+    <meta name="app-setting-session_idle_timeout_minutes"
+        content="<?= app_setting_int('session_idle_timeout_minutes', 30); ?>">
+    <meta name="app-setting-analytics_refresh_seconds"
+        content="<?= app_setting_int('analytics_refresh_seconds', 30); ?>">
 
     <!-- ===== Stylesheets ===== -->
     <link rel="stylesheet" href="<?= base_url('assets/vendor/bootstrap/css/bootstrap.min.css'); ?>">
@@ -75,21 +77,30 @@ $secondaryColor = app_setting('secondary_color', '');
     <?php if ($primaryColor !== '' || $secondaryColor !== '') { ?>
         <style>
             :root {
-                <?php if ($primaryColor !== '') { ?>--primary: <?= esc($primaryColor); ?>;
-                --primary-300: <?= esc($primaryColor); ?>;
-                <?php } ?><?php if ($secondaryColor !== '') { ?>--primary-700: <?= esc($secondaryColor); ?>;
-                <?php } ?><?php
-                            $gradStart = '#0792cd';
-                            if ($primaryColor !== '') {
-                                $gradStart = $primaryColor;
-                            }
-                            $gradEnd = '#0476a7';
-                            if ($secondaryColor !== '') {
-                                $gradEnd = $secondaryColor;
-                            }
-                            ?>--grad-primary: linear-gradient(135deg, <?= esc($gradStart); ?> 0%, <?= esc($gradEnd); ?> 100%);
-            }
-        </style>
+                <?php if ($primaryColor !== '') { ?>
+                    --primary:
+                        <?= esc($primaryColor); ?>
+                    ;
+                    --primary-300:
+                        <?= esc($primaryColor); ?>
+                    ;
+                <?php } ?>
+                <?php if ($secondaryColor !== '') { ?>--primary-700:
+                                <?= esc($secondaryColor); ?>
+                            ;
+                    <?php } ?>
+                    <?php
+                    $gradStart = '#0792cd';
+                    if ($primaryColor !== '') {
+                        $gradStart = $primaryColor;
+                    }
+                    $gradEnd = '#0476a7';
+                    if ($secondaryColor !== '') {
+                        $gradEnd = $secondaryColor;
+                    }
+                    ?>--grad-primary: linear-gradient(135deg, <?= esc($gradStart); ?> 0%, <?= esc($gradEnd); ?> 100%);
+                    }
+                </style>
     <?php } ?>
     <script>
         (function() {

@@ -17,7 +17,8 @@
   --content-bg: #090d14;
   --surface: #121720;
   --surface-2: #1a2030;
-  --deep-surface: #111722; /* topbar-user, activity icon, level indicator */
+  --deep-surface: #111722;
+  /* topbar-user, activity icon, level indicator */
 
   /* --- Sidebar --- */
   --sidebar: #0a0e17;
@@ -38,15 +39,18 @@
   /* --- Borders --- */
   --border: #252b3a;
   --border-2: #384055;
-  --border-3: #272e3d; /* meta-table, level-indicator, list-item */
-  --border-accent: #263044; /* topbar-user, activity-feed timeline line */
+  --border-3: #272e3d;
+  /* meta-table, level-indicator, list-item */
+  --border-accent: #263044;
+  /* topbar-user, activity-feed timeline line */
 
   /* --- Text --- */
   --text: #f4f7fb;
   --text-2: #d0d6e3;
   --text-3: #9ba7bc;
   --text-muted: #718098;
-  --secondary-label: #98a4b8; /* kpi labels, meta-table keys, tat block labels */
+  --secondary-label: #98a4b8;
+  /* kpi labels, meta-table keys, tat block labels */
 
   /* --- Status colours --- */
   --critical: #ff6b83;
@@ -97,7 +101,8 @@
   --kpi-red-text: #ff7b93;
   --kpi-amber-bg: #3d2b12;
   --kpi-amber-text: #ffc83d;
-  --kpi-green-bg: #0d3d37; /* reused as TAT healthy background */
+  --kpi-green-bg: #0d3d37;
+  /* reused as TAT healthy background */
 
   /* --- Charts --- */
   --chart-title: #f5f7fb;
@@ -165,6 +170,7 @@
   height: 6px;
   background: transparent;
 }
+
 [data-theme="dark"] *::-webkit-scrollbar-thumb {
   background: rgba(148, 163, 184, 0.5) transparent;
   background-clip: padding-box;
@@ -193,7 +199,7 @@
   color: var(--text-2);
 }
 
-[data-theme="dark"] .breadcrumb-item + .breadcrumb-item::before {
+[data-theme="dark"] .breadcrumb-item+.breadcrumb-item::before {
   content: "/";
   color: var(--text-3);
 }
@@ -227,7 +233,7 @@
   box-shadow: none;
 }
 
-[data-theme="dark"] .topbar .breadcrumb-item + .breadcrumb-item::before {
+[data-theme="dark"] .topbar .breadcrumb-item+.breadcrumb-item::before {
   content: "/";
   color: var(--text-3);
 }
@@ -712,7 +718,7 @@
   --bs-table-bg: transparent;
 }
 
-[data-theme="dark"] .table > :not(caption) > * > * {
+[data-theme="dark"] .table> :not(caption)>*>* {
   background: transparent;
   color: inherit;
   border-color: var(--border);

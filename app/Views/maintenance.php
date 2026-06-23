@@ -1,9 +1,9 @@
 <?php
-$appName      = app_setting('app_name', 'pView Alert System');
+$appName = app_setting('app_name', 'pView Alert System');
 if (isset($isSuperAdmin)) {
-    $isSuperAdmin = (bool) $isSuperAdmin;
+  $isSuperAdmin = (bool) $isSuperAdmin;
 } else {
-    $isSuperAdmin = false;
+  $isSuperAdmin = false;
 }
 ?>
 <div class="text-center py-4">
@@ -22,7 +22,6 @@ if (isset($isSuperAdmin)) {
       You are signed in as <strong>super_admin</strong>.
     </p>
     <form method="post" action="<?= site_url('maintenance/disable'); ?>">
-      <?= csrf_field(); ?>
       <button type="submit" class="btn btn-primary">
         <i class="bi bi-toggle-off"></i> Disable Maintenance Mode
       </button>
