@@ -118,7 +118,7 @@ The order in which an administrator configures a new project from scratch:
 
 ```
 ── ONE-TIME SYSTEM SETUP ────────────────────────────────────────────────
-  ①  Import scripts/schema.sql          creates 21 database tables
+  ①  Import scripts/schema.sql          creates 22 database tables
   ②  php scripts/setup_defaults.php     seeds roles, modules, settings
   ③  Configure SMTP in Settings page
   ④  Schedule tat_monitor.php every minute  (cron / Task Scheduler)
@@ -274,7 +274,7 @@ Then configure it as a cron job for continuous operation — see [Cron Job Setup
 | Database | MySQL 8.0+ / MariaDB 10.4+ |
 | Email | PHPMailer 6.9+ |
 | Authentication | Session-based with bcrypt passwords |
-| Session storage | File-based (configurable) |
+| Session storage | Database-driven (ci_sessions table) |
 
 ### Frontend
 
@@ -340,10 +340,9 @@ pview_alerts/
 │   │   ├── user.php          # Auth, user management, roles (27 methods)
 │   │   └── BaseController.php
 │   ├── Database/
-│   │   └── Migrations/       # CI4 migrations (indexes, lifecycle columns, cron_runs)
+│   │   └── Migrations/       # CI4 migrations (indexes, lifecycle columns, cron_runs, database sessions)
 │   ├── Helpers/
-│   │   ├── alert_helper.php  # App settings, email templates, auth guards, AJAX helpers
-│   │   ├── flow_helper.php   # vis-network node/edge data builders
+│   │   ├── app_helper.php    # Consolidated helper: settings, auth, email templates, vis-network flow builders, CSV export
 │   │   └── security_helper.php  # Login rate-limiting, upload validation
 │   ├── Models/
 │   │   ├── app_model.php     # Projects, flows, states, tickets, alerts, escalation, API keys
@@ -360,6 +359,7 @@ pview_alerts/
 │       ├── css/app.css       # Custom stylesheet (dark/light theme, all components)
 │       ├── js/app.js         # Core frontend logic
 │       ├── js/datatable.js   # DataTable initialization, filters, analytics
+│       ├── js/calendar.js    # Premium global date range picker
 │       └── vendor/           # Bundled third-party libraries
 ├── scripts/
 │   ├── schema.sql            # Full database schema for fresh installation
@@ -369,7 +369,6 @@ pview_alerts/
 ├── writable/
 │   ├── cache/                # Settings file cache (app_settings.cache, 5-min TTL)
 │   ├── logs/                 # Application error logs
-│   ├── session/              # User session files
 │   └── uploads/              # Ticket file attachments (organised by alarm_id)
 ├── .env                      # Local environment configuration (not committed to git)
 ├── .env.example              # Environment variable template
@@ -478,7 +477,7 @@ FLUSH PRIVILEGES;
 mysql -u pview -p pview_alerts < scripts/schema.sql
 ```
 
-This creates all 21 tables with their indexes and constraints.
+This creates all 22 tables with their indexes and constraints.
 
 ### Step 3: Seed baseline configuration
 
@@ -975,7 +974,8 @@ All settings are managed through `/settings` and stored in the `app_settings` ta
 | `password_rotate_days` | 90 | Forced rotation after N days (0 = disabled) |
 | `login_max_attempts` | 3 | Failed attempts before lockout |
 | `login_lockout_minutes` | 10 | Lockout duration in minutes |
-| `session_timeout_minutes` | 30 | Idle timeout in minutes (0 = disabled) |
+| `session_idle_timeout_minutes` | 30 | Client-side idle warning timeout in minutes (0 = disabled) |
+| `session_timeout_minutes` | 30 | Server-side database session timeout in minutes (0 = disabled) |
 
 ### Email / SMTP
 
