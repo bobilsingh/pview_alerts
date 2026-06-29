@@ -403,6 +403,7 @@ $settings = [
     ['login_max_attempts',              '3',              'Failed login attempts allowed per window before lockout'],
     ['login_lockout_minutes',           '10',             'Lockout window length in minutes'],
     ['session_idle_timeout_minutes',    '30',             'Minutes of inactivity before auto-logout (0 = disabled)'],
+    ['session_timeout_minutes',         '30',             'Server-side session timeout in minutes (0 = disabled)'],
 
     // Rate limiting
     ['api_rate_per_minute',             '60',             'Max API requests per API key per minute (0 = disabled)'],

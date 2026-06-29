@@ -124,6 +124,7 @@ Click the toggle button in the top-left corner of the screen. On a desktop, the 
 The bar at the top of the screen contains:
 
 - **Breadcrumb** — shows your current location, for example `Home > Tickets`
+- **Global Date Range Picker** — a premium calendar dropdown in the topbar/sidebar that lets you select a date range. Once selected, it filters all data on the Dashboard, Tickets list, Activity Logs, and Cron Panel.
 - **Theme toggle** — click the sun/moon icon to switch between dark and light mode. Your preference is saved automatically
 - **Bell icon** — shows a red badge with the number of actionable tickets (critical or escalated). Click it to see a dropdown list of the most urgent tickets
 - **Your name and avatar** — your initials appear as an avatar. Click to see your name and role
@@ -536,7 +537,9 @@ The filter panel appears above the ticket table. Click the **Filters** header to
 | Priority | All, Low, Medium, High, Urgent |
 | Project (All Tickets only) | Filter to one project |
 | Flow (All Tickets only) | Filter to one flow |
-| Date range | From and To dates for when the ticket was created |
+
+> [!NOTE]
+> **Global Date Range Picker:** All date-based filtering is now controlled globally via the premium calendar picker located in the topbar/sidebar. You can choose from presets (Today, Yesterday, Last 7 Days, Last 30 Days, Last 90 Days, This Month, Last Month, Custom Range) to filter tickets, dashboard analytics, and activity logs instantly. The old column-header date filters have been removed to keep the interface clean and unified.
 
 **Status filter pills** appear as clickable buttons above the table:
 
@@ -672,11 +675,13 @@ On the right side of the detail card, you see:
 
 ### The Take Action panel
 
+All actions inside the ticket detail page are performed **inline via AJAX**, meaning the page does not need to reload when you add a comment, assign an operator, move the state, or change the status.
+
 This panel has four tabs:
 
 #### Comment tab
 
-Write a note about this ticket. Any team member with access to the ticket can add comments. Comments are permanent — they cannot be edited or deleted.
+Write a note about this ticket. Any team member with access to the ticket can add comments. Comments are permanent — they cannot be edited or deleted. The comment is saved instantly via AJAX and appended to the timeline.
 
 **Using @mentions:** If you want to notify a specific person by email about your comment, type `@` followed by their User ID. For example, `@alice`. A dropdown list appears showing matching users. Click a name to select it, or keep typing to narrow the list. Press Tab or Enter to insert the mention.
 
@@ -696,7 +701,7 @@ Assign the ticket to an operator. The dropdown shows operators who are in any of
 1. Select an operator from the **Assign To** dropdown
 2. Click **Assign**
 
-**What happens:**
+**What happens (processed via AJAX):**
 - The ticket status changes to **In Progress**
 - The selected operator receives an email notification
 - The assignment is recorded in the activity timeline
@@ -705,7 +710,7 @@ Assign the ticket to an operator. The dropdown shows operators who are in any of
 
 #### Move State tab
 
-This tab lets you move the ticket forward through the flow or send it backward for rework.
+This tab lets you move the ticket forward through the flow or send it backward for rework. All state movements are processed via AJAX and update the visual workflow diagram immediately.
 
 **Moving forward:**
 
@@ -725,15 +730,15 @@ If you try to move a ticket you are not assigned to and do not have admin scope,
 
 **Resolving a ticket:**
 
-Click **Resolve**. A confirmation dialog appears. This marks the ticket as **Resolved** and records the resolved timestamp. The ticket can still be reopened if needed.
+Click **Resolve**. A confirmation dialog appears. This marks the ticket as **Resolved** via AJAX and records the resolved timestamp. The ticket can still be reopened if needed.
 
 **Closing a ticket:**
 
-Click **Close**. This marks the ticket as **Closed**. A closed ticket is final — no further actions (comments, moves, attachments, or reassignments) are possible.
+Click **Close**. This marks the ticket as **Closed** via AJAX. A closed ticket is final — no further actions (comments, moves, attachments, or reassignments) are possible.
 
 **Reopening a ticket:**
 
-If a ticket is **Resolved** (not Closed), you will see a **Reopen** button. Click it to revert the ticket to Open or In Progress (depending on whether it still has an assignee). A Resolved ticket cannot be reopened by default — only the assigned operator or admin-scope users can reopen.
+If a ticket is **Resolved** (not Closed), you will see a **Reopen** button. Click it to revert the ticket to Open or In Progress (depending on whether it still has an assignee) via AJAX. Reopening is restricted to the **assigned operator** or **admin-scope users** to prevent unauthorized ticket reopening.
 
 #### Attach tab
 
@@ -1000,12 +1005,12 @@ Each API key is linked to exactly one project. A key can only create tickets wit
 
 ### Generating a new API key
 
-1. Click **Generate Key** (or fill in the form on the right side of the page)
-2. Enter a **Name** — something that describes what system will use this key, for example "Zabbix-Production" or "Grafana-Alerts"
-3. Select the **Project** this key should be linked to
-4. Click **Generate Key**
+1. Click the **Generate Key** button. A Bootstrap modal window will open.
+2. In the modal, enter a **Name** — something that describes what system will use this key, for example "Zabbix-Production" or "Grafana-Alerts".
+3. Select the **Project** this key should be linked to.
+4. Click **Generate**.
 
-**Important:** After generation, the full API key is shown once in a highlighted box at the top of the page. Copy it immediately — once you leave this page or refresh, the full key is no longer visible. Only the masked version is shown from then on.
+**Important:** The newly generated API key will be displayed inside the modal in a highlighted, copyable box. Copy it immediately — once you close the modal or refresh the page, the full key is no longer visible. Only the masked version is shown in the table from then on.
 
 ### Using the API key
 
@@ -1062,7 +1067,8 @@ Go to **Settings** in the sidebar (visible only to super_admin).
 | **password_rotate_days** | Operators must change their password after this many days. Set to 0 to disable forced rotation |
 | **login_max_attempts** | How many wrong password attempts before lockout. Set to 0 to disable lockout |
 | **login_lockout_minutes** | How long the lockout lasts |
-| **session_idle_timeout_minutes** | Operators are automatically logged out after this many minutes of inactivity. Set to 0 to disable |
+| **session_idle_timeout_minutes** | Client-side idle timeout: Operators receive an idle warning modal and are automatically logged out after this many minutes of inactivity (0 = disabled) |
+| **session_timeout_minutes** | Server-side database session timeout: Absolute session expiry in minutes (default: 30). This setting is hidden in the UI by default to prevent accidental lockout, but is fully active in the backend |
 
 ### Rate limiting (API)
 

@@ -80,8 +80,8 @@ pView Alert System is a self-hosted, real-time alert management platform built f
 │          CodeIgniter 4 Application (PHP 8.1+)             │
 │  ┌──────────┐  ┌────────────┐  ┌────────────────────────┐ │
 │  │ user.php │  │  app.php   │  │   Helpers              │ │
-│  │ Controller│  │ Controller │  │ alert_helper.php       │ │
-│  │ (auth,   │  │ (all other │  │ flow_helper.php        │ │
+│  │ Controller│  │ Controller │  │ app_helper.php         │ │
+│  │ (auth,   │  │ (all other │  │ (centralized)          │ │
 │  │  users,  │  │  modules)  │  │ security_helper.php    │ │
 │  │  roles)  │  │            │  └────────────────────────┘ │
 │  └────┬─────┘  └─────┬──────┘                            │
@@ -94,7 +94,7 @@ pView Alert System is a self-hosted, real-time alert management platform built f
 └───────────────────────────┼───────────────────────────────┘
                             │
 ┌───────────────────────────▼───────────────────────────────┐
-│              MySQL / MariaDB (21 tables)                  │
+│              MySQL / MariaDB (22 tables)                  │
 └───────────────────────────────────────────────────────────┘
 
 Background:
@@ -136,7 +136,7 @@ pview_alerts/
 │   │   ├── Routes.php          ← All URL-to-controller mappings (157 lines, 57+ routes)
 │   │   ├── App.php             ← Base URL, CI4 framework config
 │   │   ├── Email.php           ← SMTP defaults (overridden by app_settings table)
-│   │   ├── Session.php         ← Session driver (file), cookie name, expiry (28800s)
+│   │   ├── Session.php         ← Session driver (database), cookie name, expiry (28800s)
 │   │   ├── Database.php        ← DB connection config (reads from .env)
 │   │   ├── Security.php        ← CSRF config
 │   │   ├── Filters.php         ← Global filter registration
@@ -149,10 +149,10 @@ pview_alerts/
 │   │   └── Migrations/
 │   │       ├── 2026-06-03-000001_AddPerformanceIndexes.php
 │   │       ├── 2026-06-04-000001_TicketLifecycleFeatures.php
-│   │       └── 2026-06-04-000002_AddCronRuns.php
+│   │       ├── 2026-06-04-000002_AddCronRuns.php
+│   │       └── 2026-06-26-000001_FixCiSessionsTimestamp.php ← Configures database-driven sessions
 │   ├── Helpers/
-│   │   ├── alert_helper.php    ← Global helper: settings, auth, email, activity log, badges
-│   │   ├── flow_helper.php     ← vis-network data builders for workflow diagrams
+│   │   ├── app_helper.php      ← Consolidated global helper: settings, auth, email, activity log, badges, and flow builders
 │   │   └── security_helper.php ← Login rate-limiting, file upload security
 │   ├── Models/
 │   │   ├── app_model.php       ← All data operations except users/roles
@@ -179,19 +179,20 @@ pview_alerts/
 │   ├── index.php               ← CI4 front controller
 │   ├── .htaccess               ← URL rewriting
 │   └── assets/
-│       ├── css/app.css         ← Custom styles (~4600 lines)
-│       ├── js/app.js           ← Core JS (~3946 lines after split)
-│       ├── js/datatable.js     ← DataTable logic (~1496 lines)
-│       └── vendor/             ← Bundled libraries (no CDN dependency)
+│   │       ├── css/app.css         ← Custom styles (~4600 lines)
+│   │       ├── js/app.js           ← Core JS (~3946 lines after split)
+│   │       ├── js/datatable.js     ← DataTable logic (~1496 lines)
+│   │       ├── js/calendar.js      ← Premium global date range picker logic
+│   │       └── vendor/             ← Bundled libraries (no CDN dependency)
+│   └── ...
 ├── scripts/
-│   ├── schema.sql              ← Full DB schema (21 tables)
+│   ├── schema.sql              ← Full DB schema (22 tables)
 │   ├── setup_defaults.php      ← Seeds roles, modules, permissions, 40+ settings
 │   ├── seed_demo_data.php      ← Demo data for evaluation
 │   └── backup.sh               ← Daily backup utility
 ├── writable/
 │   ├── cache/                  ← app_settings.cache (5-min TTL)
 │   ├── logs/                   ← CI4 application logs
-│   ├── session/                ← File-based session storage
 │   └── uploads/tickets/        ← Ticket attachments organised by alarm_id
 ├── .env                        ← Environment variables (not committed)
 ├── .env.example                ← Template
@@ -351,9 +352,9 @@ Handles users, roles, and authentication.
 
 ### 2.5 Helpers
 
-Helpers are loaded globally via CI4's autoloader config. They are available in every controller, model, and view without explicit loading.
+Helpers are loaded globally via CI4's autoloader config. They are available in every controller, model, and view without explicit loading. To improve maintainability and performance, the previously separate helpers (`alert_helper.php`, `flow_helper.php`, and `csv_helper.php`) have been consolidated into a single centralized [app_helper.php](file:///c:/xampp8/htdocs/pview_alerts/app/Helpers/app_helper.php).
 
-#### `alert_helper.php` (primary utility file)
+#### `app_helper.php` (consolidated utility file)
 
 **Settings functions:**
 - `app_settings_all()` — loads all settings from DB, caches in file (`writable/cache/app_settings.cache`, 5-min TTL) and static variable
@@ -363,7 +364,7 @@ Helpers are loaded globally via CI4's autoloader config. They are available in e
 - `app_setting_bool($key, $default)` — '1' → true, else false
 - `app_setting_csv($key, $default)` — splits comma-separated string into lowercase array
 
-**Auth helpers:**
+**Auth & Access helpers:**
 - `check_isvalidated()` — verifies session has user_id; handles maintenance mode bounce and idle session timeout; enforces password rotation redirect
 - `check_issuperadmin()` — redirects non-super_admin to dashboard
 - `has_module_access($module_key, $action)` — reads `module_permissions` table; super_admin always true; settings always requires super_admin; caches all permissions in static variable for the request lifetime
@@ -373,19 +374,21 @@ Helpers are loaded globally via CI4's autoloader config. They are available in e
 - `verify_ticket_access($ticket)` — admin-scope passes; others checked against raised_by, current_assignee, state level pools (L1–L4 JSON arrays), and ticket_actions history
 - `logged_user_id()`, `logged_user_name()`, `logged_user_role()` — session readers
 - `user_dashboard_pref($key, $default)` — reads from session's `dashboard_layout` JSON (loaded once at login)
-- `_first_accessible_module()` / `first_accessible_module_url()` — walks sidebar order to find first accessible page; used for post-login landing and access-denied fallback
+- `get_first_accessible_module()` / `first_accessible_module_url()` — walks sidebar order to find first accessible page; used for post-login landing and access-denied fallback
+
+**Global Date Filter helpers:**
+- `get_global_date_range()` — parses the global date range from session or request (start and end dates)
+- `get_global_date_range_label()` — returns a human-readable label for the active date range (e.g., "Last 7 Days")
 
 **ID generation:**
 - `generate_alarm_id()` — uses MySQL `LAST_INSERT_ID()` on `alarm_id_sequence` table to generate atomic daily sequences; format: `ALM-YYYYMMDD-NNNNN`
 - `safe_alarm_id($alarm_id)` — regex validates `ALM-\d{8}-\d{5}` format; blocks path traversal
 
-**Email builders:**
+**Email builders & delivery:**
 - `mail_subject($event, $context)` — builds subject line per event type
 - `mail_chip_span($text, $bg, $fg)` — inline-styled badge for email
 - `mail_kv_row($label, $value)` — table row for email body
 - `mail_html_body($event, $context)` — full HTML email template with inline styles; handles 8 event types
-
-**Email delivery:**
 - `send_email($to, $subject, $body)` — PHPMailer wrapper; reads SMTP config from app_settings (DB-first) with fallback to Config\Email; never called directly from controllers — always through notification queue
 - `parse_mentions($text, $excludeUserId)` — extracts `@user_id` tokens, validates against `users` table, deduplicates, excludes author
 - `highlight_mentions($text)` — HTML-escapes text then wraps @mentions in styled span
@@ -410,11 +413,12 @@ Helpers are loaded globally via CI4's autoloader config. They are available in e
 - `validate_user_id($user_id)` — validates 3–64 chars, `[A-Za-z0-9._-]` pattern
 - `password_must_rotate($password_changed_at, $maxDays)` — returns true if age exceeds max days
 
-**AJAX response helpers:**
+**AJAX & CSV response helpers:**
 - `json_ok($data, $message)` — sets `success: true`, `data`, `message` as JSON response
 - `json_fail($message, $code)` — sets `success: false`, `data: []`, `message`, HTTP status code
 - `dt_parse_request($request, $colMap)` — parses DataTables server-side request parameters (draw, start, length, search, order column/dir)
 - `dt_json_response($draw, $total, $filtered, $data)` — builds DataTables-compatible JSON response
+- `export_csv_helper($filename, $headers, $rows)` — memory-efficient, streaming CSV export utility with UTF-8 BOM
 
 **Audit:**
 - `activity_log($module, $action, $entity_type, $entity_id, $summary, $meta, $overrides)` — inserts one row to `activity_logs`; captures user from session or overrides (for pre-auth events); captures IP, UA, URL, method, browser; failures are swallowed (non-fatal)
@@ -423,10 +427,7 @@ Helpers are loaded globally via CI4's autoloader config. They are available in e
 **Module registry:**
 - `module_registry()` — reads all module rows from `modules` table; per-request cached
 
-#### `flow_helper.php`
-
-Builds vis-network JSON structures for the workflow diagram widget.
-
+**Workflow Diagram (vis-network) builders:**
 - `flow_ticket_ancestor_ids($states, $currentStateId, $transitions)` — BFS upstream from current state via reverse-forward edges; fallback to parent_state_id tree for legacy flows
 - `flow_vis_edges($states, $transitions)` — builds edge list; priority: explicit forward transitions → parent tree → sequential sort_order
 - `flow_vis_designer_data($states, $transitions)` — nodes + edges for the flow designer preview
@@ -831,6 +832,17 @@ SELECT LAST_INSERT_ID() AS n;
 
 Two-layer cache: static PHP variable (per-request) and file cache (`writable/cache/app_settings.cache`, 5-minute TTL). `settingSet()` uses INSERT ... ON DUPLICATE KEY UPDATE for upsert behaviour.
 
+#### `ci_sessions`
+
+| Column | Type | Notes |
+|---|---|
+| `id` | VARCHAR(128) PK | Session identifier |
+| `ip_address` | VARCHAR(45) | Client IP address |
+| `timestamp` | TIMESTAMP | Last active timestamp (default: current_timestamp() on update) |
+| `data` | BLOB | Serialized session data |
+
+This table supports database-driven sessions, replacing the previous file-based session handler. It is configured in `app/Config/Session.php` using the `DatabaseHandler`.
+
 #### `cron_runs`
 
 | Column | Type | Notes |
@@ -946,11 +958,13 @@ check_module_access('tickets', 'edit');  // Permission guard
 ```
 
 **`check_isvalidated()` steps:**
-1. Checks `session('user_id')` — redirects to `/login` if empty
-2. Checks `maintenance_mode` setting — redirects non-admin-scope to `/maintenance`
-3. Checks `session_timeout_minutes` against `last_activity` — destroys session if idle
-4. Updates `session['last_activity']` timestamp
-5. Checks `password_must_rotate` flag — redirects to `/password/change` unless exempt
+1. Checks `session('user_id')` — redirects to `/login` if empty.
+2. Checks `maintenance_mode` setting — redirects non-admin-scope to `/maintenance`.
+3. Checks `session_timeout_minutes` setting (server-side session timeout) against `last_activity` timestamp. If the difference exceeds the timeout value:
+   - Destroys the database-driven session in the `ci_sessions` table.
+   - Redirects to `/login` with an "expired" message.
+4. Updates the `session['last_activity']` timestamp. Note: Background AJAX polls (such as the notification bell badge) do not extend this timestamp to prevent keeping idle tabs logged in indefinitely.
+5. Checks `password_must_rotate` flag — redirects to `/password/change` unless exempt.
 
 **`has_module_access($module_key, $action)` logic:**
 1. `super_admin` → always `true`
@@ -1695,9 +1709,10 @@ All error responses:
 <script src="vendor/vis-network/vis-network.min.js">
 <script src="assets/js/app.js?v={asset_version}">         ← Core app
 <script src="assets/js/datatable.js?v={asset_version}">   ← Tables (loaded after app.js)
+<script src="assets/js/calendar.js?v={asset_version}">    ← Global Date Range Picker
 ```
 
-`datatable.js` must load after `app.js` because it depends on globals defined there (`showError`, `escapeHtml`, `APP_COLORS`, etc.). The top-level call `setupDataTablesDefaults()` was moved to the start of `document.ready` to ensure both scripts are fully parsed before it executes.
+`datatable.js` and `calendar.js` must load after `app.js` because they depend on globals defined there (`showError`, `escapeHtml`, `APP_COLORS`, etc.). The top-level call `setupDataTablesDefaults()` was moved to the start of `document.ready` to ensure both scripts are fully parsed before it executes.
 
 ### 14.2 `app.js` Structure
 
@@ -1725,7 +1740,7 @@ All error responses:
 | 22. Bell Dropdown | 3300–3450 | `renderBellList()`, `loadBellList()`, `initBellDropdown()` |
 | 26. Mentions | 3450–3560 | `initMentionAutocomplete()` |
 | 24. Settings | 3560–3660 | `initSendTestEmail()`, `initBumpAssetVersion()` |
-| 27. Date Range Widget | 3660–3800 | `drwDateStr()`, `setDateRangePreset()`, `getDateRange()`, `initDateRangeWidgets()` |
+| 27. Date Range Widget | 3660–3800 | `drwDateStr()`, `setDateRangePreset()`, `getDateRange()`, `initDateRangeWidgets()` (Note: unified with the global calendar picker) |
 | Auto Logout | 3800–3900 | `initAutoLogout()` (idle detection + SweetAlert countdown) |
 | Sidebar Scroll | 3900–3950 | `initSidebarScrollSave()` |
 | 28. Form Validation | 3950–3946 | `markInvalid()`, `validateField()`, `validateForm()`, `initFormValidation()` |
@@ -1791,8 +1806,9 @@ The loop throttles to ~30fps (`ts - flowAnimLast >= 32`). It parks itself when `
 | Brute-force lockout | Per-user sliding window in `login_attempts` table; same error message regardless of whether guess was correct |
 | Session fixation | `session->regenerate(true)` immediately after successful login |
 | Session data isolation | `session_unset()` before writing new user data |
+| Session Storage | Database-driven session storage (`DatabaseHandler` on `ci_sessions` table) to support multi-server setups |
 | CSRF protection | CI4 global CSRF filter (tokens in all forms) |
-| Idle timeout | `check_isvalidated()` enforces `session_timeout_minutes` setting |
+| Idle timeout | `check_isvalidated()` enforces `session_timeout_minutes` and `session_idle_timeout_minutes` settings |
 
 ### 15.2 Authorisation Security
 
@@ -2044,9 +2060,9 @@ email.SMTPCrypto = tls
 | Variable names | `$camelCase` for local vars, `$snake_case` for DB columns |
 | Helper functions | `snake_case`, prefixed by module (`activity_log`, `validate_password`) |
 | Type casting | Explicit: `(int)`, `(string)`, `(array)` on all external inputs |
-| Null safety | `isset() ? ... : ''` pattern; no null coalescing (`??`) for compatibility |
+| Null safety | `isset() ? ... : ''` pattern; no null-coalescing (`??`) for compatibility |
 
-**No ternary operators:** Per team coding standards, ternary expressions are avoided in favour of `if/else` for readability. This applies to all PHP and JS code.
+**No ternary and null-coalescing operators:** Per team coding standards, all ternary expressions (`? :`) and null-coalescing (`??`) operators are strictly avoided in favor of explicit `if/else` and `isset()` statements to ensure maximum PHP compatibility and style uniformity. This applies to all PHP and JS code.
 
 **No arrow functions in JS:** All JS uses `function()` syntax for browser compatibility and consistency with existing code.
 
