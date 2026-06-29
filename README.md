@@ -254,6 +254,7 @@ Then configure it as a cron job for continuous operation — see [Cron Job Setup
 - **Saved ticket filters** — operators save and recall named filter combinations
 - **Bulk ticket actions** — resolve or close multiple tickets in one operation
 - **Inline AJAX Updates** — update comments, assignee, priority, and state transitions directly on the ticket detail page without full page reloads
+- **Global Date Range Picker** — a premium calendar dropdown in the topbar/sidebar that filters all dashboard charts, tickets, and activity logs instantly
 - **Live dashboard** — real-time KPI cards, trend charts, and bell-badge polling
 - **Activity audit log** — every user action is recorded with module, action, entity, IP, and timestamp
 - **Maintenance mode** — take the system offline for all non-admin users with a one-click toggle
