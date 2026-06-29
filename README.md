@@ -1127,7 +1127,7 @@ After running `setup_defaults.php`, the following account is created:
 
 ### Structure Diagram
 
-The diagram below shows the core foreign-key relationships between the 21 tables. Audit and support tables (`activity_logs`, `login_attempts`, `alarm_id_sequence`, `app_settings`, `cron_runs`) reference the entities above them via string keys rather than hard FK constraints and are omitted from the diagram for clarity.
+The diagram below shows the core foreign-key relationships between the 22 tables. Audit and support tables (`activity_logs`, `login_attempts`, `alarm_id_sequence`, `app_settings`, `cron_runs`, `ci_sessions`) reference the entities above them via string keys rather than hard FK constraints and are omitted from the diagram for clarity.
 
 ```mermaid
 erDiagram
@@ -1184,3 +1184,4 @@ erDiagram
 | `alarm_id_sequence` | Atomic daily sequence counter for `ALM-YYYYMMDD-NNNNN` generation |
 | `app_settings` | Key-value store for all application configuration |
 | `cron_runs` | Execution history of `tat_monitor.php` (last 99 runs retained) |
+| `ci_sessions` | Database-driven user session storage |
